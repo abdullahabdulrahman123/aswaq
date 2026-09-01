@@ -4,6 +4,12 @@
 
 هذا المستودع يحتوي حالياً على **الواجهة الأمامية فقط** كنموذج أولي (prototype) الغرض منه عرضه على العميل واستخراج المتطلبات التفصيلية منه. **لا يوجد خادم ولا قاعدة بيانات بعد** — كل البيانات تجريبية في `client/src/data/catalog.ts`.
 
+## 🔗 النسخة المنشورة
+
+**https://abdullahabdulrahman123.github.io/aswaq/**
+
+منشورة على GitHub Pages، وبتتحدّث أوتوماتيك مع كل `push` على `main` عبر [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml).
+
 ## التقنيات المستخدمة
 
 | الطبقة | التقنية |
