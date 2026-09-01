@@ -63,9 +63,13 @@ export async function redirectToWasla(returnTo: string): Promise<void> {
   const challenge = base64UrlEncode(await sha256(verifier));
   const state = base64UrlEncode(crypto.getRandomValues(new Uint8Array(16)));
 
-  sessionStorage.setItem('aswaq_wasla_verifier', verifier);
-  sessionStorage.setItem('aswaq_wasla_state', state);
-  sessionStorage.setItem('aswaq_wasla_return', returnTo);
+  // localStorage مش sessionStorage: التسجيل الجديد بيمرّ على إيميل تفعيل،
+  // والمستخدم غالباً بيفتح اللينك في تاب تاني. sessionStorage محصورة في
+  // التاب الواحد فالـstate بيضيع والتحقق بيفشل عند الرجوع.
+  // القيم دي مؤقتة ومرة واحدة وبتتمسح فور تبادل الكود.
+  localStorage.setItem('aswaq_wasla_verifier', verifier);
+  localStorage.setItem('aswaq_wasla_state', state);
+  localStorage.setItem('aswaq_wasla_return', returnTo);
 
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
@@ -80,18 +84,25 @@ export async function redirectToWasla(returnTo: string): Promise<void> {
   window.location.href = `${ISSUER}/auth?${params.toString()}`;
 }
 
+/** فيه محاولة تسجيل مبدوءة أصلاً؟ لو لأ يبقى المستخدم وصل هنا من غير ما يبدأ */
+export function hasPendingLogin(): boolean {
+  return Boolean(localStorage.getItem('aswaq_wasla_state'));
+}
+
 export function validateState(state: string | null): boolean {
-  const expected = sessionStorage.getItem('aswaq_wasla_state');
+  const expected = localStorage.getItem('aswaq_wasla_state');
   return Boolean(expected) && expected === state;
 }
 
 export function consumeReturnTo(): string {
-  return sessionStorage.getItem('aswaq_wasla_return') || '/';
+  const to = localStorage.getItem('aswaq_wasla_return') || '/';
+  localStorage.removeItem('aswaq_wasla_return');
+  return to;
 }
 
 export async function exchangeCode(code: string): Promise<string> {
   if (!ISSUER) throw new Error('VITE_WASLA_ISSUER غير مضبوط');
-  const verifier = sessionStorage.getItem('aswaq_wasla_verifier') ?? '';
+  const verifier = localStorage.getItem('aswaq_wasla_verifier') ?? '';
 
   const res = await fetch(`${ISSUER}/token`, {
     method: 'POST',
@@ -107,8 +118,8 @@ export async function exchangeCode(code: string): Promise<string> {
 
   if (!res.ok) throw new Error('فشل تبادل رمز التفويض مع وصلة');
 
-  sessionStorage.removeItem('aswaq_wasla_verifier');
-  sessionStorage.removeItem('aswaq_wasla_state');
+  localStorage.removeItem('aswaq_wasla_verifier');
+  localStorage.removeItem('aswaq_wasla_state');
 
   const data = (await res.json()) as { id_token?: string };
   if (!data.id_token) throw new Error('وصلة لم ترجع id_token');
