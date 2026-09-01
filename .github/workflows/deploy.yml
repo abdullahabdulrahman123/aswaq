@@ -30,9 +30,15 @@ jobs:
         run: npm ci
         working-directory: client
 
+      # روابط وصلة بتتحقن وقت البناء. سيبها فاضية → أسواق يشتغل بوضع تجريبي.
+      # اضبطها من: Settings → Secrets and variables → Actions → Variables
       - name: Build
         run: npm run build
         working-directory: client
+        env:
+          VITE_WASLA_ISSUER: ${{ vars.WASLA_ISSUER }}
+          VITE_WASLA_CLIENT_ID: ${{ vars.WASLA_CLIENT_ID }}
+          VITE_WASLA_ACCOUNT_ORIGIN: ${{ vars.WASLA_ACCOUNT_ORIGIN }}
 
       # GitHub Pages بيرجّع 404.html لأي مسار مش موجود كملف —
       # نسخة من index.html بتخلي التوجيه داخل التطبيق يشتغل على الروابط المباشرة

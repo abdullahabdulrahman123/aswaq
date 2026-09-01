@@ -8,8 +8,17 @@
  * قبل إنشاء أي طلب.
  */
 
-const ISSUER = import.meta.env.VITE_WASLA_ISSUER as string | undefined;
-const CLIENT_ID = (import.meta.env.VITE_WASLA_CLIENT_ID as string | undefined) ?? 'aswaq';
+/**
+ * متغيّرات GitHub Actions الغير مضبوطة بتوصل كنص فاضي مش undefined،
+ * فالـ?? مش بيشتغل معاها. بنعامل الفاضي كأنه مش موجود.
+ */
+function envVar(value: unknown): string | undefined {
+  const v = typeof value === 'string' ? value.trim() : '';
+  return v.length > 0 ? v : undefined;
+}
+
+const ISSUER = envVar(import.meta.env.VITE_WASLA_ISSUER);
+const CLIENT_ID = envVar(import.meta.env.VITE_WASLA_CLIENT_ID) ?? 'aswaq';
 
 /** وصلة متوصّلة فعلاً؟ لو لأ، الواجهة بتشتغل بوضع تجريبي واضح */
 export const waslaConfigured = Boolean(ISSUER);
@@ -19,7 +28,7 @@ export const waslaConfigured = Boolean(ISSUER);
  * الـissuer هو الـAPI (منفذ 5000) والصفحات على واجهة وصلة (منفذ 5183).
  */
 export function waslaAccountUrl(): string {
-  const configured = import.meta.env.VITE_WASLA_ACCOUNT_ORIGIN as string | undefined;
+  const configured = envVar(import.meta.env.VITE_WASLA_ACCOUNT_ORIGIN);
   return (configured ?? 'http://localhost:5183').replace(/\/+$/, '');
 }
 
