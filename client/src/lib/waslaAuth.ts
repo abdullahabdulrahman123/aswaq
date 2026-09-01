@@ -14,6 +14,15 @@ const CLIENT_ID = (import.meta.env.VITE_WASLA_CLIENT_ID as string | undefined) ?
 /** وصلة متوصّلة فعلاً؟ لو لأ، الواجهة بتشتغل بوضع تجريبي واضح */
 export const waslaConfigured = Boolean(ISSUER);
 
+/**
+ * واجهة وصلة (صفحات الحساب) على أصل مختلف عن الـissuer:
+ * الـissuer هو الـAPI (منفذ 5000) والصفحات على واجهة وصلة (منفذ 5183).
+ */
+export function waslaAccountUrl(): string {
+  const configured = import.meta.env.VITE_WASLA_ACCOUNT_ORIGIN as string | undefined;
+  return (configured ?? 'http://localhost:5183').replace(/\/+$/, '');
+}
+
 export interface WaslaUser {
   sub: string;
   name?: string;
