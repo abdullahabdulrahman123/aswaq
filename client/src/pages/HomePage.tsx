@@ -1,9 +1,20 @@
 import { Link } from 'react-router-dom';
 import { PastaShape } from '../components/PastaShape';
 import { ProductCard } from '../components/ProductCard';
-import { shapes, products, brands, vendors, rules, egp } from '../data/catalog';
+import { VendorCard } from '../components/VendorCard';
+import {
+  shapes,
+  products,
+  brands,
+  offers,
+  rules,
+  egp,
+  topVendors,
+  variantById,
+  productById,
+} from '../data/catalog';
 
-function SectionHead({ title, note, to }: { title: string; note?: string; to?: string }) {
+function SectionHead({ title, note, to, cta }: { title: string; note?: string; to?: string; cta?: string }) {
   return (
     <div className="mb-5 flex items-end justify-between gap-4">
       <div>
@@ -12,17 +23,34 @@ function SectionHead({ title, note, to }: { title: string; note?: string; to?: s
       </div>
       {to && (
         <Link to={to} className="whitespace-nowrap text-sm font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400">
-          عرض الكل ←
+          {cta ?? 'عرض الكل'} ←
         </Link>
       )}
     </div>
   );
 }
 
+/** الأصناف مرتّبة بإجمالي مبيعات عروض الشركات عليها */
+function bestSellingProducts(limit: number) {
+  const totals = new Map<string, number>();
+  for (const o of offers) {
+    const productId = variantById(o.variantId)?.productId;
+    if (!productId) continue;
+    totals.set(productId, (totals.get(productId) ?? 0) + o.sold);
+  }
+  return [...totals.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([id]) => productById(id))
+    .filter((p): p is NonNullable<typeof p> => Boolean(p));
+}
+
 export function HomePage() {
-  const bestSellers = [...products].sort((a, b) => b.reviews - a.reviews).slice(0, 4);
-  const deals = products.filter((p) => p.oldPrice);
-  const partners = vendors.filter((v) => v.kind === 'partner');
+  const bestSellers = bestSellingProducts(8);
+  const leaders = topVendors().slice(0, 4);
+  const deals = products.filter((p) =>
+    offers.some((o) => o.oldPrice && variantById(o.variantId)?.productId === p.id),
+  );
 
   return (
     <div className="mx-auto max-w-6xl px-4">
@@ -39,8 +67,8 @@ export function HomePage() {
               <span className="text-brand-700 dark:text-brand-400">في مكان واحد.</span>
             </h1>
             <p className="mt-4 max-w-md leading-relaxed text-stone-600 dark:text-stone-300">
-              سباجيتي، بيني، لازانيا، فارفالليه وأكتر — من ماركات موثوقة وبائعين معتمدين.
-              أسعار تجزئة للبيت، وأسعار جملة للمحلات والمطاعم.
+              اشترِ من شركات موثّقة، تجزئة للبيت وجملة للمحلات والمطاعم.
+              كل طلب من شركة واحدة — شحن أوضح وإرجاع أسهل.
             </p>
 
             <div className="mt-6 flex flex-wrap gap-3">
@@ -91,6 +119,35 @@ export function HomePage() {
         </div>
       </section>
 
+      {/* ★ الأكثر مبيعاً من الشركات */}
+      <section className="mt-14">
+        <SectionHead
+          title="الأكثر مبيعاً من الشركات"
+          note="أعلى الأصناف مبيعاً على أسواق. اضغط على أي منتج تشوف الشركة البائعة وتدخل سوقها."
+          to="/products?sort=best"
+        />
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {bestSellers.map((p) => (
+            <ProductCard key={p.id} product={p} />
+          ))}
+        </div>
+      </section>
+
+      {/* ★ الشركات الأكتر مبيعاً */}
+      <section className="mt-14">
+        <SectionHead
+          title="الشركات الأكتر مبيعاً"
+          note="شركات موثّقة راجعنا أوراقها. ادخل سوق أي شركة وتسوق منها لوحدها."
+          to="/vendors"
+          cta="كل الشركات"
+        />
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {leaders.map((v, i) => (
+            <VendorCard key={v.id} vendor={v} rank={i + 1} />
+          ))}
+        </div>
+      </section>
+
       {/* تسوق حسب الشكل */}
       <section className="mt-14">
         <SectionHead
@@ -115,16 +172,6 @@ export function HomePage() {
         </div>
       </section>
 
-      {/* الأكثر مبيعاً */}
-      <section className="mt-14">
-        <SectionHead title="الأكثر مبيعاً" to="/products?sort=best" />
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {bestSellers.map((p) => (
-            <ProductCard key={p.id} product={p} />
-          ))}
-        </div>
-      </section>
-
       {/* بانر الجملة */}
       <section className="mt-14 overflow-hidden rounded-3xl bg-accent-700 text-white">
         <div className="grid gap-6 p-8 sm:p-10 lg:grid-cols-[1.4fr_1fr] lg:items-center">
@@ -143,25 +190,13 @@ export function HomePage() {
             </Link>
           </div>
           <div className="rounded-2xl bg-white/10 p-5 backdrop-blur">
-            <div className="text-xs text-accent-100">مثال — سباجيتي رفيع 400 جم</div>
+            <div className="text-xs text-accent-100">مثال — سباجيتي رفيع 400 جم من مخازن أسواق</div>
             <table className="mt-3 w-full text-sm tnum">
               <tbody className="divide-y divide-white/15">
-                <tr>
-                  <td className="py-2">قطعة واحدة</td>
-                  <td className="py-2 text-end font-semibold">28 ج.م</td>
-                </tr>
-                <tr>
-                  <td className="py-2">من 12 قطعة</td>
-                  <td className="py-2 text-end font-semibold">25 ج.م</td>
-                </tr>
-                <tr>
-                  <td className="py-2">من 48 قطعة</td>
-                  <td className="py-2 text-end font-semibold">22.5 ج.م</td>
-                </tr>
-                <tr>
-                  <td className="py-2">من 120 قطعة</td>
-                  <td className="py-2 text-end font-semibold text-accent-300">20 ج.م</td>
-                </tr>
+                <tr><td className="py-2">قطعة واحدة</td><td className="py-2 text-end font-semibold">28 ج.م</td></tr>
+                <tr><td className="py-2">من 12 قطعة</td><td className="py-2 text-end font-semibold">25 ج.م</td></tr>
+                <tr><td className="py-2">من 48 قطعة</td><td className="py-2 text-end font-semibold">22.5 ج.م</td></tr>
+                <tr><td className="py-2">من 120 قطعة</td><td className="py-2 text-end font-semibold text-accent-300">20 ج.م</td></tr>
               </tbody>
             </table>
           </div>
@@ -180,39 +215,19 @@ export function HomePage() {
         </section>
       )}
 
-      {/* الماركات والبائعين */}
-      <section className="mt-14 grid gap-4 lg:grid-cols-2">
-        <div className="rounded-2xl border border-stone-200 bg-white p-6 dark:border-white/10 dark:bg-surface-card">
-          <h2 className="font-display text-lg font-bold">الماركات</h2>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {brands.map((b) => (
-              <Link
-                key={b.id}
-                to={`/products?brand=${b.id}`}
-                className="rounded-xl border border-stone-200 px-4 py-2 text-sm font-medium transition hover:border-brand-400 hover:text-brand-700 dark:border-white/10 dark:hover:text-brand-400"
-              >
-                {b.name}
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-stone-200 bg-white p-6 dark:border-white/10 dark:bg-surface-card">
-          <h2 className="font-display text-lg font-bold">بائعون على أسواق</h2>
-          <ul className="mt-4 space-y-3">
-            {partners.map((v) => (
-              <li key={v.id} className="flex items-center justify-between gap-3 text-sm">
-                <div>
-                  <div className="font-semibold">{v.name}</div>
-                  <div className="text-xs text-stone-400">{v.city}</div>
-                </div>
-                <span className="tnum text-brand-600 dark:text-brand-400">★ {v.rating}</span>
-              </li>
-            ))}
-          </ul>
-          <Link to="/wholesale" className="mt-4 inline-block text-sm font-medium text-accent-600 dark:text-accent-400">
-            عايز تبيع على أسواق؟ ←
-          </Link>
+      {/* الماركات */}
+      <section className="mt-14 rounded-2xl border border-stone-200 bg-white p-6 dark:border-white/10 dark:bg-surface-card">
+        <h2 className="font-display text-lg font-bold">تسوق حسب الماركة</h2>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {brands.map((b) => (
+            <Link
+              key={b.id}
+              to={`/products?brand=${b.id}`}
+              className="rounded-xl border border-stone-200 px-4 py-2 text-sm font-medium transition hover:border-brand-400 hover:text-brand-700 dark:border-white/10 dark:hover:text-brand-400"
+            >
+              {b.name}
+            </Link>
+          ))}
         </div>
       </section>
     </div>

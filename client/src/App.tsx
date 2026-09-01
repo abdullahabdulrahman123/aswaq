@@ -2,17 +2,21 @@ import { useEffect } from 'react';
 import { Route, Routes, useLocation } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
+import { VendorSwitchDialog } from './components/VendorSwitchDialog';
 import { HomePage } from './pages/HomePage';
 import { ProductsPage } from './pages/ProductsPage';
 import { ProductPage } from './pages/ProductPage';
+import { VendorPage } from './pages/VendorPage';
+import { VendorsPage } from './pages/VendorsPage';
 import { CartPage } from './pages/CartPage';
 import { WholesalePage } from './pages/WholesalePage';
 
+/** نرجع لأعلى الصفحة عند تغيير المسار — من غير الفلاتر عشان متقفزش مع كل فلتر */
 function ScrollToTop() {
-  const { pathname, search } = useLocation();
+  const { pathname } = useLocation();
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, [pathname, search]);
+  }, [pathname]);
   return null;
 }
 
@@ -26,12 +30,15 @@ export function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/products" element={<ProductsPage />} />
           <Route path="/product/:id" element={<ProductPage />} />
+          <Route path="/vendors" element={<VendorsPage />} />
+          <Route path="/vendor/:id" element={<VendorPage />} />
           <Route path="/cart" element={<CartPage />} />
           <Route path="/wholesale" element={<WholesalePage />} />
           <Route path="*" element={<HomePage />} />
         </Routes>
       </main>
       <Footer />
+      <VendorSwitchDialog />
     </div>
   );
 }

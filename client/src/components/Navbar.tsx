@@ -2,16 +2,17 @@ import { Link, NavLink, useNavigate, useSearchParams } from 'react-router-dom';
 import { useState } from 'react';
 import { useCart } from '../context/CartContext';
 import { useTheme } from '../context/ThemeContext';
-import { rules, egp } from '../data/catalog';
+import { rules, egp, vendorById } from '../data/catalog';
 
 const navLinks = [
   { to: '/products', label: 'كل المنتجات' },
   { to: '/products?sort=best', label: 'الأكثر مبيعاً' },
-  { to: '/products?vendor=partner', label: 'بائعو أسواق' },
+  { to: '/vendors', label: 'الشركات' },
 ];
 
 export function Navbar() {
-  const { count, buyerType, setBuyerType } = useCart();
+  const { count, buyerType, setBuyerType, vendorId } = useCart();
+  const cartVendor = vendorId ? vendorById(vendorId) : undefined;
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -84,6 +85,7 @@ export function Navbar() {
 
           <Link
             to="/cart"
+            title={cartVendor ? `سلتك من ${cartVendor.name}` : undefined}
             className="relative rounded-lg bg-stone-900 px-3 py-2 text-sm font-medium text-white hover:bg-stone-800 dark:bg-brand-500 dark:hover:bg-brand-600"
           >
             السلة

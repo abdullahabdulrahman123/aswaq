@@ -1,16 +1,47 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { PastaShape } from '../components/PastaShape';
 import { ProductCard } from '../components/ProductCard';
-import { useCart, unitPrice, nextTier } from '../context/CartContext';
-import { productById, brandById, vendorById, shapeById, products, egp } from '../data/catalog';
+import { useCart } from '../context/CartContext';
+import { unitPrice, nextTier } from '../lib/pricing';
+import {
+  bestOffer,
+  brandById,
+  egp,
+  offersForVariant,
+  pricePerKg,
+  productById,
+  products,
+  shapeById,
+  variantsOf,
+  vendorById,
+  vendorInitials,
+} from '../data/catalog';
 
 export function ProductPage() {
   const { id } = useParams();
   const product = id ? productById(id) : undefined;
-  const { add, buyerType, setBuyerType } = useCart();
+  const { add, buyerType, setBuyerType, vendorId: cartVendorId } = useCart();
+
+  const sizes = product ? variantsOf(product.id) : [];
+  const [variantId, setVariantId] = useState(sizes[0]?.id ?? '');
+  const [offerId, setOfferId] = useState('');
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
+
+  // لما يتغيّر الصنف أو الحجم، نرشّح أنسب عرض
+  useEffect(() => {
+    const first = variantsOf(product?.id ?? '')[0]?.id ?? '';
+    setVariantId(first);
+    setQty(1);
+  }, [product?.id]);
+
+  useEffect(() => {
+    if (!variantId) return;
+    const list = offersForVariant(variantId);
+    const pick = bestOffer(list, cartVendorId ?? undefined);
+    setOfferId(pick?.id ?? '');
+  }, [variantId, cartVendorId]);
 
   if (!product) {
     return (
@@ -24,18 +55,25 @@ export function ProductPage() {
   }
 
   const brand = brandById(product.brandId);
-  const vendor = vendorById(product.vendorId);
   const shape = shapeById(product.shape);
-  const out = product.stock === 0;
+  const variant = sizes.find((v) => v.id === variantId) ?? sizes[0];
+  const variantOffers = [...offersForVariant(variant?.id ?? '')].sort((a, b) => a.price - b.price);
+  const offer = variantOffers.find((o) => o.id === offerId) ?? variantOffers[0];
 
-  const price = unitPrice(product, qty, buyerType);
-  const upcoming = buyerType === 'wholesale' ? nextTier(product, qty) : undefined;
+  if (!offer || !variant) return null;
+
+  const vendor = vendorById(offer.vendorId);
+  const out = offer.stock === 0;
+  const price = unitPrice(offer, qty, buyerType);
+  const upcoming = buyerType === 'wholesale' ? nextTier(offer, qty) : undefined;
   const related = products.filter((p) => p.shape === product.shape && p.id !== product.id).slice(0, 3);
 
   function handleAdd() {
-    add(product!.id, qty);
-    setAdded(true);
-    window.setTimeout(() => setAdded(false), 1800);
+    const ok = add(offer.id, qty);
+    if (ok) {
+      setAdded(true);
+      window.setTimeout(() => setAdded(false), 1800);
+    }
   }
 
   return (
@@ -53,9 +91,7 @@ export function ProductPage() {
           <div className="overflow-hidden rounded-3xl border border-stone-200 bg-gradient-to-bl from-brand-50 to-brand-100 dark:border-white/10 dark:from-brand-900/40 dark:to-brand-800/20">
             <PastaShape shape={product.shape} className="aspect-square w-full p-10" />
           </div>
-          <p className="mt-3 text-xs text-stone-400">
-            رسم توضيحي — الصور الحقيقية هيرفعها البائع من لوحته.
-          </p>
+          <p className="mt-3 text-xs text-stone-400">رسم توضيحي — الصور الحقيقية هترفعها الشركة من لوحتها.</p>
         </div>
 
         <div>
@@ -66,21 +102,46 @@ export function ProductPage() {
           </div>
 
           <h1 className="mt-2 font-display text-3xl font-bold">{product.name}</h1>
+          <p className="mt-2 leading-relaxed text-stone-600 dark:text-stone-300">{product.description}</p>
 
           <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
-            <span className="tnum text-brand-600 dark:text-brand-400">★ {product.rating}</span>
-            <span className="tnum text-stone-400">({product.reviews} تقييم)</span>
-            <span className="rounded-md bg-stone-100 px-2 py-0.5 text-xs tnum dark:bg-white/10">{product.weight} جم</span>
+            <span className="tnum text-brand-600 dark:text-brand-400">★ {offer.rating}</span>
+            <span className="tnum text-stone-400">({offer.reviews} تقييم)</span>
             {out ? (
-              <span className="rounded-md bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-500/15 dark:text-red-300">
-                غير متوفر
-              </span>
+              <span className="rounded-md bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-500/15 dark:text-red-300">غير متوفر</span>
             ) : (
               <span className="rounded-md bg-accent-50 px-2 py-0.5 text-xs font-medium text-accent-700 tnum dark:bg-accent-500/15 dark:text-accent-300">
-                متوفر {product.stock} قطعة
+                متوفر {offer.stock} قطعة
               </span>
             )}
           </div>
+
+          {/* اختيار الحجم — نفس الصنف بأحجام مش أصناف منفصلة */}
+          {sizes.length > 1 && (
+            <div className="mt-6">
+              <h2 className="mb-2 font-display text-sm font-bold">الحجم</h2>
+              <div className="flex flex-wrap gap-2">
+                {sizes.map((v) => {
+                  const cheapest = bestOffer(offersForVariant(v.id));
+                  return (
+                    <button
+                      key={v.id}
+                      onClick={() => { setVariantId(v.id); setQty(1); }}
+                      aria-pressed={v.id === variant.id}
+                      className={`rounded-xl border px-4 py-2.5 text-sm transition ${
+                        v.id === variant.id
+                          ? 'border-brand-500 bg-brand-50 font-semibold text-brand-800 dark:bg-brand-500/15 dark:text-brand-300'
+                          : 'border-stone-300 hover:border-brand-400 dark:border-white/15'
+                      }`}
+                    >
+                      <span className="tnum">{v.weight} جم</span>
+                      {cheapest && <span className="ms-2 text-xs text-stone-400 tnum">من {egp(cheapest.price)}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* السعر */}
           <div className="mt-6 rounded-2xl border border-stone-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
@@ -88,13 +149,11 @@ export function ProductPage() {
               <div>
                 <div className="flex items-baseline gap-3">
                   <span className="font-display text-3xl font-bold tnum">{egp(price)}</span>
-                  {buyerType === 'retail' && product.oldPrice && (
-                    <span className="text-base text-stone-400 line-through tnum">{egp(product.oldPrice)}</span>
+                  {buyerType === 'retail' && offer.oldPrice && (
+                    <span className="text-base text-stone-400 line-through tnum">{egp(offer.oldPrice)}</span>
                   )}
                 </div>
-                <div className="mt-1 text-xs text-stone-400 tnum">
-                  {egp(Math.round((price / product.weight) * 1000))} للكيلو
-                </div>
+                <div className="mt-1 text-xs text-stone-400 tnum">{egp(pricePerKg(price, variant.weight))} للكيلو</div>
               </div>
               <button
                 onClick={() => setBuyerType(buyerType === 'retail' ? 'wholesale' : 'retail')}
@@ -110,16 +169,9 @@ export function ProductPage() {
               </p>
             )}
 
-            {/* الكمية والإضافة */}
             <div className="mt-5 flex flex-wrap items-center gap-3">
               <div className="flex items-center rounded-xl border border-stone-300 dark:border-white/15">
-                <button
-                  onClick={() => setQty((q) => Math.max(1, q - 1))}
-                  aria-label="تقليل الكمية"
-                  className="px-4 py-2.5 text-lg leading-none hover:text-brand-600"
-                >
-                  −
-                </button>
+                <button onClick={() => setQty((q) => Math.max(1, q - 1))} aria-label="تقليل الكمية" className="px-4 py-2.5 text-lg leading-none hover:text-brand-600">−</button>
                 <input
                   value={qty}
                   onChange={(e) => setQty(Math.max(1, Number(e.target.value) || 1))}
@@ -127,13 +179,7 @@ export function ProductPage() {
                   aria-label="الكمية"
                   className="w-14 border-x border-stone-300 bg-transparent py-2.5 text-center tnum dark:border-white/15"
                 />
-                <button
-                  onClick={() => setQty((q) => q + 1)}
-                  aria-label="زيادة الكمية"
-                  className="px-4 py-2.5 text-lg leading-none hover:text-brand-600"
-                >
-                  +
-                </button>
+                <button onClick={() => setQty((q) => q + 1)} aria-label="زيادة الكمية" className="px-4 py-2.5 text-lg leading-none hover:text-brand-600">+</button>
               </div>
 
               <button
@@ -146,9 +192,73 @@ export function ProductPage() {
             </div>
           </div>
 
+          {/* الشركة البائعة + مقارنة العروض */}
+          <div className="mt-5 rounded-2xl border border-stone-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
+            <h2 className="font-display text-sm font-bold">
+              {variantOffers.length > 1 ? `متوفر من ${variantOffers.length} شركات` : 'الشركة البائعة'}
+            </h2>
+
+            <ul className="mt-3 space-y-2">
+              {variantOffers.map((o) => {
+                const v = vendorById(o.vendorId);
+                const selected = o.id === offer.id;
+                return (
+                  <li key={o.id}>
+                    <div
+                      className={`flex flex-wrap items-center gap-3 rounded-xl border p-3 transition ${
+                        selected
+                          ? 'border-brand-500 bg-brand-50/60 dark:bg-brand-500/10'
+                          : 'border-stone-200 dark:border-white/10'
+                      }`}
+                    >
+                      <button
+                        onClick={() => { setOfferId(o.id); setQty(1); }}
+                        disabled={o.stock === 0}
+                        className="flex min-w-0 flex-1 items-center gap-3 text-start disabled:opacity-50"
+                      >
+                        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-brand-100 font-display text-xs font-bold text-brand-800 dark:bg-brand-500/20 dark:text-brand-200">
+                          {vendorInitials(v?.name ?? '')}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="flex items-center gap-1 text-sm font-semibold">
+                            {v?.name}
+                            {v?.verified && <span className="text-accent-600 dark:text-accent-400" title="موثّقة">✓</span>}
+                          </span>
+                          <span className="block text-xs text-stone-400 tnum">
+                            ★ {o.rating} · {v?.city}
+                            {o.stock === 0 && ' · نفدت الكمية'}
+                          </span>
+                        </span>
+                      </button>
+
+                      <div className="text-end">
+                        <div className="font-display font-bold tnum">{egp(o.price)}</div>
+                        {selected && <div className="text-[11px] text-brand-600 dark:text-brand-400">مختارة</div>}
+                      </div>
+
+                      <Link
+                        to={`/vendor/${o.vendorId}`}
+                        className="whitespace-nowrap rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium transition hover:border-brand-400 hover:text-brand-700 dark:border-white/15 dark:hover:text-brand-400"
+                      >
+                        سوق الشركة ←
+                      </Link>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+
+            {cartVendorId && cartVendorId !== offer.vendorId && (
+              <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+                سلتك دلوقتي من <strong>{vendorById(cartVendorId)?.name}</strong>. الطلب الواحد من شركة واحدة —
+                لو ضفت من {vendor?.name} هنسألك الأول.
+              </p>
+            )}
+          </div>
+
           {/* شرائح الجملة */}
           <div className="mt-5 rounded-2xl border border-stone-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
-            <h2 className="font-display text-sm font-bold">شرائح أسعار الجملة</h2>
+            <h2 className="font-display text-sm font-bold">شرائح أسعار الجملة — {vendor?.name}</h2>
             <table className="mt-3 w-full text-sm tnum">
               <thead>
                 <tr className="text-xs text-stone-400">
@@ -159,15 +269,15 @@ export function ProductPage() {
               </thead>
               <tbody className="divide-y divide-stone-200 dark:divide-white/10">
                 <tr>
-                  <td className="py-2">1 – {product.tiers[0] ? product.tiers[0].minQty - 1 : '∞'}</td>
-                  <td className="py-2">{egp(product.price)}</td>
+                  <td className="py-2">1 – {offer.tiers[0] ? offer.tiers[0].minQty - 1 : '∞'}</td>
+                  <td className="py-2">{egp(offer.price)}</td>
                   <td className="py-2 text-end text-stone-400">—</td>
                 </tr>
-                {product.tiers.map((t) => (
+                {offer.tiers.map((t) => (
                   <tr key={t.minQty} className={qty >= t.minQty && buyerType === 'wholesale' ? 'text-accent-700 dark:text-accent-300' : ''}>
                     <td className="py-2">من {t.minQty}</td>
                     <td className="py-2 font-semibold">{egp(t.price)}</td>
-                    <td className="py-2 text-end">{Math.round(((product.price - t.price) / product.price) * 100)}%</td>
+                    <td className="py-2 text-end">{Math.round(((offer.price - t.price) / offer.price) * 100)}%</td>
                   </tr>
                 ))}
               </tbody>
@@ -175,23 +285,6 @@ export function ProductPage() {
             <p className="mt-3 text-xs leading-relaxed text-stone-400">
               أسعار الجملة تظهر لحسابات التجار المعتمدة فقط بعد رفع السجل التجاري.
             </p>
-          </div>
-
-          {/* البائع */}
-          <div className="mt-5 flex items-center justify-between gap-4 rounded-2xl border border-stone-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
-            <div>
-              <div className="text-xs text-stone-400">يُباع ويُشحن بواسطة</div>
-              <div className="mt-0.5 font-display font-bold">{vendor?.name}</div>
-              <div className="mt-1 text-xs text-stone-400 tnum">
-                {vendor?.city} · ★ {vendor?.rating}
-                {vendor?.kind === 'own' && ' · مخازن أسواق'}
-              </div>
-            </div>
-            {vendor?.kind === 'partner' && (
-              <span className="rounded-lg bg-brand-50 px-3 py-1.5 text-xs font-medium text-brand-800 dark:bg-brand-500/15 dark:text-brand-300">
-                بائع شريك
-              </span>
-            )}
           </div>
         </div>
       </div>

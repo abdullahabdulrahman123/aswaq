@@ -1,10 +1,20 @@
 import { Link } from 'react-router-dom';
 import { PastaShape } from '../components/PastaShape';
-import { useCart, unitPrice, nextTier } from '../context/CartContext';
-import { productById, brandById, vendorById, rules, egp } from '../data/catalog';
+import { useCart } from '../context/CartContext';
+import { unitPrice, nextTier } from '../lib/pricing';
+import {
+  offerById,
+  brandById,
+  vendorById,
+  variantById,
+  productById,
+  rules,
+  egp,
+  vendorInitials,
+} from '../data/catalog';
 
 export function CartPage() {
-  const { lines, setQty, remove, clear, buyerType, subtotal, shipping, total, meetsMinimum } = useCart();
+  const { lines, vendorId, setQty, remove, clear, buyerType, subtotal, shipping, total, weight, meetsMinimum } = useCart();
 
   if (lines.length === 0) {
     return (
@@ -21,6 +31,7 @@ export function CartPage() {
     );
   }
 
+  const vendor = vendorId ? vendorById(vendorId) : undefined;
   const missing = rules.minOrderValue - subtotal;
   const toFreeShipping = rules.freeShippingOver - subtotal;
 
@@ -33,20 +44,45 @@ export function CartPage() {
         </button>
       </div>
 
+      {/* الطلب من شركة واحدة — نوضّحها فوق */}
+      {vendor && (
+        <div className="mb-6 flex flex-wrap items-center gap-3 rounded-2xl border border-brand-200 bg-brand-50 p-4 dark:border-brand-500/25 dark:bg-brand-500/10">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white font-display text-sm font-bold text-brand-800 dark:bg-white/10 dark:text-brand-200">
+            {vendorInitials(vendor.name)}
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-xs text-stone-500 dark:text-stone-400">طلبك من</div>
+            <div className="flex items-center gap-1.5 font-display font-bold">
+              {vendor.name}
+              {vendor.verified && <span className="text-accent-600 dark:text-accent-400" title="موثّقة">✓</span>}
+            </div>
+            <div className="mt-0.5 text-xs text-stone-400 tnum">
+              {vendor.city} · ★ {vendor.rating} · الوزن الكلي {(weight / 1000).toFixed(2)} كجم
+            </div>
+          </div>
+          <Link
+            to={`/vendor/${vendor.id}`}
+            className="whitespace-nowrap rounded-lg border border-brand-400 px-3 py-2 text-xs font-semibold text-brand-800 transition hover:bg-white dark:border-brand-500/40 dark:text-brand-200"
+          >
+            كمّل تسوق من {vendor.name} ←
+          </Link>
+        </div>
+      )}
+
       <div className="grid gap-8 lg:grid-cols-[1fr_340px]">
         <ul className="space-y-3">
           {lines.map((line) => {
-            const product = productById(line.productId);
-            if (!product) return null;
-            const price = unitPrice(product, line.qty, buyerType);
-            const upcoming = buyerType === 'wholesale' ? nextTier(product, line.qty) : undefined;
-            const vendor = vendorById(product.vendorId);
+            const offer = offerById(line.offerId);
+            if (!offer) return null;
+            const variant = variantById(offer.variantId);
+            const product = variant ? productById(variant.productId) : undefined;
+            if (!variant || !product) return null;
+
+            const price = unitPrice(offer, line.qty, buyerType);
+            const upcoming = buyerType === 'wholesale' ? nextTier(offer, line.qty) : undefined;
 
             return (
-              <li
-                key={line.productId}
-                className="flex flex-wrap items-center gap-4 rounded-2xl border border-stone-200 bg-white p-4 dark:border-white/10 dark:bg-surface-card"
-              >
+              <li key={line.offerId} className="flex flex-wrap items-center gap-4 rounded-2xl border border-stone-200 bg-white p-4 dark:border-white/10 dark:bg-surface-card">
                 <Link to={`/product/${product.id}`} className="shrink-0 rounded-xl bg-brand-50 dark:bg-brand-900/30">
                   <PastaShape shape={product.shape} className="h-20 w-20" />
                 </Link>
@@ -56,24 +92,23 @@ export function CartPage() {
                   <Link to={`/product/${product.id}`} className="font-display font-bold hover:text-brand-600">
                     {product.name}
                   </Link>
-                  <div className="mt-0.5 text-xs text-stone-400 tnum">
-                    {product.weight} جم · {vendor?.kind === 'own' ? 'شحن أسواق' : vendor?.name}
-                  </div>
+                  <div className="mt-0.5 text-xs text-stone-400 tnum">{variant.weight} جم</div>
                   {upcoming && (
                     <div className="mt-1 text-xs text-accent-600 tnum dark:text-accent-400">
                       زوّد لـ{upcoming.minQty} والسعر ينزل لـ{egp(upcoming.price)}
                     </div>
                   )}
+                  {line.qty > offer.stock && offer.stock > 0 && (
+                    <div className="mt-1 text-xs text-amber-700 tnum dark:text-amber-400">
+                      المتاح {offer.stock} قطعة بس
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center rounded-xl border border-stone-300 dark:border-white/15">
-                  <button onClick={() => setQty(line.productId, line.qty - 1)} aria-label="تقليل" className="px-3 py-2 leading-none hover:text-brand-600">
-                    −
-                  </button>
+                  <button onClick={() => setQty(line.offerId, line.qty - 1)} aria-label="تقليل" className="px-3 py-2 leading-none hover:text-brand-600">−</button>
                   <span className="w-10 border-x border-stone-300 py-2 text-center text-sm tnum dark:border-white/15">{line.qty}</span>
-                  <button onClick={() => setQty(line.productId, line.qty + 1)} aria-label="زيادة" className="px-3 py-2 leading-none hover:text-brand-600">
-                    +
-                  </button>
+                  <button onClick={() => setQty(line.offerId, line.qty + 1)} aria-label="زيادة" className="px-3 py-2 leading-none hover:text-brand-600">+</button>
                 </div>
 
                 <div className="w-24 text-end">
@@ -81,11 +116,7 @@ export function CartPage() {
                   <div className="text-xs text-stone-400 tnum">{egp(price)} × {line.qty}</div>
                 </div>
 
-                <button
-                  onClick={() => remove(line.productId)}
-                  aria-label={`حذف ${product.name}`}
-                  className="text-stone-400 transition hover:text-red-600"
-                >
+                <button onClick={() => remove(line.offerId)} aria-label={`حذف ${product.name}`} className="text-stone-400 transition hover:text-red-600">
                   ✕
                 </button>
               </li>
@@ -93,7 +124,6 @@ export function CartPage() {
           })}
         </ul>
 
-        {/* الملخص */}
         <aside>
           <div className="sticky top-32 rounded-2xl border border-stone-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
             <h2 className="font-display text-lg font-bold">ملخص الطلب</h2>
