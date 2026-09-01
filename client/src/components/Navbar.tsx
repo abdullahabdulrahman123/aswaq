@@ -2,6 +2,7 @@ import { Link, NavLink, useNavigate, useSearchParams } from 'react-router-dom';
 import { useState } from 'react';
 import { useCart } from '../context/CartContext';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import { rules, egp, vendorById } from '../data/catalog';
 
 const navLinks = [
@@ -14,6 +15,7 @@ export function Navbar() {
   const { count, buyerType, setBuyerType, vendorId } = useCart();
   const cartVendor = vendorId ? vendorById(vendorId) : undefined;
   const { theme, toggleTheme } = useTheme();
+  const { user, openGate, signOut } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const [query, setQuery] = useState(params.get('q') ?? '');
@@ -82,6 +84,40 @@ export function Navbar() {
           >
             {theme === 'dark' ? '☀' : '☾'}
           </button>
+
+          {/* الحساب — التسجيل كله عبر وصلة */}
+          {user ? (
+            <div className="flex items-center gap-1.5">
+              <span
+                title={user.email}
+                className="hidden max-w-[140px] truncate rounded-lg border border-stone-300 px-2.5 py-1.5 text-xs font-medium sm:block dark:border-white/15"
+              >
+                {user.name ?? user.email ?? 'حسابي'}
+                {user.demo && <span className="ms-1 text-amber-600 dark:text-amber-400">(تجريبي)</span>}
+              </span>
+              <button
+                onClick={signOut}
+                className="rounded-lg border border-stone-300 px-2.5 py-1.5 text-xs font-medium hover:border-stone-400 dark:border-white/15"
+              >
+                خروج
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => openGate('login')}
+                className="rounded-lg border border-stone-300 px-2.5 py-1.5 text-xs font-medium hover:border-brand-400 dark:border-white/15"
+              >
+                دخول
+              </button>
+              <button
+                onClick={() => openGate('register')}
+                className="rounded-lg bg-brand-500 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-brand-600"
+              >
+                حساب جديد
+              </button>
+            </div>
+          )}
 
           <Link
             to="/cart"

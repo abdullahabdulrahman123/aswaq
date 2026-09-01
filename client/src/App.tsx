@@ -3,6 +3,7 @@ import { Route, Routes, useLocation } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { VendorSwitchDialog } from './components/VendorSwitchDialog';
+import { AuthGateDialog } from './components/AuthGateDialog';
 import { HomePage } from './pages/HomePage';
 import { ProductsPage } from './pages/ProductsPage';
 import { ProductPage } from './pages/ProductPage';
@@ -10,6 +11,7 @@ import { VendorPage } from './pages/VendorPage';
 import { VendorsPage } from './pages/VendorsPage';
 import { CartPage } from './pages/CartPage';
 import { WholesalePage } from './pages/WholesalePage';
+import { AuthCallbackPage } from './pages/AuthCallbackPage';
 
 /** نرجع لأعلى الصفحة عند تغيير المسار — من غير الفلاتر عشان متقفزش مع كل فلتر */
 function ScrollToTop() {
@@ -34,11 +36,13 @@ export function App() {
           <Route path="/vendor/:id" element={<VendorPage />} />
           <Route path="/cart" element={<CartPage />} />
           <Route path="/wholesale" element={<WholesalePage />} />
+          <Route path="/auth/wasla/callback" element={<AuthCallbackPage />} />
           <Route path="*" element={<HomePage />} />
         </Routes>
       </main>
       <Footer />
       <VendorSwitchDialog />
+      <AuthGateDialog />
     </div>
   );
 }

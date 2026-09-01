@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { PastaShape } from '../components/PastaShape';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 import { unitPrice, nextTier } from '../lib/pricing';
 import {
   offerById,
@@ -15,6 +16,7 @@ import {
 
 export function CartPage() {
   const { lines, vendorId, setQty, remove, clear, buyerType, subtotal, shipping, total, weight, meetsMinimum } = useCart();
+  const { user, openGate } = useAuth();
 
   if (lines.length === 0) {
     return (
@@ -157,13 +159,24 @@ export function CartPage() {
 
             <button
               disabled={!meetsMinimum}
+              onClick={() => {
+                // الزائر يتسوق عادي، وأول ما يقرر يشتري بنطلب التسجيل
+                if (!user) return openGate('login');
+              }}
               className="mt-5 w-full rounded-xl bg-stone-900 px-6 py-3 font-semibold text-white transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-300 dark:bg-brand-500 dark:hover:bg-brand-600 dark:disabled:bg-white/10 dark:disabled:text-stone-500"
             >
-              إتمام الطلب
+              {user ? 'إتمام الطلب' : 'سجّل دخولك وأتمّ الطلب'}
             </button>
-            <p className="mt-3 text-center text-xs text-stone-400">
-              صفحة الدفع لسه مش متبنية — محتاجة قرار العميل في طرق الدفع.
-            </p>
+
+            {user ? (
+              <p className="mt-3 text-center text-xs text-stone-400">
+                صفحة الدفع لسه مش متبنية — محتاجة قرار العميل في طرق الدفع.
+              </p>
+            ) : (
+              <p className="mt-3 text-center text-xs leading-relaxed text-stone-400">
+                بتتسوق كزائر. التسجيل عبر وصلة مطلوب عند إتمام الطلب بس.
+              </p>
+            )}
 
             <div className="mt-5 border-t border-stone-200 pt-4 text-xs leading-relaxed text-stone-400 dark:border-white/10">
               {buyerType === 'wholesale'
