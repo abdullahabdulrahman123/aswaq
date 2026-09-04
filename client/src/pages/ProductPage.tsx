@@ -54,7 +54,7 @@ export function ProductPage() {
   const brand = brandById(product.brandId);
   const category = categoryById(product.category);
   const variant = sizes.find((v) => v.id === variantId) ?? sizes[0];
-  const variantOffers = [...offersForVariant(variant?.id ?? '')].sort((a, b) => a.price - b.price);
+  const variantOffers = offersForVariant(variant?.id ?? '');
   const offer = variantOffers.find((o) => o.id === offerId) ?? variantOffers[0];
 
   if (!offer || !variant) return null;
@@ -171,64 +171,35 @@ export function ProductPage() {
             </div>
           </div>
 
-          {/* مقارنة الشركات */}
-          <div className="mt-5 rounded-2xl border border-stone-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
-            <h2 className="font-display text-sm font-bold">
-              {variantOffers.length > 1 ? `متوفر من ${variantOffers.length} شركات` : 'الشركة البائعة'}
-            </h2>
-
-            <ul className="mt-3 space-y-2">
-              {variantOffers.map((o) => {
-                const v = vendorById(o.vendorId);
-                const selected = o.id === offer.id;
-                return (
-                  <li key={o.id}>
-                    <div className={`flex flex-wrap items-center gap-3 rounded-xl border p-3 transition ${
-                      selected ? 'border-brand-500 bg-brand-50/60 dark:bg-brand-500/10' : 'border-stone-200 dark:border-white/10'
-                    }`}>
-                      <button
-                        onClick={() => { setOfferId(o.id); setQty(1); }}
-                        disabled={o.stock === 0}
-                        className="flex min-w-0 flex-1 items-center gap-3 text-start disabled:opacity-50"
-                      >
-                        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-brand-100 font-display text-xs font-bold text-brand-800 dark:bg-brand-500/20 dark:text-brand-200">
-                          {vendorInitials(v?.name ?? '')}
-                        </span>
-                        <span className="min-w-0">
-                          <span className="flex items-center gap-1 text-sm font-semibold">
-                            {v?.name}
-                            {v?.verified && <span className="text-accent-600 dark:text-accent-400" title="موثّقة">✓</span>}
-                          </span>
-                          <span className="block text-xs text-stone-400 tnum">
-                            ★ {o.rating} · {v?.city}{o.stock === 0 && ' · نفدت الكمية'}
-                          </span>
-                        </span>
-                      </button>
-
-                      <div className="text-end">
-                        <div className="font-display font-bold tnum">{egp(o.price)}</div>
-                        {selected && <div className="text-[11px] text-brand-600 dark:text-brand-400">مختارة</div>}
-                      </div>
-
-                      <Link
-                        to={`/vendor/${o.vendorId}`}
-                        className="whitespace-nowrap rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium transition hover:border-brand-400 hover:text-brand-700 dark:border-white/15 dark:hover:text-brand-400"
-                      >
-                        سوق الشركة ←
-                      </Link>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-
-            {cartVendorId && cartVendorId !== offer.vendorId && (
-              <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
-                سلتك دلوقتي من <strong>{vendorById(cartVendorId)?.name}</strong>. الطلب الواحد من شركة واحدة —
-                لو ضفت من {vendor?.name} هنسألك الأول.
-              </p>
-            )}
+          {/* الشركة البائعة */}
+          <div className="mt-5 flex items-center justify-between gap-4 rounded-2xl border border-stone-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brand-100 font-display text-sm font-bold text-brand-800 dark:bg-brand-500/20 dark:text-brand-200">
+                {vendorInitials(vendor?.name ?? '')}
+              </span>
+              <div className="min-w-0">
+                <div className="text-xs text-stone-400">يُباع ويُشحن بواسطة</div>
+                <div className="flex items-center gap-1.5 font-display font-bold">
+                  {vendor?.name}
+                  {vendor?.verified && <span className="text-accent-600 dark:text-accent-400" title="موثّقة">✓</span>}
+                </div>
+                <div className="mt-0.5 text-xs text-stone-400 tnum">★ {offer.rating} · {vendor?.city}</div>
+              </div>
+            </div>
+            <Link
+              to={`/vendor/${offer.vendorId}`}
+              className="whitespace-nowrap rounded-lg border border-stone-300 px-3 py-2 text-xs font-medium transition hover:border-brand-400 hover:text-brand-700 dark:border-white/15 dark:hover:text-brand-400"
+            >
+              سوق الشركة ←
+            </Link>
           </div>
+
+          {cartVendorId && cartVendorId !== offer.vendorId && (
+            <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+              سلتك دلوقتي من <strong>{vendorById(cartVendorId)?.name}</strong>. الطلب الواحد من شركة واحدة —
+              لو ضفت من {vendor?.name} هنسألك الأول.
+            </p>
+          )}
 
           {/* أسعار الكميات — للشركات فقط */}
           {seesTierPricing(accountType) && offer.tiers.length > 0 && (

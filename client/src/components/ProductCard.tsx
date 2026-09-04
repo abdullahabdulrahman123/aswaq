@@ -36,7 +36,6 @@ export function ProductCard({
   const vendor = vendorById(offer.vendorId);
   const out = offer.stock === 0;
   const shown = displayPrice(offer, accountType);
-  const vendorCount = new Set(all.map((o) => o.vendorId)).size;
   const firstTier = [...offer.tiers].sort((a, b) => a.minQty - b.minQty)[0];
 
   return (
@@ -77,12 +76,6 @@ export function ProductCard({
           </Link>
           {vendor?.verified && <span className="text-accent-600 dark:text-accent-400" title="شركة موثّقة">✓</span>}
         </div>
-
-        {!onlyVendorId && vendorCount > 1 && (
-          <Link to={`/product/${product.id}`} className="mt-1 text-[11px] text-accent-600 hover:underline dark:text-accent-400">
-            متوفر من {vendorCount} شركات — قارن الأسعار
-          </Link>
-        )}
 
         <div className="mt-3 flex items-end justify-between gap-2 pt-1">
           <div>
