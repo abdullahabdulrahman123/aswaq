@@ -4,31 +4,31 @@ import { ProductCard } from '../components/ProductCard';
 import { useCart } from '../context/CartContext';
 import {
   productsOfVendor,
-  shapeById,
+  categoryById,
   topVendors,
   vendorById,
   vendorOffers,
   vendorInitials,
   egp,
-  type ShapeId,
+  type CategoryId,
 } from '../data/catalog';
 
 export function VendorPage() {
   const { id } = useParams();
   const vendor = id ? vendorById(id) : undefined;
   const { vendorId: cartVendorId } = useCart();
-  const [shapeFilter, setShapeFilter] = useState<ShapeId | 'all'>('all');
+  const [catFilter, setCatFilter] = useState<CategoryId | 'all'>('all');
 
   const vendorProducts = useMemo(() => (vendor ? productsOfVendor(vendor.id) : []), [vendor]);
 
-  const availableShapes = useMemo(() => {
-    const set = new Set(vendorProducts.map((p) => p.shape));
+  const availableCats = useMemo(() => {
+    const set = new Set(vendorProducts.map((p) => p.category));
     return [...set];
   }, [vendorProducts]);
 
   const shown = useMemo(
-    () => (shapeFilter === 'all' ? vendorProducts : vendorProducts.filter((p) => p.shape === shapeFilter)),
-    [vendorProducts, shapeFilter],
+    () => (catFilter === 'all' ? vendorProducts : vendorProducts.filter((p) => p.category === catFilter)),
+    [vendorProducts, catFilter],
   );
 
   if (!vendor) {
@@ -119,29 +119,29 @@ export function VendorPage() {
 
       <div className="mx-auto max-w-6xl px-4 py-8">
         {/* فلترة سريعة بالشكل جوه سوق الشركة */}
-        {availableShapes.length > 1 && (
+        {availableCats.length > 1 && (
           <div className="no-scrollbar mb-6 flex gap-2 overflow-x-auto pb-1">
             <button
-              onClick={() => setShapeFilter('all')}
+              onClick={() => setCatFilter('all')}
               className={`whitespace-nowrap rounded-xl border px-4 py-2 text-sm font-medium transition ${
-                shapeFilter === 'all'
+                catFilter === 'all'
                   ? 'border-brand-500 bg-brand-500 text-white'
                   : 'border-stone-300 hover:border-brand-400 dark:border-white/15'
               }`}
             >
               الكل ({vendorProducts.length})
             </button>
-            {availableShapes.map((s) => (
+            {availableCats.map((s) => (
               <button
                 key={s}
-                onClick={() => setShapeFilter(s)}
+                onClick={() => setCatFilter(s)}
                 className={`whitespace-nowrap rounded-xl border px-4 py-2 text-sm font-medium transition ${
-                  shapeFilter === s
+                  catFilter === s
                     ? 'border-brand-500 bg-brand-500 text-white'
                     : 'border-stone-300 hover:border-brand-400 dark:border-white/15'
                 }`}
               >
-                {shapeById(s)?.name}
+                {categoryById(s)?.name}
               </button>
             ))}
           </div>

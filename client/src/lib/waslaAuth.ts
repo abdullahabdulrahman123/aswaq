@@ -37,6 +37,8 @@ export interface WaslaUser {
   name?: string;
   email?: string;
   picture?: string;
+  /** فرد ولا شركة — بييجي من وصلة وبيحدد الأسعار المعروضة */
+  accountType: 'INDIVIDUAL' | 'COMPANY';
   /** true = جلسة تجريبية مش من وصلة */
   demo?: boolean;
 }
@@ -150,5 +152,6 @@ export function decodeIdToken(idToken: string): WaslaUser {
     name: typeof claims.name === 'string' ? claims.name : undefined,
     email: typeof claims.email === 'string' ? claims.email : undefined,
     picture: typeof claims.picture === 'string' ? claims.picture : undefined,
+    accountType: claims.account_type === 'COMPANY' ? 'COMPANY' : 'INDIVIDUAL',
   };
 }

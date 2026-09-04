@@ -1,18 +1,18 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { PastaShape } from '../components/PastaShape';
+import { ProductArt } from '../components/ProductArt';
 import { ProductCard } from '../components/ProductCard';
 import { useCart } from '../context/CartContext';
-import { unitPrice, nextTier } from '../lib/pricing';
+import { useAuth } from '../context/AuthContext';
+import { unitPrice, nextTier, seesTierPricing } from '../lib/pricing';
 import {
   bestOffer,
   brandById,
+  categoryById,
   egp,
   offersForVariant,
-  pricePerKg,
   productById,
   products,
-  shapeById,
   variantsOf,
   vendorById,
   vendorInitials,
@@ -21,7 +21,8 @@ import {
 export function ProductPage() {
   const { id } = useParams();
   const product = id ? productById(id) : undefined;
-  const { add, buyerType, setBuyerType, vendorId: cartVendorId } = useCart();
+  const { add, vendorId: cartVendorId } = useCart();
+  const { accountType } = useAuth();
 
   const sizes = product ? variantsOf(product.id) : [];
   const [variantId, setVariantId] = useState(sizes[0]?.id ?? '');
@@ -29,18 +30,14 @@ export function ProductPage() {
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
 
-  // لما يتغيّر الصنف أو الحجم، نرشّح أنسب عرض
   useEffect(() => {
-    const first = variantsOf(product?.id ?? '')[0]?.id ?? '';
-    setVariantId(first);
+    setVariantId(variantsOf(product?.id ?? '')[0]?.id ?? '');
     setQty(1);
   }, [product?.id]);
 
   useEffect(() => {
     if (!variantId) return;
-    const list = offersForVariant(variantId);
-    const pick = bestOffer(list, cartVendorId ?? undefined);
-    setOfferId(pick?.id ?? '');
+    setOfferId(bestOffer(offersForVariant(variantId), cartVendorId ?? undefined)?.id ?? '');
   }, [variantId, cartVendorId]);
 
   if (!product) {
@@ -55,7 +52,7 @@ export function ProductPage() {
   }
 
   const brand = brandById(product.brandId);
-  const shape = shapeById(product.shape);
+  const category = categoryById(product.category);
   const variant = sizes.find((v) => v.id === variantId) ?? sizes[0];
   const variantOffers = [...offersForVariant(variant?.id ?? '')].sort((a, b) => a.price - b.price);
   const offer = variantOffers.find((o) => o.id === offerId) ?? variantOffers[0];
@@ -64,13 +61,12 @@ export function ProductPage() {
 
   const vendor = vendorById(offer.vendorId);
   const out = offer.stock === 0;
-  const price = unitPrice(offer, qty, buyerType);
-  const upcoming = buyerType === 'wholesale' ? nextTier(offer, qty) : undefined;
-  const related = products.filter((p) => p.shape === product.shape && p.id !== product.id).slice(0, 3);
+  const price = unitPrice(offer, qty, accountType);
+  const upcoming = seesTierPricing(accountType) ? nextTier(offer, qty) : undefined;
+  const related = products.filter((p) => p.category === product.category && p.id !== product.id).slice(0, 3);
 
   function handleAdd() {
-    const ok = add(offer.id, qty);
-    if (ok) {
+    if (add(offer.id, qty)) {
       setAdded(true);
       window.setTimeout(() => setAdded(false), 1800);
     }
@@ -83,13 +79,13 @@ export function ProductPage() {
         <span aria-hidden="true">/</span>
         <Link to="/products" className="hover:text-brand-600">المنتجات</Link>
         <span aria-hidden="true">/</span>
-        <Link to={`/products?shape=${product.shape}`} className="hover:text-brand-600">{shape?.name}</Link>
+        <Link to={`/products?category=${product.category}`} className="hover:text-brand-600">{category?.name}</Link>
       </nav>
 
       <div className="grid gap-10 lg:grid-cols-2">
         <div>
           <div className="overflow-hidden rounded-3xl border border-stone-200 bg-gradient-to-bl from-brand-50 to-brand-100 dark:border-white/10 dark:from-brand-900/40 dark:to-brand-800/20">
-            <PastaShape shape={product.shape} className="aspect-square w-full p-10" />
+            <ProductArt category={product.category} className="aspect-square w-full p-10" />
           </div>
           <p className="mt-3 text-xs text-stone-400">رسم توضيحي — الصور الحقيقية هترفعها الشركة من لوحتها.</p>
         </div>
@@ -98,7 +94,7 @@ export function ProductPage() {
           <div className="flex items-center gap-2 text-sm text-stone-500 dark:text-stone-400">
             <span>{brand?.name}</span>
             <span aria-hidden="true">·</span>
-            <span>{shape?.name}</span>
+            <span>{category?.name}</span>
           </div>
 
           <h1 className="mt-2 font-display text-3xl font-bold">{product.name}</h1>
@@ -116,10 +112,9 @@ export function ProductPage() {
             )}
           </div>
 
-          {/* اختيار الحجم — نفس الصنف بأحجام مش أصناف منفصلة */}
           {sizes.length > 1 && (
             <div className="mt-6">
-              <h2 className="mb-2 font-display text-sm font-bold">الحجم</h2>
+              <h2 className="mb-2 font-display text-sm font-bold">العبوة</h2>
               <div className="flex flex-wrap gap-2">
                 {sizes.map((v) => {
                   const cheapest = bestOffer(offersForVariant(v.id));
@@ -134,7 +129,7 @@ export function ProductPage() {
                           : 'border-stone-300 hover:border-brand-400 dark:border-white/15'
                       }`}
                     >
-                      <span className="tnum">{v.weight} جم</span>
+                      {v.label}
                       {cheapest && <span className="ms-2 text-xs text-stone-400 tnum">من {egp(cheapest.price)}</span>}
                     </button>
                   );
@@ -145,23 +140,7 @@ export function ProductPage() {
 
           {/* السعر */}
           <div className="mt-6 rounded-2xl border border-stone-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <div className="flex items-baseline gap-3">
-                  <span className="font-display text-3xl font-bold tnum">{egp(price)}</span>
-                  {buyerType === 'retail' && offer.oldPrice && (
-                    <span className="text-base text-stone-400 line-through tnum">{egp(offer.oldPrice)}</span>
-                  )}
-                </div>
-                <div className="mt-1 text-xs text-stone-400 tnum">{egp(pricePerKg(price, variant.weight))} للكيلو</div>
-              </div>
-              <button
-                onClick={() => setBuyerType(buyerType === 'retail' ? 'wholesale' : 'retail')}
-                className="rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium dark:border-white/15"
-              >
-                {buyerType === 'retail' ? 'اعرض أسعار الجملة' : 'ارجع لأسعار التجزئة'}
-              </button>
-            </div>
+            <div className="font-display text-3xl font-bold tnum">{egp(price)}</div>
 
             {upcoming && (
               <p className="mt-3 rounded-lg bg-accent-50 px-3 py-2 text-sm text-accent-700 tnum dark:bg-accent-500/10 dark:text-accent-300">
@@ -192,7 +171,7 @@ export function ProductPage() {
             </div>
           </div>
 
-          {/* الشركة البائعة + مقارنة العروض */}
+          {/* مقارنة الشركات */}
           <div className="mt-5 rounded-2xl border border-stone-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
             <h2 className="font-display text-sm font-bold">
               {variantOffers.length > 1 ? `متوفر من ${variantOffers.length} شركات` : 'الشركة البائعة'}
@@ -204,13 +183,9 @@ export function ProductPage() {
                 const selected = o.id === offer.id;
                 return (
                   <li key={o.id}>
-                    <div
-                      className={`flex flex-wrap items-center gap-3 rounded-xl border p-3 transition ${
-                        selected
-                          ? 'border-brand-500 bg-brand-50/60 dark:bg-brand-500/10'
-                          : 'border-stone-200 dark:border-white/10'
-                      }`}
-                    >
+                    <div className={`flex flex-wrap items-center gap-3 rounded-xl border p-3 transition ${
+                      selected ? 'border-brand-500 bg-brand-50/60 dark:bg-brand-500/10' : 'border-stone-200 dark:border-white/10'
+                    }`}>
                       <button
                         onClick={() => { setOfferId(o.id); setQty(1); }}
                         disabled={o.stock === 0}
@@ -225,8 +200,7 @@ export function ProductPage() {
                             {v?.verified && <span className="text-accent-600 dark:text-accent-400" title="موثّقة">✓</span>}
                           </span>
                           <span className="block text-xs text-stone-400 tnum">
-                            ★ {o.rating} · {v?.city}
-                            {o.stock === 0 && ' · نفدت الكمية'}
+                            ★ {o.rating} · {v?.city}{o.stock === 0 && ' · نفدت الكمية'}
                           </span>
                         </span>
                       </button>
@@ -256,42 +230,36 @@ export function ProductPage() {
             )}
           </div>
 
-          {/* شرائح الجملة */}
-          <div className="mt-5 rounded-2xl border border-stone-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
-            <h2 className="font-display text-sm font-bold">شرائح أسعار الجملة — {vendor?.name}</h2>
-            <table className="mt-3 w-full text-sm tnum">
-              <thead>
-                <tr className="text-xs text-stone-400">
-                  <th className="pb-2 text-start font-medium">الكمية</th>
-                  <th className="pb-2 text-start font-medium">سعر القطعة</th>
-                  <th className="pb-2 text-end font-medium">التوفير</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-200 dark:divide-white/10">
-                <tr>
-                  <td className="py-2">1 – {offer.tiers[0] ? offer.tiers[0].minQty - 1 : '∞'}</td>
-                  <td className="py-2">{egp(offer.price)}</td>
-                  <td className="py-2 text-end text-stone-400">—</td>
-                </tr>
-                {offer.tiers.map((t) => (
-                  <tr key={t.minQty} className={qty >= t.minQty && buyerType === 'wholesale' ? 'text-accent-700 dark:text-accent-300' : ''}>
-                    <td className="py-2">من {t.minQty}</td>
-                    <td className="py-2 font-semibold">{egp(t.price)}</td>
-                    <td className="py-2 text-end">{Math.round(((offer.price - t.price) / offer.price) * 100)}%</td>
+          {/* أسعار الكميات — للشركات فقط */}
+          {seesTierPricing(accountType) && offer.tiers.length > 0 && (
+            <div className="mt-5 rounded-2xl border border-stone-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
+              <h2 className="font-display text-sm font-bold">أسعار الكميات — {vendor?.name}</h2>
+              <table className="mt-3 w-full text-sm tnum">
+                <thead>
+                  <tr className="text-xs text-stone-400">
+                    <th className="pb-2 text-start font-medium">الكمية</th>
+                    <th className="pb-2 text-start font-medium">سعر القطعة</th>
+                    <th className="pb-2 text-end font-medium">التوفير</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-            <p className="mt-3 text-xs leading-relaxed text-stone-400">
-              أسعار الجملة تظهر لحسابات التجار المعتمدة فقط بعد رفع السجل التجاري.
-            </p>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-stone-200 dark:divide-white/10">
+                  {offer.tiers.map((t) => (
+                    <tr key={t.minQty} className={qty >= t.minQty ? 'text-accent-700 dark:text-accent-300' : ''}>
+                      <td className="py-2">من {t.minQty}</td>
+                      <td className="py-2 font-semibold">{egp(t.price)}</td>
+                      <td className="py-2 text-end">{Math.round(((offer.price - t.price) / offer.price) * 100)}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
 
       {related.length > 0 && (
         <section className="mt-16">
-          <h2 className="mb-5 font-display text-xl font-bold">منتجات من نفس الشكل</h2>
+          <h2 className="mb-5 font-display text-xl font-bold">منتجات من نفس التصنيف</h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {related.map((p) => (
               <ProductCard key={p.id} product={p} />

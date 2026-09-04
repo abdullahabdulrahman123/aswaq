@@ -4,16 +4,12 @@ import { useCart } from '../context/CartContext';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { AccountMenu } from './AccountMenu';
-import { rules, egp, vendorById } from '../data/catalog';
+import { vendorById } from '../data/catalog';
 
-const navLinks = [
-  { to: '/products', label: 'كل المنتجات' },
-  { to: '/products?sort=best', label: 'الأكثر مبيعاً' },
-  { to: '/vendors', label: 'الشركات' },
-];
+const navLinks = [{ to: '/products', label: 'كل المنتجات' }];
 
 export function Navbar() {
-  const { count, buyerType, setBuyerType, vendorId } = useCart();
+  const { count, vendorId } = useCart();
   const cartVendor = vendorId ? vendorById(vendorId) : undefined;
   const { theme, toggleTheme } = useTheme();
   const { user, openGate } = useAuth();
@@ -28,14 +24,6 @@ export function Navbar() {
 
   return (
     <header className="sticky top-0 z-30 border-b border-stone-200 bg-surface-light/95 backdrop-blur dark:border-white/10 dark:bg-surface-dark/95">
-      {/* شريط الإعلان العلوي */}
-      <div className="bg-brand-700 text-brand-50">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-1.5 text-xs">
-          <span>توصيل لكل محافظات مصر · شحن مجاني فوق {egp(rules.freeShippingOver)}</span>
-          <span className="tnum">الحد الأدنى للطلب {egp(rules.minOrderValue)}</span>
-        </div>
-      </div>
-
       <nav className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-3">
         <Link to="/" className="flex items-baseline gap-1.5 font-display text-2xl font-bold text-brand-700 dark:text-brand-400">
           أسواق
@@ -48,7 +36,7 @@ export function Navbar() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               type="search"
-              placeholder="دوّر على سباجيتي، بيني، ماركة…"
+              placeholder="دوّر على منتج أو شركة…"
               aria-label="بحث في المنتجات"
               className="w-full rounded-xl border border-stone-300 bg-white py-2 pe-4 ps-10 text-sm placeholder:text-stone-400 focus:border-brand-500 dark:border-white/15 dark:bg-surface-card dark:placeholder:text-stone-500"
             />
@@ -60,24 +48,6 @@ export function Navbar() {
         </form>
 
         <div className="flex items-center gap-2">
-          {/* مفتاح تجزئة/جملة — أداة عرض للعميل، في النسخة الحقيقية بييجي من الحساب */}
-          <div className="flex rounded-lg border border-stone-300 p-0.5 text-xs dark:border-white/15">
-            {(['retail', 'wholesale'] as const).map((t) => (
-              <button
-                key={t}
-                onClick={() => setBuyerType(t)}
-                aria-pressed={buyerType === t}
-                className={`rounded-md px-2.5 py-1 font-medium transition ${
-                  buyerType === t
-                    ? 'bg-brand-500 text-white'
-                    : 'text-stone-500 hover:text-stone-900 dark:hover:text-stone-100'
-                }`}
-              >
-                {t === 'retail' ? 'تجزئة' : 'جملة'}
-              </button>
-            ))}
-          </div>
-
           <button
             onClick={toggleTheme}
             aria-label="تبديل المظهر"
@@ -90,20 +60,12 @@ export function Navbar() {
           {user ? (
             <AccountMenu />
           ) : (
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => openGate('login')}
-                className="rounded-lg border border-stone-300 px-2.5 py-1.5 text-xs font-medium hover:border-brand-400 dark:border-white/15"
-              >
-                دخول
-              </button>
-              <button
-                onClick={() => openGate('register')}
-                className="rounded-lg bg-brand-500 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-brand-600"
-              >
-                حساب جديد
-              </button>
-            </div>
+            <button
+              onClick={() => openGate('login')}
+              className="rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-600"
+            >
+              تسجيل الدخول
+            </button>
           )}
 
           <Link
@@ -139,9 +101,6 @@ export function Navbar() {
               {l.label}
             </NavLink>
           ))}
-          <Link to="/wholesale" className="whitespace-nowrap border-b-2 border-transparent pb-1.5 text-accent-600 hover:text-accent-700 dark:text-accent-400">
-            طلبات الجملة والمطاعم ←
-          </Link>
         </div>
       </div>
     </header>

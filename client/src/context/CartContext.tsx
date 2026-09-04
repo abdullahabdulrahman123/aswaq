@@ -1,8 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { offerById, rules, variantById } from '../data/catalog';
-import { unitPrice, type BuyerType } from '../lib/pricing';
-
-export type { BuyerType };
+import { offerById, rules } from '../data/catalog';
+import { unitPrice } from '../lib/pricing';
+import { useAuth } from './AuthContext';
 
 export interface CartLine {
   offerId: string;
@@ -21,8 +20,6 @@ interface CartContextValue {
   lines: CartLine[];
   /** الشركة المقفولة عليها السلة — الطلب الواحد من شركة واحدة */
   vendorId: string | null;
-  buyerType: BuyerType;
-  setBuyerType: (t: BuyerType) => void;
   /** يرجّع true لو الإضافة تمت، و false لو اتوقفت عشان شركة مختلفة */
   add: (offerId: string, qty?: number) => boolean;
   pendingAdd: PendingAdd | null;
@@ -36,7 +33,6 @@ interface CartContextValue {
   subtotal: number;
   shipping: number;
   total: number;
-  weight: number;
   meetsMinimum: boolean;
 }
 
@@ -56,17 +52,13 @@ function loadLines(): CartLine[] {
 export function CartProvider({ children }: { children: ReactNode }) {
   const [lines, setLines] = useState<CartLine[]>(loadLines);
   const [pendingAdd, setPendingAdd] = useState<PendingAdd | null>(null);
-  const [buyerType, setBuyerType] = useState<BuyerType>(
-    () => (localStorage.getItem('aswaq_buyer') as BuyerType) || 'retail',
-  );
+  // الأسعار بتتحدد من نوع الحساب مش من مفتاح يدوي
+  const { accountType } = useAuth();
 
   useEffect(() => {
     localStorage.setItem('aswaq_cart_v2', JSON.stringify(lines));
   }, [lines]);
 
-  useEffect(() => {
-    localStorage.setItem('aswaq_buyer', buyerType);
-  }, [buyerType]);
 
   // الشركة مشتقّة من محتويات السلة، مش محفوظة لوحدها — عشان متتعارضش معاها
   const vendorId = useMemo(() => {
@@ -129,19 +121,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setLines([]);
   }
 
-  const { count, subtotal, weight } = useMemo(() => {
+  const { count, subtotal } = useMemo(() => {
     let count = 0;
     let subtotal = 0;
-    let weight = 0;
     for (const line of lines) {
       const offer = offerById(line.offerId);
       if (!offer) continue;
       count += line.qty;
-      subtotal += unitPrice(offer, line.qty, buyerType) * line.qty;
-      weight += (variantById(offer.variantId)?.weight ?? 0) * line.qty;
+      subtotal += unitPrice(offer, line.qty, accountType) * line.qty;
     }
-    return { count, subtotal, weight };
-  }, [lines, buyerType]);
+    return { count, subtotal };
+  }, [lines, accountType]);
 
   const shipping = subtotal === 0 || subtotal >= rules.freeShippingOver ? 0 : rules.flatShipping;
   const meetsMinimum = subtotal >= rules.minOrderValue;
@@ -151,8 +141,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
       value={{
         lines,
         vendorId,
-        buyerType,
-        setBuyerType,
         add,
         pendingAdd,
         confirmSwitchVendor,
@@ -164,7 +152,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
         subtotal,
         shipping,
         total: subtotal + shipping,
-        weight,
         meetsMinimum,
       }}
     >

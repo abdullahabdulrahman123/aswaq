@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom';
-import { PastaShape } from '../components/PastaShape';
+import { ProductArt } from '../components/ProductArt';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
-import { unitPrice, nextTier } from '../lib/pricing';
+import { unitPrice, nextTier, seesTierPricing } from '../lib/pricing';
 import {
   offerById,
   brandById,
@@ -15,14 +15,14 @@ import {
 } from '../data/catalog';
 
 export function CartPage() {
-  const { lines, vendorId, setQty, remove, clear, buyerType, subtotal, shipping, total, weight, meetsMinimum } = useCart();
-  const { user, openGate } = useAuth();
+  const { lines, vendorId, setQty, remove, clear, subtotal, shipping, total, meetsMinimum } = useCart();
+  const { user, openGate, accountType } = useAuth();
 
   if (lines.length === 0) {
     return (
       <div className="mx-auto max-w-6xl px-4 py-20 text-center">
         <div className="mx-auto h-32 w-32 opacity-40">
-          <PastaShape shape="farfalle" className="h-full w-full" />
+          <ProductArt category="grocery" className="h-full w-full" />
         </div>
         <h1 className="mt-6 font-display text-2xl font-bold">السلة فاضية</h1>
         <p className="mt-2 text-stone-500 dark:text-stone-400">ابدأ تتصفح المنتجات وضيف اللي يعجبك.</p>
@@ -59,7 +59,7 @@ export function CartPage() {
               {vendor.verified && <span className="text-accent-600 dark:text-accent-400" title="موثّقة">✓</span>}
             </div>
             <div className="mt-0.5 text-xs text-stone-400 tnum">
-              {vendor.city} · ★ {vendor.rating} · الوزن الكلي {(weight / 1000).toFixed(2)} كجم
+              {vendor.city} · ★ {vendor.rating}
             </div>
           </div>
           <Link
@@ -80,13 +80,13 @@ export function CartPage() {
             const product = variant ? productById(variant.productId) : undefined;
             if (!variant || !product) return null;
 
-            const price = unitPrice(offer, line.qty, buyerType);
-            const upcoming = buyerType === 'wholesale' ? nextTier(offer, line.qty) : undefined;
+            const price = unitPrice(offer, line.qty, accountType);
+            const upcoming = seesTierPricing(accountType) ? nextTier(offer, line.qty) : undefined;
 
             return (
               <li key={line.offerId} className="flex flex-wrap items-center gap-4 rounded-2xl border border-stone-200 bg-white p-4 dark:border-white/10 dark:bg-surface-card">
                 <Link to={`/product/${product.id}`} className="shrink-0 rounded-xl bg-brand-50 dark:bg-brand-900/30">
-                  <PastaShape shape={product.shape} className="h-20 w-20" />
+                  <ProductArt category={product.category} className="h-20 w-20" />
                 </Link>
 
                 <div className="min-w-[160px] flex-1">
@@ -94,7 +94,7 @@ export function CartPage() {
                   <Link to={`/product/${product.id}`} className="font-display font-bold hover:text-brand-600">
                     {product.name}
                   </Link>
-                  <div className="mt-0.5 text-xs text-stone-400 tnum">{variant.weight} جم</div>
+                  <div className="mt-0.5 text-xs text-stone-400">{variant.label}</div>
                   {upcoming && (
                     <div className="mt-1 text-xs text-accent-600 tnum dark:text-accent-400">
                       زوّد لـ{upcoming.minQty} والسعر ينزل لـ{egp(upcoming.price)}
@@ -179,9 +179,9 @@ export function CartPage() {
             )}
 
             <div className="mt-5 border-t border-stone-200 pt-4 text-xs leading-relaxed text-stone-400 dark:border-white/10">
-              {buyerType === 'wholesale'
-                ? 'أسعار جملة مطبقة. الحساب التجاري محتاج اعتماد الإدارة في النسخة الحقيقية.'
-                : 'أسعار تجزئة. لو عندك محل أو مطعم، فعّل وضع الجملة من الشريط العلوي.'}
+              {seesTierPricing(accountType)
+                ? 'حسابك حساب شركة — أسعار الكميات مطبّقة.'
+                : 'الأسعار المعروضة للأفراد. حسابات الشركات بتشوف أسعار كميات مختلفة.'}
             </div>
           </div>
         </aside>

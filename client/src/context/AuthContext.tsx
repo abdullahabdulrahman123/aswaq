@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { redirectToWasla, waslaConfigured, type WaslaUser } from '../lib/waslaAuth';
+import type { AccountType } from '../lib/pricing';
 
 /**
  * الزبون يتصفح كزائر عادي، وتسجيل الدخول مطلوب عند إتمام الطلب فقط.
@@ -10,6 +11,8 @@ export type AuthIntent = 'login' | 'register';
 
 interface AuthContextValue {
   user: WaslaUser | null;
+  /** نوع الحساب اللي الأسعار بتتبني عليه — الزائر بيتعامل معاملة الفرد */
+  accountType: AccountType;
   /** هل وصلة متوصّلة فعلاً؟ لو لأ بنشتغل بوضع تجريبي واضح للعميل */
   connected: boolean;
   /** الطلب اللي وقفناه لحد ما يسجّل — بيفتح نافذة الدخول */
@@ -66,6 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sub: 'demo-user',
       name: intent === 'register' ? 'حساب جديد (تجريبي)' : 'مستخدم تجريبي',
       email: 'demo@aswaq.local',
+      accountType: 'INDIVIDUAL',
       demo: true,
     });
     setGateOpen(false);
@@ -80,6 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
+        accountType: user?.accountType ?? 'INDIVIDUAL',
         connected: waslaConfigured,
         gateOpen,
         gateIntent,

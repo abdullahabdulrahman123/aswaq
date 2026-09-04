@@ -4,12 +4,11 @@ import { ProductCard } from '../components/ProductCard';
 import { useCart } from '../context/CartContext';
 import {
   products,
-  shapes,
+  categories,
   brands,
   vendors,
   offersForProduct,
   brandById,
-  variantById,
   vendorById,
   type Product,
 } from '../data/catalog';
@@ -22,12 +21,6 @@ const sortLabels: Record<Sort, string> = {
   'price-desc': 'الأعلى سعراً',
   rating: 'الأعلى تقييماً',
 };
-
-const weightBuckets = [
-  { id: 'sm', label: 'حتى 400 جم', test: (w: number) => w <= 400 },
-  { id: 'md', label: '401 – 700 جم', test: (w: number) => w > 400 && w <= 700 },
-  { id: 'lg', label: 'أكبر من 700 جم', test: (w: number) => w > 700 },
-];
 
 function FilterGroup({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -56,15 +49,14 @@ function Check({ checked, onChange, label, count }: { checked: boolean; onChange
 export function ProductsPage() {
   /**
    * الفلاتر كلها في الـURL وبس — مفيش نسخة تانية في state محلي.
-   * كده زرار الرجوع في المتصفح بيشتغل، والفلترة بقت لينك تقدر تبعته لحد.
+   * كده زرار الرجوع بيشتغل، والفلترة بقت لينك تقدر تبعته لحد.
    */
   const [params, setParams] = useSearchParams();
   const { vendorId: cartVendorId } = useCart();
 
   const query = (params.get('q') ?? '').trim().toLowerCase();
-  const selShapes = params.getAll('shape');
+  const selCategories = params.getAll('category');
   const selBrands = params.getAll('brand');
-  const selWeights = params.getAll('weight');
   const selVendors = params.getAll('vendor');
   const inStockOnly = params.get('stock') === '1';
   const filtersOpen = params.get('filters') === '1';
@@ -86,12 +78,9 @@ export function ProductsPage() {
   }
 
   function clearAll() {
-    update((p) => {
-      ['shape', 'brand', 'weight', 'vendor', 'stock'].forEach((k) => p.delete(k));
-    });
+    update((p) => ['category', 'brand', 'vendor', 'stock'].forEach((k) => p.delete(k)));
   }
 
-  /** أرخص عرض متاح للصنف — أساس الفرز والفلترة بالسعر */
   const cheapestOf = useMemo(() => {
     const map = new Map<string, number>();
     for (const p of products) {
@@ -104,9 +93,7 @@ export function ProductsPage() {
 
   const soldOf = useMemo(() => {
     const map = new Map<string, number>();
-    for (const p of products) {
-      map.set(p.id, offersForProduct(p.id).reduce((sum, o) => sum + o.sold, 0));
-    }
+    for (const p of products) map.set(p.id, offersForProduct(p.id).reduce((s, o) => s + o.sold, 0));
     return map;
   }, []);
 
@@ -122,25 +109,14 @@ export function ProductsPage() {
   const results = useMemo(() => {
     const matches = (p: Product) => {
       const productOffers = offersForProduct(p.id);
-
       if (query) {
-        const haystack = `${p.name} ${brandById(p.brandId)?.name ?? ''} ${p.shape}`.toLowerCase();
+        const haystack = `${p.name} ${brandById(p.brandId)?.name ?? ''}`.toLowerCase();
         if (!haystack.includes(query)) return false;
       }
-      if (selShapes.length && !selShapes.includes(p.shape)) return false;
+      if (selCategories.length && !selCategories.includes(p.category)) return false;
       if (selBrands.length && !selBrands.includes(p.brandId)) return false;
-
-      if (selWeights.length) {
-        const buckets = weightBuckets.filter((b) => selWeights.includes(b.id));
-        const weights = productOffers
-          .map((o) => variantById(o.variantId)?.weight ?? 0)
-          .filter(Boolean);
-        if (!weights.some((w) => buckets.some((b) => b.test(w)))) return false;
-      }
-
       if (selVendors.length && !productOffers.some((o) => selVendors.includes(o.vendorId))) return false;
       if (inStockOnly && !productOffers.some((o) => o.stock > 0)) return false;
-
       return true;
     };
 
@@ -150,39 +126,45 @@ export function ProductsPage() {
       if (sort === 'rating') return (ratingOf.get(b.id) ?? 0) - (ratingOf.get(a.id) ?? 0);
       return (soldOf.get(b.id) ?? 0) - (soldOf.get(a.id) ?? 0);
     });
-  }, [query, selShapes, selBrands, selWeights, selVendors, inStockOnly, sort, cheapestOf, soldOf, ratingOf]);
+  }, [query, selCategories, selBrands, selVendors, inStockOnly, sort, cheapestOf, soldOf, ratingOf]);
 
-  const activeCount =
-    selShapes.length + selBrands.length + selWeights.length + selVendors.length + (inStockOnly ? 1 : 0);
-
-  const countByShape = (id: string) => products.filter((p) => p.shape === id).length;
-  const countByBrand = (id: string) => products.filter((p) => p.brandId === id).length;
-  const countByVendor = (id: string) =>
-    products.filter((p) => offersForProduct(p.id).some((o) => o.vendorId === id)).length;
+  const activeCount = selCategories.length + selBrands.length + selVendors.length + (inStockOnly ? 1 : 0);
 
   const filters = (
     <>
-      <FilterGroup title="الشكل">
-        {shapes.map((s) => (
-          <Check key={s.id} label={s.name} checked={selShapes.includes(s.id)} onChange={() => toggleValue('shape', s.id)} count={countByShape(s.id)} />
+      <FilterGroup title="التصنيف">
+        {categories.map((c) => (
+          <Check
+            key={c.id}
+            label={c.name}
+            checked={selCategories.includes(c.id)}
+            onChange={() => toggleValue('category', c.id)}
+            count={products.filter((p) => p.category === c.id).length}
+          />
         ))}
       </FilterGroup>
 
       <FilterGroup title="الماركة">
         {brands.map((b) => (
-          <Check key={b.id} label={b.name} checked={selBrands.includes(b.id)} onChange={() => toggleValue('brand', b.id)} count={countByBrand(b.id)} />
-        ))}
-      </FilterGroup>
-
-      <FilterGroup title="وزن العبوة">
-        {weightBuckets.map((w) => (
-          <Check key={w.id} label={w.label} checked={selWeights.includes(w.id)} onChange={() => toggleValue('weight', w.id)} />
+          <Check
+            key={b.id}
+            label={b.name}
+            checked={selBrands.includes(b.id)}
+            onChange={() => toggleValue('brand', b.id)}
+            count={products.filter((p) => p.brandId === b.id).length}
+          />
         ))}
       </FilterGroup>
 
       <FilterGroup title="الشركة">
         {vendors.map((v) => (
-          <Check key={v.id} label={v.name} checked={selVendors.includes(v.id)} onChange={() => toggleValue('vendor', v.id)} count={countByVendor(v.id)} />
+          <Check
+            key={v.id}
+            label={v.name}
+            checked={selVendors.includes(v.id)}
+            onChange={() => toggleValue('vendor', v.id)}
+            count={products.filter((p) => offersForProduct(p.id).some((o) => o.vendorId === v.id)).length}
+          />
         ))}
       </FilterGroup>
 
@@ -198,13 +180,12 @@ export function ProductsPage() {
         <h1 className="font-display text-2xl font-bold sm:text-3xl">
           {query ? `نتائج البحث عن "${query}"` : 'كل المنتجات'}
         </h1>
-        <p className="mt-1 text-sm text-stone-500 dark:text-stone-400 tnum">{results.length} صنف</p>
+        <p className="mt-1 text-sm text-stone-500 dark:text-stone-400 tnum">{results.length} منتج</p>
       </div>
 
       {cartVendorId && (
         <p className="mb-6 rounded-xl bg-brand-50 px-4 py-2.5 text-sm text-brand-900 dark:bg-brand-500/10 dark:text-brand-200">
-          سلتك من <strong>{vendorById(cartVendorId)?.name}</strong> — بنعرضلك عروضها الأول لأن الطلب الواحد من شركة واحدة.
-          {' '}
+          سلتك من <strong>{vendorById(cartVendorId)?.name}</strong> — بنعرضلك عروضها الأول لأن الطلب الواحد من شركة واحدة.{' '}
           <button onClick={() => toggleValue('vendor', cartVendorId)} className="underline underline-offset-2">
             اعرض منتجاتها بس
           </button>
@@ -213,7 +194,7 @@ export function ProductsPage() {
 
       <div className="grid gap-8 lg:grid-cols-[240px_1fr]">
         <aside className="hidden lg:block">
-          <div className="sticky top-32 rounded-2xl border border-stone-200 bg-white px-5 dark:border-white/10 dark:bg-surface-card">
+          <div className="sticky top-24 rounded-2xl border border-stone-200 bg-white px-5 dark:border-white/10 dark:bg-surface-card">
             <div className="flex items-center justify-between border-b border-stone-200 py-4 dark:border-white/10">
               <span className="font-display text-sm font-bold">تصفية</span>
               {activeCount > 0 && (

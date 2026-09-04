@@ -36,9 +36,7 @@ export function AuthGateDialog() {
     >
       <div className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl dark:border-white/10 dark:bg-surface-card">
         <div className="flex items-start justify-between gap-4">
-          <h2 id="auth-title" className="font-display text-lg font-bold">
-            {gateIntent === 'register' ? 'اعمل حساب جديد' : 'سجّل دخولك'}
-          </h2>
+          <h2 id="auth-title" className="font-display text-lg font-bold">سجّل دخولك</h2>
           <button onClick={closeGate} aria-label="إغلاق" className="text-stone-400 hover:text-stone-900 dark:hover:text-white">
             ✕
           </button>
@@ -55,22 +53,18 @@ export function AuthGateDialog() {
           </p>
         )}
 
-        <div className="mt-6 space-y-2">
+        <div className="mt-6">
           <button
             ref={primaryRef}
             onClick={() => signIn(gateIntent)}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-500 px-4 py-3 font-semibold text-white transition hover:bg-brand-600"
           >
-            {gateIntent === 'register' ? 'أنشئ حساب عبر وصلة' : 'سجّل دخول عبر وصلة'}
+            تسجيل الدخول عبر وصلة
             <span aria-hidden="true">←</span>
           </button>
-
-          <button
-            onClick={() => signIn(gateIntent === 'register' ? 'login' : 'register')}
-            className="w-full rounded-xl border border-stone-300 px-4 py-3 text-sm font-semibold transition hover:border-stone-400 dark:border-white/15"
-          >
-            {gateIntent === 'register' ? 'عندي حساب بالفعل — سجّل دخول' : 'معنديش حساب — اعمل واحد'}
-          </button>
+          <p className="mt-3 text-center text-xs text-stone-400">
+            وصلة هتسألك تدخل بحسابك أو تعمل واحد جديد.
+          </p>
         </div>
 
         {!connected && (

@@ -7,23 +7,6 @@ const columns = [
       { to: '/products', label: 'كل المنتجات' },
       { to: '/products?sort=best', label: 'الأكثر مبيعاً' },
       { to: '/products?sort=price-asc', label: 'الأوفر سعراً' },
-      { to: '/wholesale', label: 'أسعار الجملة' },
-    ],
-  },
-  {
-    title: 'أسواق',
-    links: [
-      { to: '/wholesale', label: 'انضم كبائع' },
-      { to: '/', label: 'عن أسواق' },
-      { to: '/', label: 'تواصل معنا' },
-    ],
-  },
-  {
-    title: 'المساعدة',
-    links: [
-      { to: '/', label: 'الشحن والتوصيل' },
-      { to: '/', label: 'الاسترجاع والاستبدال' },
-      { to: '/', label: 'طرق الدفع' },
     ],
   },
 ];
@@ -31,11 +14,11 @@ const columns = [
 export function Footer() {
   return (
     <footer className="mt-20 border-t border-stone-200 bg-stone-50 dark:border-white/10 dark:bg-surface-DEFAULT">
-      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:grid-cols-2">
         <div>
           <div className="font-display text-2xl font-bold text-brand-700 dark:text-brand-400">أسواق</div>
           <p className="mt-3 max-w-xs text-sm leading-relaxed text-stone-500 dark:text-stone-400">
-            سوق المعكرونة في مصر. كل الأشكال والماركات من بائعين موثوقين، للبيت والمحل والمطعم.
+            منصة بيع تجمع شركات موثّقة في مكان واحد — كل شركة بتعرض منتجاتها وأسعارها.
           </p>
         </div>
 
