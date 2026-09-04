@@ -78,7 +78,11 @@ export async function redirectToWasla(returnTo: string): Promise<void> {
   // القيم دي مؤقتة ومرة واحدة وبتتمسح فور تبادل الكود.
   localStorage.setItem('aswaq_wasla_verifier', verifier);
   localStorage.setItem('aswaq_wasla_state', state);
-  localStorage.setItem('aswaq_wasla_return', returnTo);
+  // بنخزّن المسار نسبةً لجذر التطبيق. الراوتر بيضيف البادئة (/aswaq/) لوحده،
+  // فلو خزّنّا المسار كامل بيتكرر ويطلع /aswaq/aswaq/.
+  const base = import.meta.env.BASE_URL || '/';
+  const relative = returnTo.startsWith(base) ? returnTo.slice(base.length - 1) : returnTo;
+  localStorage.setItem('aswaq_wasla_return', relative.startsWith('/') ? relative : `/${relative}`);
 
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
