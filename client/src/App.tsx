@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { Route, Routes, useLocation } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
-import { Footer } from './components/Footer';
 import { VendorSwitchDialog } from './components/VendorSwitchDialog';
 import { HomePage } from './pages/HomePage';
 import { ProductsPage } from './pages/ProductsPage';
@@ -37,7 +36,6 @@ export function App() {
           <Route path="*" element={<HomePage />} />
         </Routes>
       </main>
-      <Footer />
       <VendorSwitchDialog />
     </div>
   );
