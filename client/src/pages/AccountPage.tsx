@@ -135,9 +135,8 @@ export function AccountPage() {
             </button>
 
             {pendingNote && (
-              <p className="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
-                نموذج تسجيل النشاط لسه مش متبني — البيانات والمستندات المطلوبة
-                محتاجة تتحدد مع العميل الأول.
+              <p className="mt-4 rounded-lg bg-stone-100 px-4 py-3 text-sm text-stone-600 dark:bg-white/5 dark:text-stone-300">
+                لم يتم التحديد
               </p>
             )}
           </>
