@@ -1,17 +1,34 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { redirectToWasla, waslaConfigured, type WaslaUser } from '../lib/waslaAuth';
 import type { AccountType } from '../lib/pricing';
+import type { CategoryId } from '../data/catalog';
 
 /**
  * الزبون يتصفح كزائر عادي، وتسجيل الدخول مطلوب عند إتمام الطلب فقط.
- * في كل الحالات التسجيل بيتم عبر وصلة — أسواق مش بيخزّن كلمات سر.
+ * التسجيل كله عبر وصلة — أسواق مش بيخزّن كلمات سر.
+ *
+ * وصلة بتقول مين المستخدم وبس. الفرق بين الفرد والشركة بيتحدد هنا في
+ * أسواق: اللي عنده نشاط تجاري مسجّل بيبقى شركة، والباقي أفراد.
+ * ده الصح لأن النشاط التجاري حاجة تخص أسواق مش منصة الهوية.
  */
 
 export type AuthIntent = 'login' | 'register';
 
+/** نشاط تجاري مسجّل على أسواق — بيحوّل الحساب لحساب شركة */
+export interface Business {
+  name: string;
+  category: CategoryId;
+  city: string;
+  createdAt: string;
+}
+
 interface AuthContextValue {
   user: WaslaUser | null;
-  /** نوع الحساب اللي الأسعار بتتبني عليه — الزائر بيتعامل معاملة الفرد */
+  /** النشاط التجاري بتاع المستخدم الحالي، لو عمل واحد */
+  business: Business | null;
+  createBusiness: (b: Omit<Business, 'createdAt'>) => void;
+  deleteBusiness: () => void;
+  /** الأسعار بتتبني عليه — الزائر والفرد زي بعض، الشركة بتشوف أسعار الكميات */
   accountType: AccountType;
   /** هل وصلة متوصّلة فعلاً؟ لو لأ بنشتغل بوضع تجريبي واضح للعميل */
   connected: boolean;
@@ -20,7 +37,6 @@ interface AuthContextValue {
   gateIntent: AuthIntent;
   openGate: (intent?: AuthIntent) => void;
   closeGate: () => void;
-  /** يوجّه لوصلة، أو يفتح جلسة تجريبية لو وصلة مش متوصّلة */
   signIn: (intent: AuthIntent) => Promise<void>;
   setUser: (u: WaslaUser) => void;
   signOut: () => void;
@@ -37,20 +53,52 @@ function loadUser(): WaslaUser | null {
   }
 }
 
+/** مفتاح لكل مستخدم — عشان نشاط حد ميظهرش لحد تاني على نفس الجهاز */
+const businessKey = (sub: string) => `aswaq_business_${sub}`;
+
+function loadBusiness(sub: string | undefined): Business | null {
+  if (!sub) return null;
+  try {
+    const raw = localStorage.getItem(businessKey(sub));
+    return raw ? (JSON.parse(raw) as Business) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUserState] = useState<WaslaUser | null>(loadUser);
+  const [business, setBusiness] = useState<Business | null>(() => loadBusiness(loadUser()?.sub));
   const [gateOpen, setGateOpen] = useState(false);
   const [gateIntent, setGateIntent] = useState<AuthIntent>('login');
 
   useEffect(() => {
     if (user) localStorage.setItem('aswaq_user', JSON.stringify(user));
     else localStorage.removeItem('aswaq_user');
+    // النشاط التجاري بيتقرا من جديد مع كل تغيير مستخدم
+    setBusiness(loadBusiness(user?.sub));
   }, [user]);
 
   const setUser = useCallback((u: WaslaUser) => {
     setUserState(u);
     setGateOpen(false);
   }, []);
+
+  const createBusiness = useCallback(
+    (b: Omit<Business, 'createdAt'>) => {
+      if (!user) return;
+      const record: Business = { ...b, createdAt: new Date().toISOString() };
+      localStorage.setItem(businessKey(user.sub), JSON.stringify(record));
+      setBusiness(record);
+    },
+    [user],
+  );
+
+  const deleteBusiness = useCallback(() => {
+    if (!user) return;
+    localStorage.removeItem(businessKey(user.sub));
+    setBusiness(null);
+  }, [user]);
 
   const openGate = useCallback((intent: AuthIntent = 'login') => {
     setGateIntent(intent);
@@ -69,7 +117,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sub: 'demo-user',
       name: intent === 'register' ? 'حساب جديد (تجريبي)' : 'مستخدم تجريبي',
       email: 'demo@aswaq.local',
-      accountType: 'INDIVIDUAL',
       demo: true,
     });
     setGateOpen(false);
@@ -77,6 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(() => {
     setUserState(null);
+    setBusiness(null);
     setGateOpen(false);
   }, []);
 
@@ -84,7 +132,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
-        accountType: user?.accountType ?? 'INDIVIDUAL',
+        business,
+        createBusiness,
+        deleteBusiness,
+        accountType: business ? 'COMPANY' : 'INDIVIDUAL',
         connected: waslaConfigured,
         gateOpen,
         gateIntent,

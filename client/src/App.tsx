@@ -9,6 +9,7 @@ import { ProductsPage } from './pages/ProductsPage';
 import { ProductPage } from './pages/ProductPage';
 import { VendorPage } from './pages/VendorPage';
 import { CartPage } from './pages/CartPage';
+import { AccountPage } from './pages/AccountPage';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 
 /** نرجع لأعلى الصفحة عند تغيير المسار — من غير الفلاتر عشان متقفزش مع كل فلتر */
@@ -32,6 +33,7 @@ export function App() {
           <Route path="/product/:id" element={<ProductPage />} />
           <Route path="/vendor/:id" element={<VendorPage />} />
           <Route path="/cart" element={<CartPage />} />
+          <Route path="/account" element={<AccountPage />} />
           <Route path="/auth/wasla/callback" element={<AuthCallbackPage />} />
           <Route path="*" element={<HomePage />} />
         </Routes>

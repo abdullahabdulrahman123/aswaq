@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { waslaAccountUrl, waslaConfigured } from '../lib/waslaAuth';
 
 /**
- * أسواق مبيخزّنش حسابات — الحساب نفسه عايش في وصلة.
- * فإدارة الحساب ومسحه بيتمّوا هناك، وإحنا بنوصّل المستخدم لهم.
+ * الهوية عايشة في وصلة، لكن صفحة الحساب في أسواق —
+ * لأن النشاط التجاري بيتسجّل هنا مش هناك.
  */
 export function AccountMenu() {
   const { user, signOut } = useAuth();
@@ -54,6 +55,15 @@ export function AccountMenu() {
             {user.email && <div className="truncate text-xs text-stone-400">{user.email}</div>}
           </div>
 
+          <Link
+            role="menuitem"
+            to="/account"
+            onClick={() => setOpen(false)}
+            className="block px-4 py-2.5 text-sm transition hover:bg-stone-50 dark:hover:bg-white/5"
+          >
+            حسابي ونشاطي التجاري
+          </Link>
+
           {waslaConfigured ? (
             <>
               <a
@@ -61,9 +71,9 @@ export function AccountMenu() {
                 href={`${waslaAccountUrl()}/profile`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block px-4 py-2.5 text-sm transition hover:bg-stone-50 dark:hover:bg-white/5"
+                className="block border-t border-stone-200 px-4 py-2.5 text-sm transition hover:bg-stone-50 dark:border-white/10 dark:hover:bg-white/5"
               >
-                إدارة حسابي في وصلة ↗
+                بياناتي في وصلة ↗
               </a>
               <a
                 role="menuitem"
