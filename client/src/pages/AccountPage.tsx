@@ -1,12 +1,10 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { waslaAccountUrl, waslaConfigured } from '../lib/waslaAuth';
 import { categoryById } from '../data/catalog';
 
 /**
  * صفحة الحساب في أسواق.
- * بيانات الهوية جاية من وصلة (وتتعدّل هناك)، والنشاط التجاري بيتسجّل هنا.
  *
  * أغلب المستخدمين مشترين مش بائعين، فأي كلام عن البيع والنشاط التجاري
  * مبيظهرش غير بعد ما يكون فيه نشاط فعلاً. اللي من غير نشاط بيشوف
@@ -56,19 +54,9 @@ export function AccountPage() {
             )}
           </div>
 
-          {waslaConfigured && (
-            <a
-              href={`${waslaAccountUrl()}/profile`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="whitespace-nowrap rounded-lg border border-stone-300 px-3 py-2 text-xs font-medium transition hover:border-brand-400 dark:border-white/15"
-            >
-              تعديل بياناتي ↗
-            </a>
-          )}
         </div>
         <p className="mt-4 border-t border-stone-200 pt-3 text-xs leading-relaxed text-stone-400 dark:border-white/10">
-          بياناتك الشخصية وكلمة السر بتتدار من حساب الدخول بتاعك — أسواق مبيحفظش كلمة السر عنده.
+          تعديل بياناتك الشخصية وكلمة السر هيتضاف في مرحلة جاية.
         </p>
       </section>
 

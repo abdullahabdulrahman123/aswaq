@@ -43,8 +43,7 @@ export function AuthGateDialog() {
         </div>
 
         <p className="mt-3 leading-relaxed text-stone-600 dark:text-stone-300">
-          حسابك على أسواق بيتم عن طريق <strong>وصلة</strong> — حساب واحد يفتحلك كل التطبيقات
-          المرتبطة بيها. أسواق مبيحفظش كلمة السر عنده.
+          سجّل دخولك أو اعمل حساب جديد في خطوة واحدة.
         </p>
 
         {isCheckout && (
@@ -59,18 +58,18 @@ export function AuthGateDialog() {
             onClick={() => signIn(gateIntent)}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-500 px-4 py-3 font-semibold text-white transition hover:bg-brand-600"
           >
-            تسجيل الدخول عبر وصلة
+            تسجيل الدخول
             <span aria-hidden="true">←</span>
           </button>
           <p className="mt-3 text-center text-xs text-stone-400">
-            وصلة هتسألك تدخل بحسابك أو تعمل واحد جديد.
+            هتقدر تدخل بحسابك أو تعمل واحد جديد.
           </p>
         </div>
 
         {!connected && (
           <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
-            <strong>وضع تجريبي:</strong> وصلة مش متوصّلة بالنسخة دي، فالضغط هيفتح جلسة وهمية
-            لعرض الشكل بس. في التشغيل الحقيقي الزرار بيوديك على صفحة وصلة.
+            <strong>وضع تجريبي:</strong> تسجيل الدخول مش متوصّل بالنسخة دي، فالضغط
+            هيفتح جلسة وهمية لعرض الشكل بس.
           </p>
         )}
 

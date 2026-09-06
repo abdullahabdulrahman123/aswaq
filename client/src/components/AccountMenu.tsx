@@ -1,12 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { waslaAccountUrl, waslaConfigured } from '../lib/waslaAuth';
 
-/**
- * الهوية عايشة في وصلة، لكن صفحة الحساب في أسواق —
- * لأن النشاط التجاري بيتسجّل هنا مش هناك.
- */
+/** قائمة الحساب — كل حاجة تخص المستخدم جوه أسواق */
 export function AccountMenu() {
   const { user, signOut } = useAuth();
   const [open, setOpen] = useState(false);
@@ -63,33 +59,6 @@ export function AccountMenu() {
           >
             حسابي
           </Link>
-
-          {waslaConfigured ? (
-            <>
-              <a
-                role="menuitem"
-                href={`${waslaAccountUrl()}/sessions`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block border-t border-stone-200 px-4 py-2.5 text-sm transition hover:bg-stone-50 dark:border-white/10 dark:hover:bg-white/5"
-              >
-                الأجهزة والجلسات ↗
-              </a>
-              <a
-                role="menuitem"
-                href={`${waslaAccountUrl()}/profile#delete`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block border-t border-stone-200 px-4 py-2.5 text-sm text-red-600 transition hover:bg-red-50 dark:border-white/10 dark:text-red-400 dark:hover:bg-red-500/10"
-              >
-                مسح الحساب نهائياً ↗
-              </a>
-            </>
-          ) : (
-            <p className="border-b border-stone-200 px-4 py-3 text-xs leading-relaxed text-stone-400 dark:border-white/10">
-              إدارة الحساب ومسحه مش متاحين في النسخة التجريبية دي.
-            </p>
-          )}
 
           <button
             role="menuitem"
