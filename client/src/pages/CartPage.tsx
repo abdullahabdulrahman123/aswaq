@@ -174,7 +174,7 @@ export function CartPage() {
               </p>
             ) : (
               <p className="mt-3 text-center text-xs leading-relaxed text-stone-400">
-                بتتسوق كزائر. التسجيل عبر وصلة مطلوب عند إتمام الطلب بس.
+                بتتسوق كزائر. تسجيل الدخول مطلوب عند إتمام الطلب بس.
               </p>
             )}
 

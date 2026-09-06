@@ -63,12 +63,12 @@ export function AccountPage() {
               rel="noopener noreferrer"
               className="whitespace-nowrap rounded-lg border border-stone-300 px-3 py-2 text-xs font-medium transition hover:border-brand-400 dark:border-white/15"
             >
-              تعديل بياناتي في وصلة ↗
+              تعديل بياناتي ↗
             </a>
           )}
         </div>
         <p className="mt-4 border-t border-stone-200 pt-3 text-xs leading-relaxed text-stone-400 dark:border-white/10">
-          بياناتك الشخصية وكلمة السر بتتدار في وصلة. أسواق مبيحفظش كلمة السر عنده.
+          بياناتك الشخصية وكلمة السر بتتدار من حساب الدخول بتاعك — أسواق مبيحفظش كلمة السر عنده.
         </p>
       </section>
 

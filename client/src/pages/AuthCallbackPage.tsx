@@ -29,13 +29,13 @@ export function AuthCallbackPage() {
       const oidcError = params.get('error');
 
       if (oidcError) {
-        setError(params.get('error_description') || 'وصلة رفضت طلب تسجيل الدخول.');
+        setError(params.get('error_description') || 'اتفض طلب تسجيل الدخول.');
         setCanRetry(true);
         return;
       }
 
       if (!code) {
-        setError('رد وصلة ناقص. حاول تسجّل تاني.');
+        setError('الرد ناقص. حاول تسجّل تاني.');
         setCanRetry(true);
         return;
       }
@@ -48,7 +48,7 @@ export function AuthCallbackPage() {
       }
 
       if (!validateState(state)) {
-        setError('رد وصلة مش مطابق للمحاولة المحفوظة. ابدأ من الأول.');
+        setError('الرد مش مطابق للمحاولة المحفوظة. ابدأ من الأول.');
         setCanRetry(true);
         return;
       }
@@ -90,7 +90,7 @@ export function AuthCallbackPage() {
       ) : (
         <div>
           <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-stone-200 border-t-brand-500 motion-reduce:animate-none dark:border-white/15 dark:border-t-brand-400" />
-          <p className="mt-4 text-stone-500 dark:text-stone-400">بنكمّل تسجيل الدخول عبر وصلة…</p>
+          <p className="mt-4 text-stone-500 dark:text-stone-400">بنكمّل تسجيل دخولك…</p>
         </div>
       )}
     </div>

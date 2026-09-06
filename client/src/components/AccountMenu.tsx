@@ -87,7 +87,7 @@ export function AccountMenu() {
             </>
           ) : (
             <p className="border-b border-stone-200 px-4 py-3 text-xs leading-relaxed text-stone-400 dark:border-white/10">
-              إدارة الحساب ومسحه بيتمّوا في وصلة — مش متاحين في النسخة التجريبية دي.
+              إدارة الحساب ومسحه مش متاحين في النسخة التجريبية دي.
             </p>
           )}
 
