@@ -1,16 +1,12 @@
 import { Link, NavLink, useNavigate, useSearchParams } from 'react-router-dom';
 import { useState } from 'react';
-import { useCart } from '../context/CartContext';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { AccountMenu } from './AccountMenu';
-import { vendorById } from '../data/catalog';
 
 const navLinks = [{ to: '/products', label: 'كل المنتجات' }];
 
 export function Navbar() {
-  const { count, vendorId } = useCart();
-  const cartVendor = vendorId ? vendorById(vendorId) : undefined;
   const { theme, toggleTheme } = useTheme();
   const { user, openGate } = useAuth();
   const navigate = useNavigate();
@@ -68,18 +64,6 @@ export function Navbar() {
             </button>
           )}
 
-          <Link
-            to="/cart"
-            title={cartVendor ? `سلتك من ${cartVendor.name}` : undefined}
-            className="relative rounded-lg bg-stone-900 px-3 py-2 text-sm font-medium text-white hover:bg-stone-800 dark:bg-brand-500 dark:hover:bg-brand-600"
-          >
-            السلة
-            {count > 0 && (
-              <span className="absolute -top-1.5 -end-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-accent-500 px-1 text-[11px] font-bold text-white tnum">
-                {count}
-              </span>
-            )}
-          </Link>
         </div>
       </nav>
 
