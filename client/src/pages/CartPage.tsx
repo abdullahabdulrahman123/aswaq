@@ -26,9 +26,6 @@ export function CartPage() {
         </div>
         <h1 className="mt-6 font-display text-2xl font-bold">السلة فاضية</h1>
         <p className="mt-2 text-stone-500 dark:text-stone-400">ابدأ تتصفح المنتجات وضيف اللي يعجبك.</p>
-        <Link to="/products" className="mt-6 inline-block rounded-xl bg-brand-500 px-6 py-3 font-semibold text-white hover:bg-brand-600">
-          تصفح المنتجات
-        </Link>
       </div>
     );
   }

@@ -44,9 +44,6 @@ export function ProductPage() {
     return (
       <div className="mx-auto max-w-6xl px-4 py-20 text-center">
         <h1 className="font-display text-2xl font-bold">المنتج غير موجود</h1>
-        <Link to="/products" className="mt-4 inline-block text-brand-600 hover:underline dark:text-brand-400">
-          ارجع للمنتجات
-        </Link>
       </div>
     );
   }
@@ -77,9 +74,7 @@ export function ProductPage() {
       <nav className="mb-6 flex flex-wrap items-center gap-2 text-sm text-stone-500 dark:text-stone-400">
         <Link to="/" className="hover:text-brand-600">الرئيسية</Link>
         <span aria-hidden="true">/</span>
-        <Link to="/products" className="hover:text-brand-600">المنتجات</Link>
-        <span aria-hidden="true">/</span>
-        <Link to={`/products?category=${product.category}`} className="hover:text-brand-600">{category?.name}</Link>
+        <span>{category?.name}</span>
       </nav>
 
       <div className="grid gap-10 lg:grid-cols-2">

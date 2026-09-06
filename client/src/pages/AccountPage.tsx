@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { categoryById } from '../data/catalog';
 
@@ -126,11 +125,6 @@ export function AccountPage() {
         </div>
       )}
 
-      <p className="mt-8 text-center text-sm">
-        <Link to="/products" className="text-brand-600 hover:underline dark:text-brand-400">
-          ارجع للتسوق ←
-        </Link>
-      </p>
     </div>
   );
 }
