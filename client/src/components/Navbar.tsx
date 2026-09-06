@@ -1,10 +1,8 @@
-import { Link, NavLink, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useState } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { AccountMenu } from './AccountMenu';
-
-const navLinks = [{ to: '/products', label: 'كل المنتجات' }];
 
 export function Navbar() {
   const { theme, toggleTheme } = useTheme();
@@ -75,26 +73,6 @@ export function Navbar() {
         </div>
       </nav>
 
-      <div className="mx-auto max-w-6xl px-4 pb-2">
-        <div className="no-scrollbar flex gap-4 overflow-x-auto text-sm">
-          {navLinks.map((l) => (
-            <NavLink
-              key={l.label}
-              to={l.to}
-              className={({ isActive }) =>
-                `whitespace-nowrap border-b-2 pb-1.5 transition ${
-                  isActive
-                    ? 'border-brand-500 text-brand-700 dark:text-brand-400'
-                    : 'border-transparent text-stone-500 hover:text-stone-900 dark:hover:text-stone-100'
-                }`
-              }
-              end
-            >
-              {l.label}
-            </NavLink>
-          ))}
-        </div>
-      </div>
     </header>
   );
 }
