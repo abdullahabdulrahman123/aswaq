@@ -61,7 +61,7 @@ export function AccountMenu() {
             onClick={() => setOpen(false)}
             className="block px-4 py-2.5 text-sm transition hover:bg-stone-50 dark:hover:bg-white/5"
           >
-            حسابي ونشاطي التجاري
+            حسابي
           </Link>
 
           {waslaConfigured ? (
