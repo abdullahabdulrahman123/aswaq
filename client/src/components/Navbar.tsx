@@ -8,7 +8,7 @@ const navLinks = [{ to: '/products', label: 'كل المنتجات' }];
 
 export function Navbar() {
   const { theme, toggleTheme } = useTheme();
-  const { user, openGate } = useAuth();
+  const { user, signIn } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const [query, setQuery] = useState(params.get('q') ?? '');
@@ -58,13 +58,13 @@ export function Navbar() {
           ) : (
             <div className="flex items-center gap-1.5">
               <button
-                onClick={() => openGate('login')}
+                onClick={() => signIn('login')}
                 className="rounded-lg border border-stone-300 px-2.5 py-1.5 text-xs font-medium transition hover:border-brand-400 dark:border-white/15"
               >
                 تسجيل الدخول
               </button>
               <button
-                onClick={() => openGate('register')}
+                onClick={() => signIn('register')}
                 className="rounded-lg bg-brand-500 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-600"
               >
                 إنشاء حساب

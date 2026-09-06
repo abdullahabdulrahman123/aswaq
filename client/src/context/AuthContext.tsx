@@ -32,11 +32,6 @@ interface AuthContextValue {
   accountType: AccountType;
   /** هل وصلة متوصّلة فعلاً؟ لو لأ بنشتغل بوضع تجريبي واضح للعميل */
   connected: boolean;
-  /** الطلب اللي وقفناه لحد ما يسجّل — بيفتح نافذة الدخول */
-  gateOpen: boolean;
-  gateIntent: AuthIntent;
-  openGate: (intent?: AuthIntent) => void;
-  closeGate: () => void;
   signIn: (intent: AuthIntent) => Promise<void>;
   setUser: (u: WaslaUser) => void;
   signOut: () => void;
@@ -69,8 +64,6 @@ function loadBusiness(sub: string | undefined): Business | null {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUserState] = useState<WaslaUser | null>(loadUser);
   const [business, setBusiness] = useState<Business | null>(() => loadBusiness(loadUser()?.sub));
-  const [gateOpen, setGateOpen] = useState(false);
-  const [gateIntent, setGateIntent] = useState<AuthIntent>('login');
 
   useEffect(() => {
     if (user) localStorage.setItem('aswaq_user', JSON.stringify(user));
@@ -81,7 +74,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const setUser = useCallback((u: WaslaUser) => {
     setUserState(u);
-    setGateOpen(false);
   }, []);
 
   const createBusiness = useCallback(
@@ -100,13 +92,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setBusiness(null);
   }, [user]);
 
-  const openGate = useCallback((intent: AuthIntent = 'login') => {
-    setGateIntent(intent);
-    setGateOpen(true);
-  }, []);
-
-  const closeGate = useCallback(() => setGateOpen(false), []);
-
   const signIn = useCallback(async (intent: AuthIntent) => {
     if (waslaConfigured) {
       await redirectToWasla(window.location.pathname + window.location.search);
@@ -119,13 +104,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: 'demo@aswaq.local',
       demo: true,
     });
-    setGateOpen(false);
   }, []);
 
   const signOut = useCallback(() => {
     setUserState(null);
     setBusiness(null);
-    setGateOpen(false);
   }, []);
 
   return (
@@ -137,10 +120,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         deleteBusiness,
         accountType: business ? 'COMPANY' : 'INDIVIDUAL',
         connected: waslaConfigured,
-        gateOpen,
-        gateIntent,
-        openGate,
-        closeGate,
         signIn,
         setUser,
         signOut,

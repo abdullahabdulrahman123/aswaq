@@ -3,7 +3,6 @@ import { Route, Routes, useLocation } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { VendorSwitchDialog } from './components/VendorSwitchDialog';
-import { AuthGateDialog } from './components/AuthGateDialog';
 import { HomePage } from './pages/HomePage';
 import { ProductsPage } from './pages/ProductsPage';
 import { ProductPage } from './pages/ProductPage';
@@ -40,7 +39,6 @@ export function App() {
       </main>
       <Footer />
       <VendorSwitchDialog />
-      <AuthGateDialog />
     </div>
   );
 }

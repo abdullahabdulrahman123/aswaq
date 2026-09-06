@@ -16,7 +16,7 @@ import {
 
 export function CartPage() {
   const { lines, vendorId, setQty, remove, clear, subtotal, shipping, total, meetsMinimum } = useCart();
-  const { user, openGate, accountType } = useAuth();
+  const { user, signIn, accountType } = useAuth();
 
   if (lines.length === 0) {
     return (
@@ -161,7 +161,7 @@ export function CartPage() {
               disabled={!meetsMinimum}
               onClick={() => {
                 // الزائر يتسوق عادي، وأول ما يقرر يشتري بنطلب التسجيل
-                if (!user) return openGate('login');
+                if (!user) return signIn('login');
               }}
               className="mt-5 w-full rounded-xl bg-stone-900 px-6 py-3 font-semibold text-white transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-300 dark:bg-brand-500 dark:hover:bg-brand-600 dark:disabled:bg-white/10 dark:disabled:text-stone-500"
             >

@@ -11,7 +11,7 @@ import { categoryById } from '../data/catalog';
  * زرار واحد هادي وبس.
  */
 export function AccountPage() {
-  const { user, business, deleteBusiness, openGate } = useAuth();
+  const { user, business, deleteBusiness, signIn } = useAuth();
   /** الزرار موجود، والنموذج نفسه لسه بيتحدد مع العميل */
   const [pendingNote, setPendingNote] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -24,7 +24,7 @@ export function AccountPage() {
           صفحة الحساب متاحة بعد تسجيل الدخول.
         </p>
         <button
-          onClick={() => openGate('login')}
+          onClick={() => signIn('login')}
           className="mt-6 rounded-xl bg-brand-500 px-6 py-3 font-semibold text-white hover:bg-brand-600"
         >
           تسجيل الدخول
