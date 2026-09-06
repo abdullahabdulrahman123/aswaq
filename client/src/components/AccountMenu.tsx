@@ -68,19 +68,10 @@ export function AccountMenu() {
             <>
               <a
                 role="menuitem"
-                href={`${waslaAccountUrl()}/profile`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block border-t border-stone-200 px-4 py-2.5 text-sm transition hover:bg-stone-50 dark:border-white/10 dark:hover:bg-white/5"
-              >
-                بياناتي في وصلة ↗
-              </a>
-              <a
-                role="menuitem"
                 href={`${waslaAccountUrl()}/sessions`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block px-4 py-2.5 text-sm transition hover:bg-stone-50 dark:hover:bg-white/5"
+                className="block border-t border-stone-200 px-4 py-2.5 text-sm transition hover:bg-stone-50 dark:border-white/10 dark:hover:bg-white/5"
               >
                 الأجهزة والجلسات ↗
               </a>
