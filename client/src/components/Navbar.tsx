@@ -56,12 +56,20 @@ export function Navbar() {
           {user ? (
             <AccountMenu />
           ) : (
-            <button
-              onClick={() => openGate('login')}
-              className="rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-600"
-            >
-              تسجيل الدخول
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => openGate('login')}
+                className="rounded-lg border border-stone-300 px-2.5 py-1.5 text-xs font-medium transition hover:border-brand-400 dark:border-white/15"
+              >
+                تسجيل الدخول
+              </button>
+              <button
+                onClick={() => openGate('register')}
+                className="rounded-lg bg-brand-500 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-600"
+              >
+                إنشاء حساب
+              </button>
+            </div>
           )}
 
         </div>

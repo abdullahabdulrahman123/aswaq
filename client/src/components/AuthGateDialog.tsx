@@ -36,14 +36,18 @@ export function AuthGateDialog() {
     >
       <div className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl dark:border-white/10 dark:bg-surface-card">
         <div className="flex items-start justify-between gap-4">
-          <h2 id="auth-title" className="font-display text-lg font-bold">سجّل دخولك</h2>
+          <h2 id="auth-title" className="font-display text-lg font-bold">
+            {gateIntent === 'register' ? 'اعمل حساب جديد' : 'سجّل دخولك'}
+          </h2>
           <button onClick={closeGate} aria-label="إغلاق" className="text-stone-400 hover:text-stone-900 dark:hover:text-white">
             ✕
           </button>
         </div>
 
         <p className="mt-3 leading-relaxed text-stone-600 dark:text-stone-300">
-          سجّل دخولك أو اعمل حساب جديد في خطوة واحدة.
+          {gateIntent === 'register'
+            ? 'اعمل حسابك في خطوة واحدة وابدأ تتسوق.'
+            : 'سجّل دخولك أو اعمل حساب جديد في خطوة واحدة.'}
         </p>
 
         {isCheckout && (
@@ -58,7 +62,7 @@ export function AuthGateDialog() {
             onClick={() => signIn(gateIntent)}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-500 px-4 py-3 font-semibold text-white transition hover:bg-brand-600"
           >
-            تسجيل الدخول
+            {gateIntent === 'register' ? 'إنشاء حساب' : 'تسجيل الدخول'}
             <span aria-hidden="true">←</span>
           </button>
           <p className="mt-3 text-center text-xs text-stone-400">
