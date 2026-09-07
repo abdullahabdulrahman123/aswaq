@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
+/** أقصى عدد نشاطات بتظهر أسماؤها في القائمة قبل ما نختصر */
+const MAX_IN_MENU = 5;
+
 /** قائمة الحساب — كل حاجة تخص المستخدم جوه أسواق */
 export function AccountMenu() {
   const { user, businesses, signOut } = useAuth();
@@ -82,6 +85,37 @@ export function AccountMenu() {
               </span>
             )}
           </Link>
+
+          {/*
+            أسماء النشاطات تحت الزرار مباشرة. بنعرض أول MAX_IN_MENU وبس —
+            القائمة دي منسدلة من الناڤبار، ولو المستخدم عنده عشرين نشاط
+            هتطوّل لحد ما تخرج بره الشاشة.
+          */}
+          {businesses.length > 0 && (
+            <ul className="border-b border-stone-100 pb-1.5 dark:border-white/5">
+              {businesses.slice(0, MAX_IN_MENU).map((b) => (
+                <li key={b.id}>
+                  <Link
+                    role="menuitem"
+                    to="/businesses"
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-2 py-1.5 pe-4 ps-8 text-sm text-stone-600 transition hover:bg-stone-50 dark:text-stone-300 dark:hover:bg-white/5"
+                  >
+                    <span className="shrink-0 rounded bg-brand-50 px-1.5 py-0.5 font-display text-[11px] font-bold text-brand-800 dark:bg-brand-500/15 dark:text-brand-200">
+                      {b.abbreviation}
+                    </span>
+                    <span className="truncate">{b.name}</span>
+                  </Link>
+                </li>
+              ))}
+
+              {businesses.length > MAX_IN_MENU && (
+                <li className="py-1.5 pe-4 ps-8 text-xs text-stone-400">
+                  وكمان {businesses.length - MAX_IN_MENU}…
+                </li>
+              )}
+            </ul>
+          )}
 
           <button
             role="menuitem"
