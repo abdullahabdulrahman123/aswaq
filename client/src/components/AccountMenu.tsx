@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 
 /** قائمة الحساب — كل حاجة تخص المستخدم جوه أسواق */
 export function AccountMenu() {
-  const { user, signOut } = useAuth();
+  const { user, businesses, signOut } = useAuth();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -60,26 +60,28 @@ export function AccountMenu() {
             حسابي
           </Link>
 
-          {/*
-            الزرارين دول لسه مش موصّلين بأي صفحة — وجهتهم بتتحدد مع العميل.
-            سايبينهم <button> من غير onClick بدل <Link> لمكان مؤقت، عشان
-            محدش يدوس ويلاقي نفسه في صفحة نص مبنية.
-          */}
-          <button
+          <Link
             role="menuitem"
+            to="/business/new"
             onClick={() => setOpen(false)}
-            className="block w-full px-4 py-2.5 text-start text-sm transition hover:bg-stone-50 dark:hover:bg-white/5"
+            className="block px-4 py-2.5 text-sm transition hover:bg-stone-50 dark:hover:bg-white/5"
           >
             أنشئ نشاط تجاري
-          </button>
+          </Link>
 
-          <button
+          <Link
             role="menuitem"
+            to="/businesses"
             onClick={() => setOpen(false)}
-            className="block w-full px-4 py-2.5 text-start text-sm transition hover:bg-stone-50 dark:hover:bg-white/5"
+            className="flex items-center justify-between gap-2 px-4 py-2.5 text-sm transition hover:bg-stone-50 dark:hover:bg-white/5"
           >
-            نشاطاتي التجارية
-          </button>
+            <span>نشاطاتي التجارية</span>
+            {businesses.length > 0 && (
+              <span className="rounded-md bg-stone-100 px-1.5 py-0.5 text-xs tabular-nums text-stone-500 dark:bg-white/10 dark:text-stone-400">
+                {businesses.length}
+              </span>
+            )}
+          </Link>
 
           <button
             role="menuitem"

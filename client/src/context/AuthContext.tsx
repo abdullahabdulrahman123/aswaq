@@ -1,7 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { redirectToWasla, waslaConfigured, type WaslaUser } from '../lib/waslaAuth';
 import type { AccountType } from '../lib/pricing';
-import type { CategoryId } from '../data/catalog';
 
 /**
  * الزبون يتصفح كزائر عادي، وتسجيل الدخول مطلوب عند إتمام الطلب فقط.
@@ -14,20 +13,24 @@ import type { CategoryId } from '../data/catalog';
 
 export type AuthIntent = 'login' | 'register';
 
-/** نشاط تجاري مسجّل على أسواق — بيحوّل الحساب لحساب شركة */
+/**
+ * نشاط تجاري مسجّل على أسواق — وجود واحد على الأقل بيحوّل الحساب لحساب شركة.
+ * المستخدم ممكن يكون عنده أكتر من نشاط.
+ */
 export interface Business {
+  id: string;
   name: string;
-  category: CategoryId;
-  city: string;
+  /** اختصار قصير للنشاط — بيظهر كشارة جنب الاسم */
+  abbreviation: string;
   createdAt: string;
 }
 
 interface AuthContextValue {
   user: WaslaUser | null;
-  /** النشاط التجاري بتاع المستخدم الحالي، لو عمل واحد */
-  business: Business | null;
-  createBusiness: (b: Omit<Business, 'createdAt'>) => void;
-  deleteBusiness: () => void;
+  /** أنشطة المستخدم الحالي التجارية — فاضية لو معملش ولا واحد */
+  businesses: Business[];
+  createBusiness: (b: Omit<Business, 'id' | 'createdAt'>) => Business;
+  deleteBusiness: (id: string) => void;
   /** الأسعار بتتبني عليه — الزائر والفرد زي بعض، الشركة بتشوف أسعار الكميات */
   accountType: AccountType;
   /** هل وصلة متوصّلة فعلاً؟ لو لأ بنشتغل بوضع تجريبي واضح للعميل */
@@ -48,28 +51,29 @@ function loadUser(): WaslaUser | null {
   }
 }
 
-/** مفتاح لكل مستخدم — عشان نشاط حد ميظهرش لحد تاني على نفس الجهاز */
-const businessKey = (sub: string) => `aswaq_business_${sub}`;
+/** مفتاح لكل مستخدم — عشان أنشطة حد ما تظهرش لحد تاني على نفس الجهاز */
+const businessKey = (sub: string) => `aswaq_businesses_${sub}`;
 
-function loadBusiness(sub: string | undefined): Business | null {
-  if (!sub) return null;
+function loadBusinesses(sub: string | undefined): Business[] {
+  if (!sub) return [];
   try {
     const raw = localStorage.getItem(businessKey(sub));
-    return raw ? (JSON.parse(raw) as Business) : null;
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? (parsed as Business[]) : [];
   } catch {
-    return null;
+    return [];
   }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUserState] = useState<WaslaUser | null>(loadUser);
-  const [business, setBusiness] = useState<Business | null>(() => loadBusiness(loadUser()?.sub));
+  const [businesses, setBusinesses] = useState<Business[]>(() => loadBusinesses(loadUser()?.sub));
 
   useEffect(() => {
     if (user) localStorage.setItem('aswaq_user', JSON.stringify(user));
     else localStorage.removeItem('aswaq_user');
-    // النشاط التجاري بيتقرا من جديد مع كل تغيير مستخدم
-    setBusiness(loadBusiness(user?.sub));
+    // الأنشطة بتتقرا من جديد مع كل تغيير مستخدم
+    setBusinesses(loadBusinesses(user?.sub));
   }, [user]);
 
   const setUser = useCallback((u: WaslaUser) => {
@@ -77,20 +81,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const createBusiness = useCallback(
-    (b: Omit<Business, 'createdAt'>) => {
-      if (!user) return;
-      const record: Business = { ...b, createdAt: new Date().toISOString() };
-      localStorage.setItem(businessKey(user.sub), JSON.stringify(record));
-      setBusiness(record);
+    (b: Omit<Business, 'id' | 'createdAt'>) => {
+      if (!user) throw new Error('لازم تسجّل دخول الأول');
+      const record: Business = {
+        ...b,
+        id: crypto.randomUUID(),
+        createdAt: new Date().toISOString(),
+      };
+      setBusinesses((prev) => {
+        const next = [...prev, record];
+        localStorage.setItem(businessKey(user.sub), JSON.stringify(next));
+        return next;
+      });
+      return record;
     },
     [user],
   );
 
-  const deleteBusiness = useCallback(() => {
-    if (!user) return;
-    localStorage.removeItem(businessKey(user.sub));
-    setBusiness(null);
-  }, [user]);
+  const deleteBusiness = useCallback(
+    (id: string) => {
+      if (!user) return;
+      setBusinesses((prev) => {
+        const next = prev.filter((b) => b.id !== id);
+        localStorage.setItem(businessKey(user.sub), JSON.stringify(next));
+        return next;
+      });
+    },
+    [user],
+  );
 
   const signIn = useCallback(async (intent: AuthIntent) => {
     if (waslaConfigured) {
@@ -108,17 +126,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(() => {
     setUserState(null);
-    setBusiness(null);
+    setBusinesses([]);
   }, []);
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        business,
+        businesses,
         createBusiness,
         deleteBusiness,
-        accountType: business ? 'COMPANY' : 'INDIVIDUAL',
+        accountType: businesses.length > 0 ? 'COMPANY' : 'INDIVIDUAL',
         connected: waslaConfigured,
         signIn,
         setUser,
