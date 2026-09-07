@@ -12,7 +12,7 @@ import type { Offer } from '../data/catalog';
 
 /**
  * نوع الحساب هو اللي بيحدد الأسعار — مفيش مفتاح يدوي.
- * بييجي من وصلة في الـid_token (claim اسمه account_type).
+ * بيتحدد جوه أسواق: اللي عنده نشاط تجاري مسجّل يبقى شركة، والباقي أفراد.
  * الزائر بيتعامل معاملة الفرد.
  */
 export type AccountType = 'INDIVIDUAL' | 'COMPANY';

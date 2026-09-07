@@ -7,12 +7,10 @@ import { categoryById } from '../data/catalog';
  *
  * أغلب المستخدمين مشترين مش بائعين، فأي كلام عن البيع والنشاط التجاري
  * مبيظهرش غير بعد ما يكون فيه نشاط فعلاً. اللي من غير نشاط بيشوف
- * زرار واحد هادي وبس.
+ * بياناته وبس — إنشاء النشاط بقى في قائمة الحساب (AccountMenu).
  */
 export function AccountPage() {
   const { user, business, deleteBusiness, signIn } = useAuth();
-  /** الزرار موجود، والنموذج نفسه لسه بيتحدد مع العميل */
-  const [pendingNote, setPendingNote] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   if (!user) {
@@ -107,23 +105,7 @@ export function AccountPage() {
             )}
           </div>
         </section>
-      ) : (
-        /* مشتري عادي — زرار هادي من غير أي كلام بيع */
-        <div className="mt-5">
-          <button
-            onClick={() => setPendingNote(true)}
-            className="rounded-xl border border-stone-300 px-4 py-2.5 text-sm font-medium transition hover:border-brand-400 hover:text-brand-700 dark:border-white/15 dark:hover:text-brand-400"
-          >
-            أنشئ نشاط تجاري
-          </button>
-
-          {pendingNote && (
-            <p className="mt-3 rounded-lg bg-stone-100 px-4 py-3 text-sm text-stone-600 dark:bg-white/5 dark:text-stone-300">
-              لم يتم التحديد
-            </p>
-          )}
-        </div>
-      )}
+      ) : null}
 
     </div>
   );

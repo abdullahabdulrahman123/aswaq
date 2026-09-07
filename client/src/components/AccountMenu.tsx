@@ -60,6 +60,27 @@ export function AccountMenu() {
             حسابي
           </Link>
 
+          {/*
+            الزرارين دول لسه مش موصّلين بأي صفحة — وجهتهم بتتحدد مع العميل.
+            سايبينهم <button> من غير onClick بدل <Link> لمكان مؤقت، عشان
+            محدش يدوس ويلاقي نفسه في صفحة نص مبنية.
+          */}
+          <button
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="block w-full px-4 py-2.5 text-start text-sm transition hover:bg-stone-50 dark:hover:bg-white/5"
+          >
+            أنشئ نشاط تجاري
+          </button>
+
+          <button
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="block w-full px-4 py-2.5 text-start text-sm transition hover:bg-stone-50 dark:hover:bg-white/5"
+          >
+            نشاطاتي التجارية
+          </button>
+
           <button
             role="menuitem"
             onClick={() => {
