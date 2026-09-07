@@ -18,6 +18,8 @@ export function BusinessNewPage() {
   const [name, setName] = useState('');
   const [abbreviation, setAbbreviation] = useState('');
   const [error, setError] = useState('');
+  /** آخر نشاط اتسجّل — بنعرض تأكيد بدل ما نحوّل، لأن صفحة النشاطات لسه متعملتش */
+  const [justCreated, setJustCreated] = useState<{ name: string; abbreviation: string } | null>(null);
 
   if (!user) {
     return (
@@ -52,7 +54,40 @@ export function BusinessNewPage() {
     }
 
     createBusiness({ name: cleanName, abbreviation: cleanAbbr });
-    navigate('/businesses');
+    setJustCreated({ name: cleanName, abbreviation: cleanAbbr });
+    setName('');
+    setAbbreviation('');
+  }
+
+  if (justCreated) {
+    return (
+      <div className="mx-auto max-w-lg px-4 py-8">
+        <div className="rounded-2xl border border-accent-200 bg-accent-50 p-6 text-center dark:border-accent-500/25 dark:bg-accent-500/10">
+          <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-white font-display text-sm font-bold text-brand-800 dark:bg-white/10 dark:text-brand-200">
+            <span className="truncate px-1">{justCreated.abbreviation}</span>
+          </div>
+          <h1 className="mt-4 font-display text-xl font-bold">اتسجّل النشاط</h1>
+          <p className="mt-2 text-sm leading-relaxed text-stone-600 dark:text-stone-300">
+            «{justCreated.name}» بقى في قائمة نشاطاتك — تلاقيه تحت اسمك فوق.
+          </p>
+
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            <button
+              onClick={() => setJustCreated(null)}
+              className="rounded-xl border border-stone-300 bg-white px-5 py-2.5 text-sm font-medium transition hover:border-brand-400 dark:border-white/15 dark:bg-transparent"
+            >
+              سجّل نشاط تاني
+            </button>
+            <button
+              onClick={() => navigate('/')}
+              className="rounded-xl bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-600"
+            >
+              تمام
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 /**
@@ -57,20 +56,10 @@ export function AccountPage() {
 
       {businesses.length > 0 && (
         <section className="mt-5 rounded-2xl border border-stone-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="font-display text-lg font-bold">النشاط التجاري</h2>
-              <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
-                عندك {businesses.length} نشاط مسجّل.
-              </p>
-            </div>
-            <Link
-              to="/businesses"
-              className="rounded-lg border border-stone-300 px-3 py-2 text-sm font-medium transition hover:border-brand-400 dark:border-white/15"
-            >
-              إدارة نشاطاتي
-            </Link>
-          </div>
+          <h2 className="font-display text-lg font-bold">النشاط التجاري</h2>
+          <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
+            عندك {businesses.length} نشاط مسجّل — تلاقيهم في قائمة حسابك فوق.
+          </p>
         </section>
       )}
 

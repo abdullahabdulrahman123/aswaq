@@ -72,40 +72,39 @@ export function AccountMenu() {
             أنشئ نشاط تجاري
           </Link>
 
-          <Link
-            role="menuitem"
-            to="/businesses"
-            onClick={() => setOpen(false)}
-            className="flex items-center justify-between gap-2 px-4 py-2.5 text-sm transition hover:bg-stone-50 dark:hover:bg-white/5"
-          >
+          {/*
+            الزرار ده عنوان للمجموعة اللي تحته — الدخول على نشاط بيبقى من
+            اسمه نفسه، ووجهته لسه بتتحدد. فمفيش صفحة وراه.
+          */}
+          <div className="flex items-center justify-between gap-2 px-4 py-2.5 text-sm">
             <span>نشاطاتي التجارية</span>
             {businesses.length > 0 && (
               <span className="rounded-md bg-stone-100 px-1.5 py-0.5 text-xs tabular-nums text-stone-500 dark:bg-white/10 dark:text-stone-400">
                 {businesses.length}
               </span>
             )}
-          </Link>
+          </div>
 
           {/*
-            أسماء النشاطات تحت الزرار مباشرة. بنعرض أول MAX_IN_MENU وبس —
-            القائمة دي منسدلة من الناڤبار، ولو المستخدم عنده عشرين نشاط
-            هتطوّل لحد ما تخرج بره الشاشة.
+            أسماء النشاطات — دي هي مدخل الدخول على النشاط، بس صفحته لسه
+            متعملتش فالزرار مش بيودّي على حاجة دلوقتي.
+            بنعرض أول MAX_IN_MENU وبس: دي قائمة منسدلة من الناڤبار، ولو
+            المستخدم عنده عشرين نشاط هتطوّل لحد ما تخرج بره الشاشة.
           */}
           {businesses.length > 0 && (
             <ul className="border-b border-stone-100 pb-1.5 dark:border-white/5">
               {businesses.slice(0, MAX_IN_MENU).map((b) => (
                 <li key={b.id}>
-                  <Link
+                  <button
                     role="menuitem"
-                    to="/businesses"
                     onClick={() => setOpen(false)}
-                    className="flex items-center gap-2 py-1.5 pe-4 ps-8 text-sm text-stone-600 transition hover:bg-stone-50 dark:text-stone-300 dark:hover:bg-white/5"
+                    className="flex w-full items-center gap-2 py-1.5 pe-4 ps-8 text-start text-sm text-stone-600 transition hover:bg-stone-50 dark:text-stone-300 dark:hover:bg-white/5"
                   >
                     <span className="shrink-0 rounded bg-brand-50 px-1.5 py-0.5 font-display text-[11px] font-bold text-brand-800 dark:bg-brand-500/15 dark:text-brand-200">
                       {b.abbreviation}
                     </span>
                     <span className="truncate">{b.name}</span>
-                  </Link>
+                  </button>
                 </li>
               ))}
 
