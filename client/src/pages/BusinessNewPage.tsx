@@ -3,7 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth, type BusinessAddress } from '../context/AuthContext';
 import { COUNTRIES, GOVERNORATE_NAMES, citiesOf } from '../data/egypt';
 import { LocationPicker } from '../components/LocationPicker';
-import { canLookupAnyPoint, detectPlace, lookupPoint, GeolocateError, type Coords } from '../lib/geolocate';
+import {
+  canLookupAnyPoint,
+  detectPlace,
+  lookupPoint,
+  GeolocateError,
+  type Coords,
+  type DetectedPlace,
+} from '../lib/geolocate';
 
 /** أقصى طول للاختصار — بيظهر كشارة صغيرة فمينفعش يكون طويل */
 const ABBR_MAX = 8;
@@ -56,12 +63,14 @@ export function BusinessNewPage() {
     setError('');
   }
 
-  function applyPlace(place: { country: string; governorate: string | null; city: string }) {
+  function applyPlace(place: DetectedPlace) {
     setAddress((prev) => ({
       ...prev,
       country: place.country || prev.country,
       governorate: place.governorate ?? prev.governorate,
       city: place.city || prev.city,
+      // الحي بييجي من جوجل بس، ومبنمسحش اللي المستخدم كتبه لو مرجعش حاجة
+      district: place.district || prev.district,
     }));
     setLocated(true);
     // لقينا الموقع بس المحافظة مش في قايمتنا — نقول للمستخدم يختارها بنفسه

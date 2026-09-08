@@ -50,6 +50,17 @@ export function citiesOf(governorate: string): string[] {
   return GOVERNORATES.find((g) => g.name === governorate)?.cities ?? [];
 }
 
+/** توحيد شكل الحروف قبل المقارنة — أ/إ/آ ← ا، وة ← ه، وشيل التشكيل */
+export function normalizeArabic(text: string): string {
+  return text
+    .replace(/[ً-ْ]/g, '')
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/ى/g, 'ي')
+    .replace(/ة/g, 'ه')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 /**
  * خدمات تحديد الموقع بترجّع الاسم بصيغتها هي ("محافظة القاهرة"، "Cairo
  * Governorate"). بنشيل الزوايد ونقارن بقايمتنا عشان نلاقي المحافظة الصح.
@@ -64,12 +75,45 @@ export function matchGovernorate(raw: string | null | undefined): string | null 
     .trim();
   if (!cleaned) return null;
 
+  const target = normalizeArabic(cleaned);
   return (
-    GOVERNORATE_NAMES.find((n) => n.replace(/[أإآ]/g, 'ا') === cleaned) ??
+    GOVERNORATE_NAMES.find((n) => normalizeArabic(n) === target) ??
     GOVERNORATE_NAMES.find((n) => {
-      const norm = n.replace(/[أإآ]/g, 'ا');
-      return norm.includes(cleaned) || cleaned.includes(norm);
+      const norm = normalizeArabic(n);
+      return norm.includes(target) || target.includes(norm);
     }) ??
     null
   );
+}
+
+/**
+ * جوجل في مصر مبيرجّعش اسم المدينة مباشرة — بيرجّع اسم القسم أو المركز
+ * بصيغة زي "اول المنصورة" أو "قسم قصر النيل" أو "أول العاشر من رمضان".
+ * بنشيل البادئات دي ونقارن الباقي بقايمة مدن المحافظة.
+ *
+ * لو ملقيناش (بيحصل في محافظات المدن زي القاهرة والإسكندرية، لأن القسم
+ * هناك حي مش مدينة — "قصر النيل"، "باب شرق")، بنرجّع اسم المحافظة نفسه
+ * لو هو موجود كمدينة في قايمتها. وده الصح: مدينة القاهرة اسمها القاهرة.
+ */
+const AREA_PREFIXES = /^(قسم|أول|اول|ثان|ثاني|ثالث|رابع|خامس|مركز|بندر|حي)\s+/;
+
+export function matchCity(governorate: string, rawArea: string | null | undefined): string | null {
+  const cities = citiesOf(governorate);
+  if (cities.length === 0) return null;
+
+  if (rawArea) {
+    const stripped = normalizeArabic(rawArea).replace(AREA_PREFIXES, '').trim();
+    if (stripped) {
+      const hit =
+        cities.find((c) => normalizeArabic(c) === stripped) ??
+        cities.find((c) => {
+          const n = normalizeArabic(c);
+          return n.includes(stripped) || stripped.includes(n);
+        });
+      if (hit) return hit;
+    }
+  }
+
+  // محافظات المدن: اسم المدينة = اسم المحافظة
+  return cities.find((c) => normalizeArabic(c) === normalizeArabic(governorate)) ?? null;
 }

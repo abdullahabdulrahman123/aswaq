@@ -1,4 +1,4 @@
-import { matchGovernorate } from '../data/egypt';
+import { matchCity, matchGovernorate, normalizeArabic } from '../data/egypt';
 
 /**
  * تحديد الموقع وتحويل الإحداثيات لأسماء (دولة / محافظة / مدينة).
@@ -18,7 +18,6 @@ import { matchGovernorate } from '../data/egypt';
  */
 
 const BDC_ENDPOINT = 'https://api.bigdatacloud.net/data/reverse-geocode-client';
-const GOOGLE_ENDPOINT = 'https://maps.googleapis.com/maps/api/geocode/json';
 /** المتصفح ممكن يفضل مستني الـGPS للأبد — بنقطع بعد ١٥ ثانية */
 const GEO_TIMEOUT_MS = 15_000;
 
@@ -38,6 +37,8 @@ export interface DetectedPlace {
   /** اسم المحافظة زي ما هو في قايمتنا، أو null لو مقدرناش نطابقه */
   governorate: string | null;
   city: string;
+  /** الحي — جوجل بيرجّعه، BigDataCloud لأ فبيفضل فاضي */
+  district: string;
 }
 
 /** رسائل مفهومة بدل أكواد المتصفح */
@@ -92,36 +93,112 @@ async function viaBigDataCloud({ lat, lng }: Coords): Promise<DetectedPlace> {
     governorate: matchGovernorate(data.principalSubdivision),
     // locality بتيجي غلط أحياناً (رجّعت "السنبلاوين" لنقطة في القاهرة)، فبنعتمد على city
     city: data.city?.trim() || '',
+    district: '',
   };
 }
 
-interface GoogleComponent {
+/**
+ * جوجل بيتنده من مكتبة الخرائط بتاعته مش بطلب مباشر لـ
+ * maps.googleapis.com/maps/api/geocode/json.
+ *
+ * السبب: الطلب المباشر بيرفض أي مفتاح مقيّد بدومين ("API keys with referer
+ * restrictions cannot be used with this API")، يعني كنا هنضطر نشيل التقييد
+ * ونسيب المفتاح مكشوف في كود الموقع لأي حد ياخده ويستهلك بيه.
+ * المكتبة معمولة للمتصفح فبتقبل التقييد بالدومين، والمفتاح يفضل محمي.
+ *
+ * بنحمّل المكتبة أول مرة بس، وبنستخدم منها الـGeocoder — من غير ما نعمل
+ * خريطة، فمفيش تكلفة "تحميل خريطة"؛ العرض كله على Leaflet وOpenStreetMap.
+ */
+
+interface GoogleAddressComponent {
   long_name: string;
   types: string[];
 }
+interface GoogleGeocoderResult {
+  address_components: GoogleAddressComponent[];
+}
+interface GoogleGeocoder {
+  geocode(req: { location: { lat: number; lng: number } }): Promise<{ results: GoogleGeocoderResult[] }>;
+}
+interface GoogleMapsNamespace {
+  Geocoder: new () => GoogleGeocoder;
+}
+
+const MAPS_READY_CALLBACK = '__aswaqGoogleMapsReady';
+let mapsLoader: Promise<GoogleMapsNamespace> | null = null;
+
+function loadGoogleMaps(): Promise<GoogleMapsNamespace> {
+  if (mapsLoader) return mapsLoader;
+
+  mapsLoader = new Promise<GoogleMapsNamespace>((resolve, reject) => {
+    const w = window as unknown as Record<string, unknown> & {
+      google?: { maps?: GoogleMapsNamespace };
+    };
+
+    w[MAPS_READY_CALLBACK] = () => {
+      const maps = w.google?.maps;
+      if (maps) resolve(maps);
+      else reject(new GeolocateError('خدمة العناوين محمّلتش صح. اكتب العنوان يدوي.'));
+    };
+
+    const script = document.createElement('script');
+    script.src =
+      'https://maps.googleapis.com/maps/api/js' +
+      `?key=${encodeURIComponent(GOOGLE_KEY)}&language=ar&loading=async&callback=${MAPS_READY_CALLBACK}`;
+    script.async = true;
+    script.onerror = () => {
+      // نصفّر عشان المحاولة الجاية تعيد التحميل بدل ما تفضل عالقة على وعد فاشل
+      mapsLoader = null;
+      reject(new GeolocateError('مقدرناش نحمّل خدمة العناوين. اتأكد من النت أو اكتب العنوان يدوي.'));
+    };
+    document.head.appendChild(script);
+  });
+
+  return mapsLoader;
+}
 
 async function viaGoogle({ lat, lng }: Coords): Promise<DetectedPlace> {
-  const data = (await fetchJson(
-    `${GOOGLE_ENDPOINT}?latlng=${lat},${lng}&language=ar&key=${encodeURIComponent(GOOGLE_KEY)}`,
-  )) as { status?: string; error_message?: string; results?: { address_components: GoogleComponent[] }[] };
+  const maps = await loadGoogleMaps();
 
-  if (data.status === 'ZERO_RESULTS') {
-    throw new GeolocateError('مفيش عنوان معروف للنقطة دي. اكتب العنوان يدوي.');
-  }
-  if (data.status !== 'OK' || !data.results?.length) {
-    // مفتاح غلط أو الحصة خلصت — نقول رسالة عامة للمستخدم ونسيب التفصيلة للكونسول
-    console.error('[geocode] Google رفض الطلب:', data.status, data.error_message);
+  let results: GoogleGeocoderResult[];
+  try {
+    ({ results } = await new maps.Geocoder().geocode({ location: { lat, lng } }));
+  } catch (err) {
+    console.error('[geocode] Google رفض الطلب:', err);
     throw new GeolocateError('خدمة العناوين مش متاحة دلوقتي. اكتب العنوان يدوي.');
   }
+  if (!results?.length) {
+    throw new GeolocateError('مفيش عنوان معروف للنقطة دي. اكتب العنوان يدوي.');
+  }
 
-  const parts = data.results[0].address_components;
+  const parts = results[0].address_components;
   const pick = (type: string) => parts.find((c) => c.types.includes(type))?.long_name.trim() ?? '';
+
+  /**
+   * جوجل في مصر مبيرجّعش locality خالص. الشكل اللي بيرجّعه:
+   *   admin_1 = المحافظة   ("محافظة الدقهلية")
+   *   admin_2 = القسم/المركز ("اول المنصورة"، "قسم قصر النيل")
+   *   admin_3 = الحي         ("ميدان التحرير"، "شياخة ثالثة")
+   * فبنستخرج المدينة من admin_2 بمطابقتها على قايمة مدن المحافظة.
+   */
+  const governorate = matchGovernorate(pick('administrative_area_level_1'));
+  const area = pick('administrative_area_level_2');
+  const city = governorate ? matchCity(governorate, area) : null;
 
   return {
     country: pick('country'),
-    governorate: matchGovernorate(pick('administrative_area_level_1')),
-    // جوجل بيحط المدينة في locality، وبعض المناطق بتيجي في المستوى الإداري التاني
-    city: pick('locality') || pick('administrative_area_level_2'),
+    governorate,
+    city: city ?? '',
+    /*
+     * لو admin_2 هو اللي طلعت منه المدينة ("اول المنصورة" ← المنصورة)، يبقى
+     * الحي هو admin_3. لو المدينة جت من اسم المحافظة (زي القاهرة)، يبقى
+     * admin_2 نفسه حي ("قسم قصر النيل").
+     * المقارنة بعد توحيد الألف عشان "اول اسوان" تتطابق مع "أسوان".
+     */
+    district:
+      (city && area && normalizeArabic(area).includes(normalizeArabic(city))
+        ? pick('administrative_area_level_3')
+        : area || pick('administrative_area_level_3')) || '',
   };
 }
 
