@@ -32,6 +32,11 @@ jobs:
 
       # روابط وصلة بتتحقن وقت البناء. سيبها فاضية → أسواق يشتغل بوضع تجريبي.
       # اضبطها من: Settings → Secrets and variables → Actions → Variables
+      #
+      # مفتاح جوجل في Secrets مش Variables: هو بيظهر في كود الموقع المنشور
+      # بحكم إنه مفتاح متصفح، بس Secrets بيخفيه من سجلات التشغيل على الأقل.
+      # لو مضبوطش، الموقع بيشتغل بالخدمة المجانية — تحديد الموقع يفضل شغّال
+      # وسحب الدبوس بس مش هيجيب العنوان.
       - name: Build
         run: npm run build
         working-directory: client
@@ -39,6 +44,7 @@ jobs:
           VITE_WASLA_ISSUER: ${{ vars.WASLA_ISSUER }}
           VITE_WASLA_CLIENT_ID: ${{ vars.WASLA_CLIENT_ID }}
           VITE_WASLA_ACCOUNT_ORIGIN: ${{ vars.WASLA_ACCOUNT_ORIGIN }}
+          VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
 
       # GitHub Pages بيرجّع 404.html لأي مسار مش موجود كملف —
       # نسخة من index.html بتخلي التوجيه داخل التطبيق يشتغل على الروابط المباشرة
