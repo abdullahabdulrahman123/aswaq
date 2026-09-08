@@ -17,11 +17,26 @@ export type AuthIntent = 'login' | 'register';
  * نشاط تجاري مسجّل على أسواق — وجود واحد على الأقل بيحوّل الحساب لحساب شركة.
  * المستخدم ممكن يكون عنده أكتر من نشاط.
  */
+/** عنوان النشاط — الدولة والمحافظة والمدينة من قوايم، والباقي كتابة حرة */
+export interface BusinessAddress {
+  country: string;
+  governorate: string;
+  city: string;
+  district: string;
+  street: string;
+  /** علامة مميزة تسهّل الوصول — "جنب مسجد النور" مثلاً */
+  landmark: string;
+  /** موقع الدبوس على الخريطة — بيلزم للتوصيل و"الشركات القريبة مني" بعدين */
+  lat: number;
+  lng: number;
+}
+
 export interface Business {
   id: string;
   name: string;
   /** اختصار قصير للنشاط — بيظهر كشارة جنب الاسم */
   abbreviation: string;
+  address: BusinessAddress;
   createdAt: string;
 }
 
