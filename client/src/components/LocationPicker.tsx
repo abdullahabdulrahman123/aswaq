@@ -156,7 +156,12 @@ export function LocationPicker({ value, onChange, hint, onLocate, locating }: Pr
         ref={holderRef}
         role="application"
         aria-label="خريطة لاختيار موقع النشاط"
-        className="h-64 w-full overflow-hidden rounded-xl border border-stone-300 dark:border-white/15"
+        /*
+         * isolate مهم: Leaflet بيدي طبقاته z-index من 400 لفوق، والناڤبار
+         * عنده 30 — فالخريطة كانت بتعدّي فوقه وقت التمرير. isolation:isolate
+         * بيعمل سياق تكديس مستقل، فأرقام Leaflet تفضل محبوسة جوه الخريطة.
+         */
+        className="isolate h-64 w-full overflow-hidden rounded-xl border border-stone-300 dark:border-white/15"
       />
       <p className="mt-1.5 text-xs leading-relaxed text-stone-400">{hint}</p>
     </div>
