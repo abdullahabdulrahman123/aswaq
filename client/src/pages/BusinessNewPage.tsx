@@ -19,6 +19,8 @@ const ABBR_MAX = 8;
 const DEFAULT_POINT: Coords = { lat: 30.0444, lng: 31.2357 };
 
 const EMPTY_ADDRESS: BusinessAddress = {
+  label: '',
+  description: '',
   country: 'مصر',
   governorate: '',
   city: '',
@@ -131,6 +133,8 @@ export function BusinessNewPage() {
 
     const trimmed: BusinessAddress = {
       ...address,
+      label: address.label.trim(),
+      description: address.description.trim(),
       country: address.country.trim(),
       governorate: address.governorate,
       city: address.city.trim(),
@@ -257,6 +261,34 @@ export function BusinessNewPage() {
             وتقدر تكتب العنوان كله بإيدك من غير ما تستخدمه.
           </p>
 
+          <div className="mt-4 grid gap-4">
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-medium">اسم العنوان</span>
+              <input
+                value={address.label}
+                onChange={(e) => setField('label', e.target.value)}
+                maxLength={60}
+                placeholder="مثال: الفرع الرئيسي"
+                className={fieldClass}
+              />
+              <span className="mt-1.5 block text-xs text-stone-400">
+                اسم يفرّق العنوان ده عن غيره لو ليك أكتر من مكان.
+              </span>
+            </label>
+
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-medium">وصف العنوان</span>
+              <textarea
+                value={address.description}
+                onChange={(e) => setField('description', e.target.value)}
+                maxLength={300}
+                rows={3}
+                placeholder="مثال: الدور التالت فوق صيدلية النور، المدخل من الشارع الجانبي"
+                className={`${fieldClass} resize-y`}
+              />
+            </label>
+          </div>
+
           {locateError && (
             <p role="alert" className="mt-3 rounded-lg bg-amber-50 px-3 py-2.5 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
               {locateError}
@@ -272,6 +304,8 @@ export function BusinessNewPage() {
             <LocationPicker
               value={{ lat: address.lat, lng: address.lng }}
               onChange={handlePointChange}
+              onLocate={handleLocate}
+              locating={locating}
               hint={
                 canLookupAnyPoint
                   ? 'اسحب الدبوس أو دوس على الخريطة لتحديد مكان نشاطك بالظبط — الأسماء هتتحدّث لوحدها.'

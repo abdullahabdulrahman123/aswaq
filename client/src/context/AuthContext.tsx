@@ -19,6 +19,10 @@ export type AuthIntent = 'login' | 'register';
  */
 /** عنوان النشاط — الدولة والمحافظة والمدينة من قوايم، والباقي كتابة حرة */
 export interface BusinessAddress {
+  /** اسم يميّز العنوان — "الفرع الرئيسي"، "المخزن" */
+  label: string;
+  /** وصف حر يساعد في الوصول */
+  description: string;
   country: string;
   governorate: string;
   city: string;

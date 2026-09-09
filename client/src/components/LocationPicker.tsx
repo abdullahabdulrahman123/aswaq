@@ -24,17 +24,40 @@ const PIN = L.divIcon({
   iconAnchor: [13, 26],
 });
 
+/**
+ * زرار "موقعي" جوه الخريطة، تحت أزرار التكبير مباشرة.
+ * علامة تصويب (crosshair) — دي العلامة المتعارف عليها في كل الخرائط
+ * لتحديد موقعك، فالمستخدم بيعرفها من غير شرح.
+ */
+const LOCATE_ICON =
+  '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" ' +
+  'stroke-width="2" stroke-linecap="round" aria-hidden="true">' +
+  '<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"/>' +
+  '<line x1="12" y1="1.5" x2="12" y2="4.5"/><line x1="12" y1="19.5" x2="12" y2="22.5"/>' +
+  '<line x1="1.5" y1="12" x2="4.5" y2="12"/><line x1="19.5" y1="12" x2="22.5" y2="12"/></svg>';
+
 interface Props {
   value: Coords;
   onChange: (coords: Coords) => void;
   /** بيظهر تحت الخريطة — بيوضّح إن سحب الدبوس هيعمل إيه */
   hint: string;
+  /** تحديد الموقع تلقائي — نفس اللي بيعمله الزرار اللي فوق الخريطة */
+  onLocate: () => void;
+  /** بنعطّل الزرار وهو شغّال عشان مفيش طلبين مع بعض */
+  locating: boolean;
 }
 
-export function LocationPicker({ value, onChange, hint }: Props) {
+export function LocationPicker({ value, onChange, hint, onLocate, locating }: Props) {
   const holderRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
+  const locateBtnRef = useRef<HTMLAnchorElement | null>(null);
+  /**
+   * الزرار بيتعمل مرة واحدة مع الخريطة، فلو ربطنا onLocate عليه مباشرة
+   * هيفضل ماسك أول نسخة منها للأبد. الـref بيخلّي الضغطة تنادي آخر نسخة.
+   */
+  const onLocateRef = useRef(onLocate);
+  onLocateRef.current = onLocate;
   /** آخر قيمة إحنا اللي بعتناها لبرّه — عشان منحركش الخريطة رداً على تغييرنا إحنا */
   const selfSetRef = useRef<string>('');
 
@@ -54,6 +77,30 @@ export function LocationPicker({ value, onChange, hint }: Props) {
       maxZoom: 19,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map);
+
+    // زرار "موقعي" كعنصر تحكم في الخريطة، تحت أزرار التكبير
+    const LocateControl = L.Control.extend({
+      options: { position: 'topleft' as L.ControlPosition },
+      onAdd() {
+        const wrap = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+        const btn = L.DomUtil.create('a', '', wrap) as HTMLAnchorElement;
+        btn.href = '#';
+        btn.title = 'حدّد موقعي';
+        btn.setAttribute('role', 'button');
+        btn.innerHTML = LOCATE_ICON;
+        btn.style.display = 'grid';
+        btn.style.placeItems = 'center';
+        // من غير ده الضغطة بتوصل للخريطة تحته وتنقل الدبوس
+        L.DomEvent.disableClickPropagation(wrap);
+        L.DomEvent.on(btn, 'click', (e) => {
+          L.DomEvent.preventDefault(e);
+          if (btn.getAttribute('aria-disabled') !== 'true') onLocateRef.current();
+        });
+        locateBtnRef.current = btn;
+        return wrap;
+      },
+    });
+    map.addControl(new LocateControl());
 
     const marker = L.marker([value.lat, value.lng], { draggable: true, icon: PIN, keyboard: true }).addTo(map);
 
@@ -82,6 +129,15 @@ export function LocationPicker({ value, onChange, hint }: Props) {
     // مرة واحدة بس — التحديثات بعد كده في الـeffect اللي تحت
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // شكل زرار الموقع وهو شغّال
+  useEffect(() => {
+    const btn = locateBtnRef.current;
+    if (!btn) return;
+    btn.setAttribute('aria-disabled', String(locating));
+    btn.style.opacity = locating ? '0.45' : '1';
+    btn.style.cursor = locating ? 'progress' : 'pointer';
+  }, [locating]);
 
   // لما الإحداثيات تتغيّر من بره (زرار "حدّد موقعي")
   useEffect(() => {
