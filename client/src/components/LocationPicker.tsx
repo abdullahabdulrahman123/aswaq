@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { Coords } from '../lib/geolocate';
@@ -36,6 +36,9 @@ const LOCATE_ICON =
   '<line x1="12" y1="1.5" x2="12" y2="4.5"/><line x1="12" y1="19.5" x2="12" y2="22.5"/>' +
   '<line x1="1.5" y1="12" x2="4.5" y2="12"/><line x1="19.5" y1="12" x2="22.5" y2="12"/></svg>';
 
+/** ٦ خانات عشرية ≈ ١٠ سنتيمتر — أدق من أي دبوس حد هيحطه بإيده */
+const fmt = (n: number) => n.toFixed(6);
+
 interface Props {
   value: Coords;
   onChange: (coords: Coords) => void;
@@ -60,6 +63,12 @@ export function LocationPicker({ value, onChange, hint, onLocate, locating }: Pr
   onLocateRef.current = onLocate;
   /** آخر قيمة إحنا اللي بعتناها لبرّه — عشان منحركش الخريطة رداً على تغييرنا إحنا */
   const selfSetRef = useRef<string>('');
+  /**
+   * الإحداثيات اللي بتتعرض تحت الخريطة. منفصلة عن value عن قصد: value مبتتحدّثش
+   * غير لما السحب يخلص (لأن كل تحديث ليها بيشغّل طلب عنوان جديد)، والقراءة
+   * المفروض تتحرّك مع الدبوس وهو ماشي.
+   */
+  const [shown, setShown] = useState<Coords>({ lat: value.lat, lng: value.lng });
 
   // إنشاء الخريطة مرة واحدة
   useEffect(() => {
@@ -104,9 +113,16 @@ export function LocationPicker({ value, onChange, hint, onLocate, locating }: Pr
 
     const marker = L.marker([value.lat, value.lng], { draggable: true, icon: PIN, keyboard: true }).addTo(map);
 
+    // القراءة تحت الخريطة بتمشي مع الدبوس لحظة بلحظة
+    marker.on('drag', () => {
+      const { lat, lng } = marker.getLatLng();
+      setShown({ lat, lng });
+    });
+
     marker.on('dragend', () => {
       const { lat, lng } = marker.getLatLng();
       selfSetRef.current = `${lat},${lng}`;
+      setShown({ lat, lng });
       onChange({ lat, lng });
     });
 
@@ -115,6 +131,7 @@ export function LocationPicker({ value, onChange, hint, onLocate, locating }: Pr
       const { lat, lng } = e.latlng;
       marker.setLatLng(e.latlng);
       selfSetRef.current = `${lat},${lng}`;
+      setShown({ lat, lng });
       onChange({ lat, lng });
     });
 
@@ -149,6 +166,9 @@ export function LocationPicker({ value, onChange, hint, onLocate, locating }: Pr
 
   // لما الإحداثيات تتغيّر من بره (زرار "حدّد موقعي")
   useEffect(() => {
+    // القراءة بتتزامن دايماً، حتى لو التغيير جه مننا إحنا
+    setShown({ lat: value.lat, lng: value.lng });
+
     const map = mapRef.current;
     const marker = markerRef.current;
     if (!map || !marker) return;
@@ -171,7 +191,26 @@ export function LocationPicker({ value, onChange, hint, onLocate, locating }: Pr
          */
         className="isolate h-64 w-full overflow-hidden rounded-xl border border-stone-300 dark:border-white/15"
       />
-      <p className="mt-1.5 text-xs leading-relaxed text-stone-400">{hint}</p>
+      {/*
+        الإحداثيات: dir="ltr" على الأرقام نفسها عشان في صفحة عربية الرقم
+        بيتقلب ويبان بالعكس. tabular-nums بيخلي كل الأرقام بنفس العرض فالسطر
+        مبيرقصش وإحنا بنسحب الدبوس.
+      */}
+      <p className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-stone-400">
+        <span>
+          خط العرض{' '}
+          <span dir="ltr" className="font-mono tabular-nums text-stone-500 dark:text-stone-300">
+            {fmt(shown.lat)}
+          </span>
+        </span>
+        <span>
+          خط الطول{' '}
+          <span dir="ltr" className="font-mono tabular-nums text-stone-500 dark:text-stone-300">
+            {fmt(shown.lng)}
+          </span>
+        </span>
+      </p>
+      <p className="mt-1 text-xs leading-relaxed text-stone-400">{hint}</p>
     </div>
   );
 }
