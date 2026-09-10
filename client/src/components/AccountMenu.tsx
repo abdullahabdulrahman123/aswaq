@@ -86,8 +86,8 @@ export function AccountMenu() {
           </div>
 
           {/*
-            أسماء النشاطات — دي هي مدخل الدخول على النشاط، بس صفحته لسه
-            متعملتش فالزرار مش بيودّي على حاجة دلوقتي.
+            أسماء النشاطات — دي هي مدخل الدخول على صفحة النشاط، اللي منها
+            بيتضافوا العناوين.
             بنعرض أول MAX_IN_MENU وبس: دي قائمة منسدلة من الناڤبار، ولو
             المستخدم عنده عشرين نشاط هتطوّل لحد ما تخرج بره الشاشة.
           */}
@@ -95,8 +95,9 @@ export function AccountMenu() {
             <ul className="border-b border-stone-100 pb-1.5 dark:border-white/5">
               {businesses.slice(0, MAX_IN_MENU).map((b) => (
                 <li key={b.id}>
-                  <button
+                  <Link
                     role="menuitem"
+                    to={`/business/${b.id}`}
                     onClick={() => setOpen(false)}
                     className="flex w-full items-center gap-2 py-1.5 pe-4 ps-8 text-start text-sm text-stone-600 transition hover:bg-stone-50 dark:text-stone-300 dark:hover:bg-white/5"
                   >
@@ -104,7 +105,7 @@ export function AccountMenu() {
                       {b.abbreviation}
                     </span>
                     <span className="truncate">{b.name}</span>
-                  </button>
+                  </Link>
                 </li>
               ))}
 

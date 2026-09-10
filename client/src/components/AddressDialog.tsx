@@ -14,10 +14,30 @@ import {
 const fieldClass =
   'w-full rounded-xl border border-stone-300 bg-transparent px-3 py-2.5 outline-none transition focus:border-brand-500 dark:border-white/15';
 
+/** وسط القاهرة — نقطة بداية الخريطة قبل ما المستخدم يحدد حاجة */
+const DEFAULT_POINT = { lat: 30.0444, lng: 31.2357 };
+
+/** المسودة اللي بتبدأ بيها أي إضافة جديدة */
+export const EMPTY_ADDRESS: BusinessAddress = {
+  id: '',
+  label: '',
+  description: '',
+  country: 'مصر',
+  governorate: '',
+  city: '',
+  district: '',
+  street: '',
+  landmark: '',
+  lat: DEFAULT_POINT.lat,
+  lng: DEFAULT_POINT.lng,
+};
+
 interface Props {
   open: boolean;
   /** العنوان الحالي — بيتنسخ لمسودة جوه الدايالوج */
   value: BusinessAddress;
+  /** بيغيّر العنوان والزرار بس — الخانات واحدة في الحالتين */
+  mode: 'add' | 'edit';
   onSave: (address: BusinessAddress) => void;
   onClose: () => void;
 }
@@ -32,7 +52,7 @@ interface Props {
  * بنستخدم عنصر <dialog> الأصلي مش div عادي: بيدينا حبس التركيز جوه النافذة،
  * وقفل بزرار Esc، وخلفية معتمة — كل ده من غير كود ولا مكتبة.
  */
-export function AddressDialog({ open, value, onSave, onClose }: Props) {
+export function AddressDialog({ open, value, mode, onSave, onClose }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   const [draft, setDraft] = useState<BusinessAddress>(value);
@@ -146,7 +166,9 @@ export function AddressDialog({ open, value, onSave, onClose }: Props) {
       {open && (
         <div className="max-h-[85vh] overflow-y-auto p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-display text-lg font-bold">عنوان النشاط</h2>
+            <h2 className="font-display text-lg font-bold">
+              {mode === 'add' ? 'إضافة عنوان' : 'تعديل العنوان'}
+            </h2>
             <button
               type="button"
               onClick={handleLocate}
@@ -312,7 +334,7 @@ export function AddressDialog({ open, value, onSave, onClose }: Props) {
               onClick={handleSave}
               className="rounded-xl bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-600"
             >
-              حفظ العنوان
+              {mode === 'add' ? 'إضافة العنوان' : 'حفظ التعديل'}
             </button>
             <button
               type="button"

@@ -1,40 +1,18 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth, type BusinessAddress } from '../context/AuthContext';
-import { AddressDialog } from '../components/AddressDialog';
-import type { Coords } from '../lib/geolocate';
+import { useAuth } from '../context/AuthContext';
 
 /** أقصى طول للاختصار — بيظهر كشارة صغيرة فمينفعش يكون طويل */
 const ABBR_MAX = 8;
-
-/** وسط القاهرة — نقطة بداية الخريطة قبل ما المستخدم يحدد حاجة */
-const DEFAULT_POINT: Coords = { lat: 30.0444, lng: 31.2357 };
-
-const EMPTY_ADDRESS: BusinessAddress = {
-  label: '',
-  description: '',
-  country: 'مصر',
-  governorate: '',
-  city: '',
-  district: '',
-  street: '',
-  landmark: '',
-  lat: DEFAULT_POINT.lat,
-  lng: DEFAULT_POINT.lng,
-};
 
 const fieldClass =
   'w-full rounded-xl border border-stone-300 bg-transparent px-3 py-2.5 outline-none transition focus:border-brand-500 dark:border-white/15';
 
 /**
- * تسجيل نشاط تجاري جديد.
+ * تسجيل نشاط تجاري جديد — اسم واختصار وبس.
  *
- * العنوان: الدولة والمحافظة من قوايم ثابتة، والمدينة قايمة بتقبل الكتابة كمان
- * (مصر فيها مئات المدن، والقايمة عندنا بالمراكز الرئيسية بس). الحي والشارع
- * والعلامة المميزة كتابة حرة.
- *
- * زرار "حدّد موقعي" بيملا الدولة والمحافظة والمدينة، والخانات بتفضل قابلة
- * للتعديل بعدها — تحديد الموقع على الكمبيوتر بيعتمد على الـIP وممكن يغلط.
+ * العناوين مش جزء من التسجيل: النشاط ممكن يكون لسه مالوش مكان، وممكن يكون
+ * له كذا فرع. بيتضافوا من صفحة النشاط نفسها بعد ما يتسجّل.
  */
 export function BusinessNewPage() {
   const { user, businesses, createBusiness, signIn } = useAuth();
@@ -42,16 +20,7 @@ export function BusinessNewPage() {
 
   const [name, setName] = useState('');
   const [abbreviation, setAbbreviation] = useState('');
-  const [address, setAddress] = useState<BusinessAddress>(EMPTY_ADDRESS);
   const [error, setError] = useState('');
-
-  const [addressOpen, setAddressOpen] = useState(false);
-
-  /** آخر نشاط اتسجّل — بنعرض تأكيد بدل ما نحوّل، لأن صفحة النشاطات لسه متعملتش */
-  const [justCreated, setJustCreated] = useState<{ name: string; abbreviation: string } | null>(null);
-
-  /** العنوان يعتبر متحدد لما يبقى فيه محافظة ومدينة */
-  const hasAddress = Boolean(address.governorate && address.city.trim());
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -67,17 +36,10 @@ export function BusinessNewPage() {
       setError('الاختصار ده مستخدم في نشاط تاني عندك. اختار غيره.');
       return;
     }
-    if (!hasAddress) {
-      setError('حدّد عنوان النشاط.');
-      return;
-    }
 
-    // العنوان اتنضّف خلاص وقت حفظه من الدايالوج
-    createBusiness({ name: cleanName, abbreviation: cleanAbbr, address });
-    setJustCreated({ name: cleanName, abbreviation: cleanAbbr });
-    setName('');
-    setAbbreviation('');
-    setAddress(EMPTY_ADDRESS);
+    const created = createBusiness({ name: cleanName, abbreviation: cleanAbbr });
+    // على طول لصفحة النشاط — منها بيضيف العناوين
+    navigate(`/business/${created.id}`, { state: { created: true } });
   }
 
   if (!user) {
@@ -93,37 +55,6 @@ export function BusinessNewPage() {
         >
           تسجيل الدخول
         </button>
-      </div>
-    );
-  }
-
-  if (justCreated) {
-    return (
-      <div className="mx-auto max-w-lg px-4 py-8">
-        <div className="rounded-2xl border border-accent-200 bg-accent-50 p-6 text-center dark:border-accent-500/25 dark:bg-accent-500/10">
-          <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-white font-display text-sm font-bold text-brand-800 dark:bg-white/10 dark:text-brand-200">
-            <span className="truncate px-1">{justCreated.abbreviation}</span>
-          </div>
-          <h1 className="mt-4 font-display text-xl font-bold">اتسجّل النشاط</h1>
-          <p className="mt-2 text-sm leading-relaxed text-stone-600 dark:text-stone-300">
-            «{justCreated.name}» بقى في قائمة نشاطاتك — تلاقيه تحت اسمك فوق.
-          </p>
-
-          <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <button
-              onClick={() => setJustCreated(null)}
-              className="rounded-xl border border-stone-300 bg-white px-5 py-2.5 text-sm font-medium transition hover:border-brand-400 dark:border-white/15 dark:bg-transparent"
-            >
-              سجّل نشاط تاني
-            </button>
-            <button
-              onClick={() => navigate('/')}
-              className="rounded-xl bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-600"
-            >
-              تمام
-            </button>
-          </div>
-        </div>
       </div>
     );
   }
@@ -166,41 +97,6 @@ export function BusinessNewPage() {
           </span>
         </label>
 
-        {/* ————— العنوان ————— */}
-        <div className="mt-7 border-t border-stone-200 pt-5 dark:border-white/10">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-display text-base font-bold">العنوان</h2>
-            <button
-              type="button"
-              onClick={() => setAddressOpen(true)}
-              className="rounded-lg border border-stone-300 px-3 py-2 text-xs font-medium transition hover:border-brand-400 hover:text-brand-700 dark:border-white/15 dark:hover:text-brand-400"
-            >
-              {hasAddress ? 'تعديل العنوان' : '＋ حدّد العنوان'}
-            </button>
-          </div>
-
-          {hasAddress ? (
-            <div className="mt-3 rounded-xl bg-stone-50 p-4 text-sm dark:bg-white/5">
-              {address.label && <div className="font-display font-bold">{address.label}</div>}
-              <div className={address.label ? 'mt-0.5 text-stone-600 dark:text-stone-300' : 'font-medium'}>
-                {[address.governorate, address.city, address.district, address.street]
-                  .filter(Boolean)
-                  .join('، ')}
-              </div>
-              {address.landmark && (
-                <div className="mt-1 text-xs text-stone-500 dark:text-stone-400">{address.landmark}</div>
-              )}
-              {address.description && (
-                <div className="mt-1 text-xs leading-relaxed text-stone-400">{address.description}</div>
-              )}
-            </div>
-          ) : (
-            <p className="mt-3 rounded-xl border border-dashed border-stone-300 px-4 py-5 text-center text-sm text-stone-400 dark:border-white/15">
-              لسه مش محدد — دوس «حدّد العنوان» وهتلاقي خريطة تظبط عليها المكان.
-            </p>
-          )}
-        </div>
-
         {error && (
           <p role="alert" className="mt-5 rounded-lg bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-300">
             {error}
@@ -222,24 +118,17 @@ export function BusinessNewPage() {
             إلغاء
           </button>
         </div>
+
+        <p className="mt-5 border-t border-stone-200 pt-4 text-xs leading-relaxed text-stone-400 dark:border-white/10">
+          العناوين بتتضاف بعد التسجيل من صفحة النشاط — تقدر تضيف أكتر من عنوان،
+          أو تسيبه من غير عنوان دلوقتي.
+        </p>
       </form>
 
       <p className="mt-4 text-xs leading-relaxed text-stone-400">
         البيانات محفوظة على المتصفح ده دلوقتي، فمش هتلاقيها لو فتحت من جهاز تاني.
         ربطها بالحساب لسه في الطريق.
       </p>
-
-      {/* بره الفورم عن قصد — <dialog> جوه <form> بيعمل تداخل مش محتاجينه */}
-      <AddressDialog
-        open={addressOpen}
-        value={address}
-        onSave={(next) => {
-          setAddress(next);
-          setAddressOpen(false);
-          setError('');
-        }}
-        onClose={() => setAddressOpen(false)}
-      />
     </div>
   );
 }

@@ -19,6 +19,8 @@ export type AuthIntent = 'login' | 'register';
  */
 /** عنوان النشاط — الدولة والمحافظة والمدينة من قوايم، والباقي كتابة حرة */
 export interface BusinessAddress {
+  /** بيتولّد وقت الإضافة — عشان التعديل والحذف يمسكوا العنوان الصح مهما اتغيّر ترتيبهم */
+  id: string;
   /** اسم يميّز العنوان — "الفرع الرئيسي"، "المخزن" */
   label: string;
   /** وصف حر يساعد في الوصول */
@@ -40,7 +42,11 @@ export interface Business {
   name: string;
   /** اختصار قصير للنشاط — بيظهر كشارة جنب الاسم */
   abbreviation: string;
-  address: BusinessAddress;
+  /**
+   * النشاط ممكن يكون له أكتر من مكان (فرع، مخزن، مكتب)، وممكن يتسجّل من
+   * غير عنوان خالص ويتضاف بعدين من صفحة النشاط.
+   */
+  addresses: BusinessAddress[];
   createdAt: string;
 }
 
@@ -48,8 +54,12 @@ interface AuthContextValue {
   user: WaslaUser | null;
   /** أنشطة المستخدم الحالي التجارية — فاضية لو معملش ولا واحد */
   businesses: Business[];
-  createBusiness: (b: Omit<Business, 'id' | 'createdAt'>) => Business;
+  createBusiness: (b: Pick<Business, 'name' | 'abbreviation'>) => Business;
   deleteBusiness: (id: string) => void;
+  /** بترجّع العنوان بالـid اللي اتولّد له */
+  addAddress: (businessId: string, address: Omit<BusinessAddress, 'id'>) => BusinessAddress;
+  updateAddress: (businessId: string, address: BusinessAddress) => void;
+  removeAddress: (businessId: string, addressId: string) => void;
   /** الأسعار بتتبني عليه — الزائر والفرد زي بعض، الشركة بتشوف أسعار الكميات */
   accountType: AccountType;
   /** هل وصلة متوصّلة فعلاً؟ لو لأ بنشتغل بوضع تجريبي واضح للعميل */
@@ -73,12 +83,30 @@ function loadUser(): WaslaUser | null {
 /** مفتاح لكل مستخدم — عشان أنشطة حد ما تظهرش لحد تاني على نفس الجهاز */
 const businessKey = (sub: string) => `aswaq_businesses_${sub}`;
 
+/**
+ * الشكل المحفوظ على الأجهزة. النشاط كان بياخد عنوان واحد اسمه address، وبقى
+ * بياخد قايمة، فبنحوّل القديم بدل ما يضيع على اللي مسجّل نشاطه قبل التغيير.
+ */
+type StoredBusiness = Omit<Business, 'addresses'> & {
+  addresses?: BusinessAddress[];
+  address?: Omit<BusinessAddress, 'id'> & { id?: string };
+};
+
+function normalize(stored: StoredBusiness[]): Business[] {
+  return stored.map(({ address, addresses, ...rest }) => ({
+    ...rest,
+    addresses:
+      addresses ??
+      (address ? [{ ...address, id: address.id || crypto.randomUUID() }] : []),
+  }));
+}
+
 function loadBusinesses(sub: string | undefined): Business[] {
   if (!sub) return [];
   try {
     const raw = localStorage.getItem(businessKey(sub));
     const parsed: unknown = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? (parsed as Business[]) : [];
+    return Array.isArray(parsed) ? normalize(parsed as StoredBusiness[]) : [];
   } catch {
     return [];
   }
@@ -99,34 +127,68 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUserState(u);
   }, []);
 
-  const createBusiness = useCallback(
-    (b: Omit<Business, 'id' | 'createdAt'>) => {
-      if (!user) throw new Error('لازم تسجّل دخول الأول');
-      const record: Business = {
-        ...b,
-        id: crypto.randomUUID(),
-        createdAt: new Date().toISOString(),
-      };
+  /** كل تعديل بيتكتب على المتصفح فوراً — مفيش سيرفر بيحفظ الأنشطة لسه */
+  const commit = useCallback(
+    (update: (prev: Business[]) => Business[]) => {
+      if (!user) return;
       setBusinesses((prev) => {
-        const next = [...prev, record];
+        const next = update(prev);
         localStorage.setItem(businessKey(user.sub), JSON.stringify(next));
         return next;
       });
-      return record;
     },
     [user],
   );
 
-  const deleteBusiness = useCallback(
-    (id: string) => {
-      if (!user) return;
-      setBusinesses((prev) => {
-        const next = prev.filter((b) => b.id !== id);
-        localStorage.setItem(businessKey(user.sub), JSON.stringify(next));
-        return next;
-      });
+  const createBusiness = useCallback(
+    (b: Pick<Business, 'name' | 'abbreviation'>) => {
+      if (!user) throw new Error('لازم تسجّل دخول الأول');
+      const record: Business = {
+        ...b,
+        // العناوين بتتضاف بعدين من صفحة النشاط — التسجيل نفسه اسم واختصار وبس
+        addresses: [],
+        id: crypto.randomUUID(),
+        createdAt: new Date().toISOString(),
+      };
+      commit((prev) => [...prev, record]);
+      return record;
     },
-    [user],
+    [user, commit],
+  );
+
+  const deleteBusiness = useCallback(
+    (id: string) => commit((prev) => prev.filter((b) => b.id !== id)),
+    [commit],
+  );
+
+  /** تعديل عناوين نشاط واحد من غير ما نلمس الباقي */
+  const mapAddresses = useCallback(
+    (businessId: string, update: (list: BusinessAddress[]) => BusinessAddress[]) =>
+      commit((prev) =>
+        prev.map((b) => (b.id === businessId ? { ...b, addresses: update(b.addresses) } : b)),
+      ),
+    [commit],
+  );
+
+  const addAddress = useCallback(
+    (businessId: string, address: Omit<BusinessAddress, 'id'>) => {
+      const record: BusinessAddress = { ...address, id: crypto.randomUUID() };
+      mapAddresses(businessId, (list) => [...list, record]);
+      return record;
+    },
+    [mapAddresses],
+  );
+
+  const updateAddress = useCallback(
+    (businessId: string, address: BusinessAddress) =>
+      mapAddresses(businessId, (list) => list.map((a) => (a.id === address.id ? address : a))),
+    [mapAddresses],
+  );
+
+  const removeAddress = useCallback(
+    (businessId: string, addressId: string) =>
+      mapAddresses(businessId, (list) => list.filter((a) => a.id !== addressId)),
+    [mapAddresses],
   );
 
   const signIn = useCallback(async (intent: AuthIntent) => {
@@ -155,6 +217,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         businesses,
         createBusiness,
         deleteBusiness,
+        addAddress,
+        updateAddress,
+        removeAddress,
         accountType: businesses.length > 0 ? 'COMPANY' : 'INDIVIDUAL',
         connected: waslaConfigured,
         signIn,
