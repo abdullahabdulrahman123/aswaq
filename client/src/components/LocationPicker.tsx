@@ -121,7 +121,15 @@ export function LocationPicker({ value, onChange, hint, onLocate, locating }: Pr
     mapRef.current = map;
     markerRef.current = marker;
 
+    /*
+     * Leaflet بيقيس الحاوية وقت الإنشاء. جوه <dialog> الحاوية بتبقى لسه
+     * بمقاس صفر في اللحظة دي، فالخريطة بتترسم ناقصة أو رمادية. إعادة القياس
+     * بعد أول رسمة بتصلّحها، ومش بتأذي حاجة لما تكون الخريطة في صفحة عادية.
+     */
+    const raf = requestAnimationFrame(() => map.invalidateSize());
+
     return () => {
+      cancelAnimationFrame(raf);
       map.remove();
       mapRef.current = null;
       markerRef.current = null;
