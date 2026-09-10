@@ -1,12 +1,10 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { Notch, fieldClass } from '../components/OutlinedField';
 
 /** أقصى طول للاختصار — بيظهر كشارة صغيرة فمينفعش يكون طويل */
 const ABBR_MAX = 8;
-
-const fieldClass =
-  'w-full rounded-xl border border-stone-300 bg-transparent px-3 py-2.5 outline-none transition focus:border-brand-500 dark:border-white/15';
 
 /**
  * تسجيل نشاط تجاري جديد — اسم واختصار وبس.
@@ -70,8 +68,8 @@ export function BusinessNewPage() {
         onSubmit={handleSubmit}
         className="mt-6 rounded-2xl border border-stone-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card"
       >
-        <label className="block">
-          <span className="mb-1.5 block text-sm font-medium">اسم النشاط التجاري</span>
+        {/* mt-2 على الأولى: اسم الخانة طالع فوق حدّها بـ٨ بكسل */}
+        <label className="relative mt-2 block">
           <input
             value={name}
             onChange={(e) => { setName(e.target.value); setError(''); }}
@@ -80,10 +78,10 @@ export function BusinessNewPage() {
             placeholder="مثال: شركة النور للتجارة"
             className={fieldClass}
           />
+          <Notch>اسم النشاط التجاري</Notch>
         </label>
 
-        <label className="mt-5 block">
-          <span className="mb-1.5 block text-sm font-medium">الاختصار</span>
+        <label className="relative mt-6 block">
           <input
             value={abbreviation}
             onChange={(e) => { setAbbreviation(e.target.value); setError(''); }}
@@ -92,6 +90,7 @@ export function BusinessNewPage() {
             placeholder="مثال: النور"
             className={fieldClass}
           />
+          <Notch>الاختصار</Notch>
           <span className="mt-1.5 block text-xs text-stone-400">
             اسم قصير بيظهر كشارة جنب نشاطك — {ABBR_MAX} حروف كحد أقصى.
           </span>
