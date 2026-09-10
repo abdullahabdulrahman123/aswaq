@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { BusinessAddress } from '../context/AuthContext';
 import { COUNTRIES, GOVERNORATE_NAMES, citiesOf } from '../data/egypt';
 import { LocationPicker } from './LocationPicker';
@@ -11,8 +11,29 @@ import {
   type DetectedPlace,
 } from '../lib/geolocate';
 
+/**
+ * خانة بإطار واسم قاعد على الإطار نفسه (الشكل اللي طلبه العميل).
+ *
+ * peer عشان الاسم يغيّر لونه لما الخانة تبقى في التركيز. ring-inset بيتخن
+ * الإطار من جوه بدل ما يزوّد عرض العنصر — الإطار التقيل لو زوّد بكسل واحد
+ * كانت الخانات هتنطّ وإحنا بننقّل بينها.
+ */
 const fieldClass =
-  'w-full rounded-xl border border-stone-300 bg-transparent px-3 py-2.5 outline-none transition focus:border-brand-500 dark:border-white/15';
+  'peer w-full rounded-xl border border-stone-300 bg-transparent px-3 py-3 outline-none transition focus:border-brand-500 focus:ring-1 focus:ring-inset focus:ring-brand-500 dark:border-white/20';
+
+/**
+ * اسم الخانة، قاعد على خط الإطار.
+ *
+ * الفتحة في الإطار مش فتحة حقيقية — خلفية الاسم هي نفس خلفية النافذة،
+ * فبتغطّي الخط تحتها. يعني لو خلفية النافذة اتغيّرت لازم تتغيّر هنا كمان.
+ */
+function Notch({ children }: { children: ReactNode }) {
+  return (
+    <span className="pointer-events-none absolute -top-2 start-3 bg-white px-1 text-xs font-medium text-stone-500 transition-colors peer-focus:text-brand-600 peer-disabled:text-stone-400 dark:bg-surface-card dark:text-stone-400 dark:peer-focus:text-brand-400">
+      {children}
+    </span>
+  );
+}
 
 /** وسط القاهرة — نقطة بداية الخريطة قبل ما المستخدم يحدد حاجة */
 const DEFAULT_POINT = { lat: 30.0444, lng: 31.2357 };
@@ -209,9 +230,24 @@ export function AddressDialog({ open, value, mode, onSave, onClose }: Props) {
             />
           </div>
 
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-medium">الدولة</span>
+          {/* gap أوسع من العادي: اسم كل خانة طالع فوق حدّها بـ٨ بكسل */}
+          <div className="mt-6 grid gap-5 sm:grid-cols-2">
+            {/* أول خانة: الاسم ده بيقول نوع المكان — فرع؟ مخزن؟ مكتب؟ */}
+            <label className="relative block sm:col-span-2">
+              <input
+                value={draft.label}
+                onChange={(e) => setField('label', e.target.value)}
+                maxLength={60}
+                placeholder="مثال: الفرع الرئيسي"
+                className={fieldClass}
+              />
+              <Notch>اسم العنوان</Notch>
+              <span className="mt-1.5 block text-xs text-stone-400">
+                نوع المكان أو اللي يفرّقه عن غيره — «الفرع الرئيسي»، «المخزن»، «المكتب».
+              </span>
+            </label>
+
+            <label className="relative block">
               <select
                 value={draft.country}
                 onChange={(e) => setField('country', e.target.value)}
@@ -221,10 +257,10 @@ export function AddressDialog({ open, value, mode, onSave, onClose }: Props) {
                   <option key={c} value={c}>{c}</option>
                 ))}
               </select>
+              <Notch>الدولة</Notch>
             </label>
 
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-medium">المحافظة</span>
+            <label className="relative block">
               <select
                 value={draft.governorate}
                 onChange={(e) => {
@@ -239,10 +275,10 @@ export function AddressDialog({ open, value, mode, onSave, onClose }: Props) {
                   <option key={g} value={g}>{g}</option>
                 ))}
               </select>
+              <Notch>المحافظة</Notch>
             </label>
 
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-medium">المدينة</span>
+            <label className="relative block">
               <input
                 list="aswaq-cities"
                 value={draft.city}
@@ -251,6 +287,7 @@ export function AddressDialog({ open, value, mode, onSave, onClose }: Props) {
                 placeholder={draft.governorate ? 'اختار أو اكتب' : 'اختار المحافظة الأول'}
                 className={`${fieldClass} disabled:cursor-not-allowed disabled:opacity-60`}
               />
+              <Notch>المدينة</Notch>
               {/* قايمة بتقبل الكتابة: مصر فيها مدن أكتر من اللي عندنا */}
               <datalist id="aswaq-cities">
                 {cities.map((c) => (
@@ -259,8 +296,7 @@ export function AddressDialog({ open, value, mode, onSave, onClose }: Props) {
               </datalist>
             </label>
 
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-medium">الحي</span>
+            <label className="relative block">
               <input
                 value={draft.district}
                 onChange={(e) => setField('district', e.target.value)}
@@ -268,10 +304,10 @@ export function AddressDialog({ open, value, mode, onSave, onClose }: Props) {
                 placeholder="مثال: المنشية"
                 className={fieldClass}
               />
+              <Notch>الحي</Notch>
             </label>
 
-            <label className="block sm:col-span-2">
-              <span className="mb-1.5 block text-sm font-medium">الشارع</span>
+            <label className="relative block sm:col-span-2">
               <input
                 value={draft.street}
                 onChange={(e) => setField('street', e.target.value)}
@@ -279,36 +315,23 @@ export function AddressDialog({ open, value, mode, onSave, onClose }: Props) {
                 placeholder="مثال: شارع الجمهورية، عمارة ١٢"
                 className={fieldClass}
               />
+              <Notch>الشارع</Notch>
             </label>
 
-            <label className="block sm:col-span-2">
-              <span className="mb-1.5 block text-sm font-medium">اسم العنوان</span>
-              <input
-                value={draft.label}
-                onChange={(e) => setField('label', e.target.value)}
-                maxLength={60}
-                placeholder="مثال: الفرع الرئيسي"
-                className={fieldClass}
-              />
-              <span className="mt-1.5 block text-xs text-stone-400">
-                اسم يفرّق العنوان ده عن غيره لو ليك أكتر من مكان.
-              </span>
-            </label>
-
-            <label className="block sm:col-span-2">
-              <span className="mb-1.5 block text-sm font-medium">وصف العنوان</span>
+            <label className="relative block sm:col-span-2">
               <textarea
                 value={draft.description}
                 onChange={(e) => setField('description', e.target.value)}
                 maxLength={300}
                 rows={3}
                 placeholder="مثال: الدور التالت فوق صيدلية النور، المدخل من الشارع الجانبي"
-                className={`${fieldClass} resize-y`}
+                /* block عشان الـtextarea ميسيبش فراغ تحته جوه الـlabel */
+                className={`${fieldClass} block resize-y`}
               />
+              <Notch>وصف العنوان</Notch>
             </label>
 
-            <label className="block sm:col-span-2">
-              <span className="mb-1.5 block text-sm font-medium">علامة مميزة</span>
+            <label className="relative block sm:col-span-2">
               <input
                 value={draft.landmark}
                 onChange={(e) => setField('landmark', e.target.value)}
@@ -316,6 +339,7 @@ export function AddressDialog({ open, value, mode, onSave, onClose }: Props) {
                 placeholder="مثال: جنب مسجد النور"
                 className={fieldClass}
               />
+              <Notch>علامة مميزة</Notch>
               <span className="mt-1.5 block text-xs text-stone-400">
                 حاجة قريبة تسهّل الوصول للمكان.
               </span>
