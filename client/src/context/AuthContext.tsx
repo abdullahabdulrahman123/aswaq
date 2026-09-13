@@ -134,6 +134,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => save(USER_KEY, user), [user]);
   useEffect(() => save(SESSION_KEY, session), [session]);
 
+  /*
+   * تسجيل الدخول ممكن يخلص في شباك غير اللي المستخدم فاتحه: تاب تاني، أو —
+   * في أسواق المتثبّت كتطبيق على أندرويد — الشباك الصغير اللي بيفتح فوق
+   * التطبيق لأي رابط برّه نطاقه (زي وصلة). التخزين واحد بين الاتنين، فبنقرا
+   * الجلسة تاني أول ما تتغيّر أو المستخدم يرجع للشباك ده. من غير كده التطبيق
+   * كان بيفضل عارض إنه مش مسجّل لحد ما يتقفل ويتفتح.
+   *
+   * بنرجّع نفس الكائن لو مفيش تغيير فعلي، عشان منعيدش تحميل الأنشطة على الفاضي.
+   */
+  useEffect(() => {
+    const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+    const sync = () => {
+      const nextUser = load<WaslaUser>(USER_KEY);
+      const nextSession = load<WaslaSession>(SESSION_KEY);
+      setUser((prev) => (same(prev, nextUser) ? prev : nextUser));
+      setSession((prev) => (same(prev, nextSession) ? prev : nextSession));
+      if (isLive(nextSession)) setSessionExpired(false);
+    };
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === null || event.key === USER_KEY || event.key === SESSION_KEY) sync();
+    };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') sync();
+    };
+    window.addEventListener('storage', onStorage);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, []);
+
   // القايمة من وصلة مع كل مستخدم أو توكن جديد
   useEffect(() => {
     if (!user || user.demo) {
