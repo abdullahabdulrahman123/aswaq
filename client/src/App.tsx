@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Route, Routes, useLocation } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { VendorSwitchDialog } from './components/VendorSwitchDialog';
+import { InstallPrompt } from './components/InstallPrompt';
 import { HomePage } from './pages/HomePage';
 import { ProductPage } from './pages/ProductPage';
 import { VendorPage } from './pages/VendorPage';
@@ -40,6 +41,7 @@ export function App() {
         </Routes>
       </main>
       <VendorSwitchDialog />
+      <InstallPrompt />
     </div>
   );
 }

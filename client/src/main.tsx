@@ -20,3 +20,15 @@ createRoot(document.getElementById('root')!).render(
     </BrowserRouter>
   </StrictMode>,
 );
+
+/*
+ * service worker للتثبيت بس — مبيخزّنش حاجة (شوف public/sw.js).
+ * في النسخة المنشورة بس: في التطوير كان هيقف بين Vite والمتصفح من غير فايدة.
+ */
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => {
+      // الموقع بيشتغل عادي من غيره — بس إشعار التثبيت ممكن ميظهرش على متصفحات قديمة
+    });
+  });
+}
