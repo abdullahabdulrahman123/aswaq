@@ -9,7 +9,8 @@ export function oneLine(a: BusinessAddress): string {
 interface Props {
   address: BusinessAddress;
   onEdit: () => void;
-  onDelete: () => void;
+  /** بيخلص لما وصلة ترد. الأخطاء بتتعرض في الصفحة، فمبيرميش */
+  onDelete: () => Promise<void>;
 }
 
 /** صف تفصيلة واحدة جوه العنوان المفتوح */
@@ -33,8 +34,20 @@ function Row({ label, value }: { label: string; value: string }) {
 export function AddressCard({ address, onEdit, onDelete }: Props) {
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const summary = oneLine(address) || 'عنوان من غير تفاصيل';
+
+  async function handleDelete() {
+    setDeleting(true);
+    try {
+      await onDelete();
+    } finally {
+      // لو الحذف نجح الكارت بيختفي من القايمة، ولو فشل يرجع زي ما كان
+      setDeleting(false);
+      setConfirming(false);
+    }
+  }
 
   return (
     <li className="overflow-hidden rounded-xl border border-stone-200 bg-white dark:border-white/10 dark:bg-white/5">
@@ -92,7 +105,8 @@ export function AddressCard({ address, onEdit, onDelete }: Props) {
             <button
               type="button"
               onClick={onEdit}
-              className="rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium transition hover:border-brand-400 hover:text-brand-700 dark:border-white/15 dark:hover:text-brand-400"
+              disabled={deleting}
+              className="rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium transition hover:border-brand-400 hover:text-brand-700 disabled:opacity-60 dark:border-white/15 dark:hover:text-brand-400"
             >
               تعديل
             </button>
@@ -103,15 +117,17 @@ export function AddressCard({ address, onEdit, onDelete }: Props) {
                 <span className="text-xs text-stone-500 dark:text-stone-400">متأكد؟</span>
                 <button
                   type="button"
-                  onClick={onDelete}
-                  className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-red-700"
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-red-700 disabled:cursor-progress disabled:opacity-70"
                 >
-                  احذف
+                  {deleting ? 'بنحذف…' : 'احذف'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setConfirming(false)}
-                  className="rounded-lg px-2 py-1.5 text-xs text-stone-500 transition hover:text-stone-700 dark:text-stone-400"
+                  disabled={deleting}
+                  className="rounded-lg px-2 py-1.5 text-xs text-stone-500 transition hover:text-stone-700 disabled:opacity-60 dark:text-stone-400"
                 >
                   رجوع
                 </button>

@@ -2,6 +2,8 @@ import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Notch, fieldClass } from '../components/OutlinedField';
+import { SessionExpiredNotice } from '../components/SessionExpiredNotice';
+import { ApiError, SessionExpiredError } from '../lib/waslaApi';
 
 /** أقصى طول للاختصار — بيظهر كشارة صغيرة فمينفعش يكون طويل */
 const ABBR_MAX = 8;
@@ -19,9 +21,12 @@ export function BusinessNewPage() {
   const [name, setName] = useState('');
   const [abbreviation, setAbbreviation] = useState('');
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (submitting) return;
+
     const cleanName = name.trim();
     const cleanAbbr = abbreviation.trim();
 
@@ -29,15 +34,27 @@ export function BusinessNewPage() {
       setError('اكتب اسم النشاط والاختصار.');
       return;
     }
-    // الاختصار بيتعرض كشارة، فتكراره بيخلي الأنشطة مش متميّزة عن بعض
+    // فحص سريع قبل ما نبعت — وصلة بتفحص تاني، وهي الحكم الأخير
     if (businesses.some((b) => b.abbreviation.toLowerCase() === cleanAbbr.toLowerCase())) {
       setError('الاختصار ده مستخدم في نشاط تاني عندك. اختار غيره.');
       return;
     }
 
-    const created = createBusiness({ name: cleanName, abbreviation: cleanAbbr });
-    // على طول لصفحة النشاط — منها بيضيف العناوين
-    navigate(`/business/${created.id}`, { state: { created: true } });
+    setSubmitting(true);
+    try {
+      const created = await createBusiness({ name: cleanName, abbreviation: cleanAbbr });
+      // على طول لصفحة النشاط — منها بيضيف العناوين
+      navigate(`/business/${created.accountId}`, { state: { created: true } });
+    } catch (err) {
+      setSubmitting(false);
+      // انتهاء الجلسة ليه تنبيه لوحده فوق الفورم
+      if (err instanceof SessionExpiredError) return;
+      if (err instanceof ApiError && err.status === 409) {
+        setError('الاختصار ده مستخدم في نشاط تاني عندك. اختار غيره.');
+        return;
+      }
+      setError(err instanceof Error ? err.message : 'مقدرناش نسجّل النشاط. جرّب تاني.');
+    }
   }
 
   if (!user) {
@@ -64,9 +81,13 @@ export function BusinessNewPage() {
         سجّل نشاطك عشان تبدأ تبيع على أسواق.
       </p>
 
+      <div className="mt-6">
+        <SessionExpiredNotice />
+      </div>
+
       <form
         onSubmit={handleSubmit}
-        className="mt-6 rounded-2xl border border-stone-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card"
+        className="rounded-2xl border border-stone-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card"
       >
         {/* mt-2 على الأولى: اسم الخانة طالع فوق حدّها بـ٨ بكسل */}
         <label className="relative mt-2 block">
@@ -105,9 +126,10 @@ export function BusinessNewPage() {
         <div className="mt-6 flex flex-wrap gap-3">
           <button
             type="submit"
-            className="rounded-xl bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-600"
+            disabled={submitting}
+            className="rounded-xl bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:cursor-progress disabled:opacity-70"
           >
-            سجّل النشاط
+            {submitting ? 'بنسجّل…' : 'سجّل النشاط'}
           </button>
           <button
             type="button"
@@ -123,11 +145,6 @@ export function BusinessNewPage() {
           أو تسيبه من غير عنوان دلوقتي.
         </p>
       </form>
-
-      <p className="mt-4 text-xs leading-relaxed text-stone-400">
-        البيانات محفوظة على المتصفح ده دلوقتي، فمش هتلاقيها لو فتحت من جهاز تاني.
-        ربطها بالحساب لسه في الطريق.
-      </p>
     </div>
   );
 }

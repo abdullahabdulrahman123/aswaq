@@ -11,7 +11,7 @@ import {
 
 /** المستخدم راجع من وصلة — نبدّل الكود بـtoken ونكمّل من حيث وقف */
 export function AuthCallbackPage() {
-  const { setUser, signIn } = useAuth();
+  const { completeSignIn, signIn } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const [error, setError] = useState('');
@@ -54,15 +54,15 @@ export function AuthCallbackPage() {
       }
 
       try {
-        const idToken = await exchangeCode(code);
-        setUser(decodeIdToken(idToken));
+        const { idToken, session } = await exchangeCode(code);
+        completeSignIn(decodeIdToken(idToken), session);
         navigate(consumeReturnTo(), { replace: true });
       } catch (e) {
         setError(e instanceof Error ? e.message : 'حصلت مشكلة أثناء تسجيل الدخول.');
         setCanRetry(true);
       }
     })();
-  }, [params, setUser, navigate]);
+  }, [params, completeSignIn, navigate]);
 
   return (
     <div className="mx-auto grid min-h-[60vh] max-w-md place-items-center px-4 text-center">

@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+/**
+ * MongoDB Atlas — نفس كلاستر وصلة، قاعدة بيانات منفصلة اسمها aswaq.
+ * مفيش migrations هنا — التحديث بـ`npm run db:push`.
+ *
+ * البيانات الأساسية (الحسابات، الأنشطة، الأسماء، العناوين) مش هنا — دي في وصلة.
+ * accountId في كل جدول هنا هو id حساب النشاط في وصلة. مفيش علاقة حقيقية
+ * بينهم لأنهم في قاعدتين مختلفتين، فالسيرفر بيتأكد منه بإنه يسأل وصلة نفسها
+ * (شوف middleware/auth.ts).
+ *
+ * أسماء الحقول زي ما هي في السكيمة اللي العميل وافق عليها، من غير @map.
+ */
+datasource db {
+  provider = "mongodb"
+  url      = env("MONGODB_URL")
+}
+
+/** محل تابع لنشاط تجاري */
+model Shop {
+  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+  accountId String  @db.ObjectId
+  name      String
+  /** واحد من عناوين النشاط في وصلة */
+  addressId String? @db.ObjectId
+
+  items Item[]
+
+  @@index([accountId])
+  @@map("shops")
+}
+
+/**
+ * صنف. نفس الصنف بيتسجّل على مستويين:
+ *   shopId = null → الصنف على مستوى النشاط
+ *   shopId = id   → نسخة المحل ده بأسعاره
+ * ومسح المحل بيمسح نسخه معاه.
+ */
+model Item {
+  id        String     @id @default(auto()) @map("_id") @db.ObjectId
+  accountId String     @db.ObjectId
+  shopId    String?    @db.ObjectId
+  shop      Shop?      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  name      String
+  picture   String?
+  /** بالقرش. بيتحسب من المشتريات (متوسط مرجّح) — مش بيتكتب بإيد */
+  avgCost   Int        @default(0)
+  rate      Float      @default(0)
+  isOwner   Boolean    @default(true)
+  units     ItemUnit[]
+
+  /**
+   * الفهرس الفريد في MongoDB بيعامل null كقيمة واحدة (عكس Postgres).
+   * هنا ده بالظبط المطلوب: صنف واحد بس بالاسم ده على مستوى النشاط.
+   */
+  @@unique([accountId, shopId, name])
+  @@map("items")
+}
+
+/** وحدة بيع. كل الأسعار بالقرش، والفاضي = لسه متحددش */
+type ItemUnit {
+  name        String
+  /** كام وحدة من أصغر وحدة جوه الوحدة دي — 1 = أصغر وحدة */
+  unitContent Int
+  rate        Float?
+  /** جملة في المحل */
+  onSWP       Int?
+  /** قطاعي في المحل */
+  onSRP       Int?
+  /** جملة أونلاين */
+  onLWP       Int?
+  /** قطاعي أونلاين */
+  onLRP       Int?
+}

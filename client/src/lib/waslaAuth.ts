@@ -2,10 +2,10 @@
  * تسجيل الدخول عبر وصلة (Wasla) — تدفّق OIDC Authorization Code + PKCE.
  * نفس النمط المستخدم في cura-pres، معدّل لأن أسواق منشور تحت مسار فرعي.
  *
- * ⚠️ ملاحظة أمنية: أسواق لسه من غير سيرفر، فالـ id_token بيتفك هنا من غير
- * التحقق من التوقيع. ده مقبول دلوقتي لأن مفيش حاجة محمية على المتصفح أصلاً.
- * ساعة ما نبني الـbackend لازم الـtoken يتبعتله ويتحقق من التوقيع عبر JWKS
- * قبل إنشاء أي طلب.
+ * ⚠️ ملاحظة أمنية: الـid_token بيتفك هنا من غير التحقق من التوقيع، وده مقبول
+ * لأنه للعرض بس (الاسم والإيميل). أي بيانات بتتحفظ بتروح بتوكن الوصول،
+ * ووصلة (أو سيرفر أسواق عن طريق وصلة) هي اللي بتتحقق منه — المتصفح مش
+ * مصدر ثقة في أي حاجة.
  */
 
 /**
@@ -32,6 +32,16 @@ export function waslaAccountUrl(): string {
   return (configured ?? 'http://localhost:5183').replace(/\/+$/, '');
 }
 
+/**
+ * سيرفر وصلة لبيانات النشاط والعناوين: نفس أصل الـissuer من غير /op.
+ * محلياً ده بروكسي واجهة وصلة (5183) اللي بيمرّر /api للسيرفر، وعلى النشر
+ * ده سيرفر وصلة نفسه — فمفيش متغيّر بيئة جديد يتظبط.
+ */
+export function waslaApiOrigin(): string {
+  if (!ISSUER) throw new Error('VITE_WASLA_ISSUER غير مضبوط');
+  return new URL(ISSUER).origin;
+}
+
 export interface WaslaUser {
   sub: string;
   name?: string;
@@ -39,6 +49,13 @@ export interface WaslaUser {
   picture?: string;
   /** true = جلسة تجريبية مش من وصلة */
   demo?: boolean;
+}
+
+/** توكن الوصول — بيتبعت مع أي طلب بيحفظ بيانات */
+export interface WaslaSession {
+  accessToken: string;
+  /** بالمللي ثانية */
+  expiresAt: number;
 }
 
 function base64UrlEncode(buffer: ArrayBuffer | Uint8Array): string {
@@ -113,7 +130,10 @@ export function consumeReturnTo(): string {
   return to;
 }
 
-export async function exchangeCode(code: string): Promise<string> {
+/** وصلة بتدي توكن الوصول ساعة — ده الافتراضي لو الرد مقالش */
+const DEFAULT_TOKEN_SECONDS = 3600;
+
+export async function exchangeCode(code: string): Promise<{ idToken: string; session: WaslaSession }> {
   if (!ISSUER) throw new Error('VITE_WASLA_ISSUER غير مضبوط');
   const verifier = localStorage.getItem('aswaq_wasla_verifier') ?? '';
 
@@ -134,9 +154,16 @@ export async function exchangeCode(code: string): Promise<string> {
   localStorage.removeItem('aswaq_wasla_verifier');
   localStorage.removeItem('aswaq_wasla_state');
 
-  const data = (await res.json()) as { id_token?: string };
-  if (!data.id_token) throw new Error('وصلة لم ترجع id_token');
-  return data.id_token;
+  const data = (await res.json()) as { id_token?: string; access_token?: string; expires_in?: number };
+  if (!data.id_token || !data.access_token) throw new Error('وصلة مرجّعتش التوكنات المطلوبة');
+
+  return {
+    idToken: data.id_token,
+    session: {
+      accessToken: data.access_token,
+      expiresAt: Date.now() + (data.expires_in ?? DEFAULT_TOKEN_SECONDS) * 1000,
+    },
+  };
 }
 
 /** فك الـpayload بدون تحقق من التوقيع — انظر الملاحظة الأمنية أعلى الملف */

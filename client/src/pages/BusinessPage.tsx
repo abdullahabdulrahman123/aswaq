@@ -3,21 +3,35 @@ import { Link, useLocation, useParams } from 'react-router-dom';
 import { useAuth, type BusinessAddress } from '../context/AuthContext';
 import { AddressDialog, EMPTY_ADDRESS } from '../components/AddressDialog';
 import { AddressCard } from '../components/AddressCard';
+import { SessionExpiredNotice } from '../components/SessionExpiredNotice';
+import { SessionExpiredError } from '../lib/waslaApi';
 
 /**
  * صفحة النشاط التجاري.
  *
  * التسجيل بياخد اسم واختصار وبس، والعناوين بتتضاف من هنا — نشاط ممكن يكون
  * له فرع ومخزن ومكتب، وممكن يفضل من غير عنوان لحد ما صاحبه يجهّز مكانه.
+ * كل ده متخزّن في وصلة، وأسواق بيعرضه ويبعت التعديلات.
  */
 export function BusinessPage() {
   const { id } = useParams<{ id: string }>();
-  const { user, businesses, addAddress, updateAddress, removeAddress, signIn } = useAuth();
+  const {
+    user,
+    businesses,
+    businessesLoading,
+    businessesError,
+    addAddress,
+    updateAddress,
+    removeAddress,
+    signIn,
+  } = useAuth();
   // بنيجي هنا على طول بعد التسجيل — بنقول للمستخدم إنه تم قبل ما يسأل
   const justCreated = Boolean((useLocation().state as { created?: boolean } | null)?.created);
 
   /** null = مقفول، عنوان بـid فاضي = إضافة، عنوان بـid = تعديل */
   const [editing, setEditing] = useState<BusinessAddress | null>(null);
+  /** خطأ الحذف. أخطاء الإضافة والتعديل بتتعرض جوه النافذة نفسها */
+  const [deleteError, setDeleteError] = useState('');
 
   if (!user) {
     return (
@@ -36,30 +50,69 @@ export function BusinessPage() {
     );
   }
 
-  const business = businesses.find((b) => b.id === id);
+  const business = businesses.find((b) => b.accountId === id);
 
   if (!business) {
+    // القايمة لسه جاية من وصلة — "مش موجود" دلوقتي ممكن تبقى غلط
+    if (businessesLoading) {
+      return (
+        <div className="mx-auto grid min-h-[50vh] max-w-md place-items-center px-4 text-center">
+          <div>
+            <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-stone-200 border-t-brand-500 motion-reduce:animate-none dark:border-white/15 dark:border-t-brand-400" />
+            <p className="mt-4 text-sm text-stone-500 dark:text-stone-400">بنجيب بيانات النشاط من وصلة…</p>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="mx-auto max-w-md px-4 py-20 text-center">
-        <h1 className="font-display text-2xl font-bold">النشاط ده مش موجود</h1>
+        <SessionExpiredNotice />
+        <h1 className="font-display text-2xl font-bold">
+          {businessesError ? 'مقدرناش نجيب النشاط' : 'النشاط ده مش موجود'}
+        </h1>
         <p className="mt-3 text-sm leading-relaxed text-stone-500 dark:text-stone-400">
-          يمكن يكون اتحذف، أو مسجّل على جهاز تاني — الأنشطة لسه محفوظة على المتصفح.
+          {businessesError || 'يمكن يكون اتحذف، أو تبع حساب تاني.'}
         </p>
-        <Link
-          to="/business/new"
-          className="mt-6 inline-block rounded-xl bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-600"
-        >
-          أنشئ نشاط تجاري
-        </Link>
+        {businessesError ? (
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-6 rounded-xl bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-600"
+          >
+            جرّب تاني
+          </button>
+        ) : (
+          <Link
+            to="/business/new"
+            className="mt-6 inline-block rounded-xl bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-600"
+          >
+            أنشئ نشاط تجاري
+          </Link>
+        )}
       </div>
     );
   }
 
-  function handleSave(address: BusinessAddress) {
+  /** بترمي لو الحفظ فشل — النافذة بتمسك الخطأ وتعرضه وتفضل مفتوحة */
+  async function handleSave(address: BusinessAddress) {
     if (!business) return;
-    if (address.id) updateAddress(business.id, address);
-    else addAddress(business.id, address);
+    const { id: addressId, ...fields } = address;
+    if (addressId) await updateAddress(business.accountId, address);
+    else await addAddress(business.accountId, fields);
     setEditing(null);
+  }
+
+  async function handleDelete(addressId: string) {
+    if (!business) return;
+    setDeleteError('');
+    try {
+      await removeAddress(business.accountId, addressId);
+    } catch (err) {
+      // انتهاء الجلسة ليه تنبيه لوحده فوق
+      if (!(err instanceof SessionExpiredError)) {
+        setDeleteError(err instanceof Error ? err.message : 'مقدرناش نحذف العنوان. جرّب تاني.');
+      }
+    }
   }
 
   return (
@@ -69,6 +122,8 @@ export function BusinessPage() {
           اتسجّل النشاط. تقدر تضيف عناوينه دلوقتي أو في أي وقت بعدين.
         </p>
       )}
+
+      <SessionExpiredNotice />
 
       <div className="flex items-start gap-3">
         <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-brand-50 font-display text-xs font-bold text-brand-800 dark:bg-brand-500/15 dark:text-brand-200">
@@ -99,6 +154,12 @@ export function BusinessPage() {
           </button>
         </div>
 
+        {deleteError && (
+          <p role="alert" className="mt-4 rounded-lg bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-300">
+            {deleteError}
+          </p>
+        )}
+
         {business.addresses.length > 0 ? (
           <>
             <ul className="mt-4 grid gap-2.5">
@@ -107,7 +168,7 @@ export function BusinessPage() {
                   key={a.id}
                   address={a}
                   onEdit={() => setEditing(a)}
-                  onDelete={() => removeAddress(business.id, a.id)}
+                  onDelete={() => handleDelete(a.id)}
                 />
               ))}
             </ul>
@@ -119,11 +180,6 @@ export function BusinessPage() {
           </p>
         )}
       </section>
-
-      <p className="mt-4 text-xs leading-relaxed text-stone-400">
-        البيانات محفوظة على المتصفح ده دلوقتي، فمش هتلاقيها لو فتحت من جهاز تاني.
-        ربطها بالحساب لسه في الطريق.
-      </p>
 
       <AddressDialog
         open={editing !== null}

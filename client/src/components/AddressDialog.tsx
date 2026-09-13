@@ -36,7 +36,8 @@ interface Props {
   value: BusinessAddress;
   /** بيغيّر العنوان والزرار بس — الخانات واحدة في الحالتين */
   mode: 'add' | 'edit';
-  onSave: (address: BusinessAddress) => void;
+  /** بيخلص لما وصلة ترد، وبيرمي لو الحفظ فشل — النافذة بتعرض الخطأ وتفضل مفتوحة */
+  onSave: (address: BusinessAddress) => Promise<void>;
   onClose: () => void;
 }
 
@@ -55,6 +56,7 @@ export function AddressDialog({ open, value, mode, onSave, onClose }: Props) {
 
   const [draft, setDraft] = useState<BusinessAddress>(value);
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
   const [locating, setLocating] = useState(false);
   const [locateError, setLocateError] = useState('');
   const [located, setLocated] = useState(false);
@@ -72,6 +74,7 @@ export function AddressDialog({ open, value, mode, onSave, onClose }: Props) {
     if (!open) return;
     setDraft(value);
     setError('');
+    setSaving(false);
     setLocateError('');
     setLocated(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -128,21 +131,31 @@ export function AddressDialog({ open, value, mode, onSave, onClose }: Props) {
     }
   }
 
-  function handleSave() {
+  async function handleSave() {
+    if (saving) return;
     if (!draft.governorate || !draft.city.trim()) {
       setError('اختار المحافظة والمدينة.');
       return;
     }
-    onSave({
-      ...draft,
-      label: draft.label.trim(),
-      description: draft.description.trim(),
-      country: draft.country.trim(),
-      city: draft.city.trim(),
-      district: draft.district.trim(),
-      street: draft.street.trim(),
-      landmark: draft.landmark.trim(),
-    });
+
+    setSaving(true);
+    setError('');
+    try {
+      await onSave({
+        ...draft,
+        label: draft.label.trim(),
+        description: draft.description.trim(),
+        country: draft.country.trim(),
+        city: draft.city.trim(),
+        district: draft.district.trim(),
+        street: draft.street.trim(),
+        landmark: draft.landmark.trim(),
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'مقدرناش نحفظ العنوان. جرّب تاني.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   const cities = citiesOf(draft.governorate);
@@ -333,9 +346,10 @@ export function AddressDialog({ open, value, mode, onSave, onClose }: Props) {
             <button
               type="button"
               onClick={handleSave}
-              className="rounded-xl bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-600"
+              disabled={saving}
+              className="rounded-xl bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:cursor-progress disabled:opacity-70"
             >
-              {mode === 'add' ? 'إضافة العنوان' : 'حفظ التعديل'}
+              {saving ? 'بنحفظ…' : mode === 'add' ? 'إضافة العنوان' : 'حفظ التعديل'}
             </button>
             <button
               type="button"

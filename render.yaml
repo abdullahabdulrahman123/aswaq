@@ -1,0 +1,30 @@
+# نشر سيرفر أسواق على Render.
+#
+# الواجهة نفسها على GitHub Pages (.github/workflows/deploy.yml) — ده السيرفر بس.
+# قاعدة البيانات على MongoDB Atlas: نفس كلاستر وصلة، قاعدة اسمها aswaq.
+# المتغيّرات المعلّمة sync:false بتتكتب بإيدك في لوحة Render (أسرار).
+
+services:
+  - type: web
+    name: aswaq-api
+    runtime: node
+    plan: free
+    region: frankfurt
+    rootDir: server
+    # --include=dev: NODE_ENV=production بيخلي npm يتخطّى devDependencies،
+    # وTypeScript وحزم @types هناك — نفس المشكلة اللي وقعت في بناء وصلة
+    buildCommand: npm ci --include=dev && npx prisma generate && npm run build
+    startCommand: npx prisma db push --skip-generate && npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY
+        value: 'true'
+      # أسواق بيسأل وصلة مع كل طلب: مين المستخدم وإيه الأنشطة اللي بيديرها
+      - key: WASLA_API_ORIGIN
+        value: https://wasla-api.onrender.com
+      - key: CLIENT_ORIGINS
+        value: https://abdullahabdulrahman123.github.io
+      - key: MONGODB_URL
+        sync: false

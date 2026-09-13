@@ -1,25 +1,30 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import { redirectToWasla, waslaConfigured, type WaslaUser } from '../lib/waslaAuth';
+import { redirectToWasla, waslaConfigured, type WaslaSession, type WaslaUser } from '../lib/waslaAuth';
+import {
+  ApiError,
+  deleteAddress,
+  fetchBusinesses,
+  postAddress,
+  postBusiness,
+  putAddress,
+  SessionExpiredError,
+} from '../lib/waslaApi';
 import type { AccountType } from '../lib/pricing';
 
 /**
  * الزبون يتصفح كزائر عادي، وتسجيل الدخول مطلوب عند إتمام الطلب فقط.
  * التسجيل كله عبر وصلة — أسواق مش بيخزّن كلمات سر.
  *
- * وصلة بتقول مين المستخدم وبس. الفرق بين الفرد والشركة بيتحدد هنا في
- * أسواق: اللي عنده نشاط تجاري مسجّل بيبقى شركة، والباقي أفراد.
- * ده الصح لأن النشاط التجاري حاجة تخص أسواق مش منصة الهوية.
+ * النشاط التجاري نفسه (اسمه واختصاره وعناوينه) متسجّل في وصلة بطلب العميل:
+ * البيانات الأساسية في مكان واحد لكل التطبيقات. أسواق بياخد منه قرار واحد:
+ * اللي عنده نشاط يبقى شركة، والباقي أفراد.
  */
 
 export type AuthIntent = 'login' | 'register';
 
-/**
- * نشاط تجاري مسجّل على أسواق — وجود واحد على الأقل بيحوّل الحساب لحساب شركة.
- * المستخدم ممكن يكون عنده أكتر من نشاط.
- */
 /** عنوان النشاط — الدولة والمحافظة والمدينة من قوايم، والباقي كتابة حرة */
 export interface BusinessAddress {
-  /** بيتولّد وقت الإضافة — عشان التعديل والحذف يمسكوا العنوان الصح مهما اتغيّر ترتيبهم */
+  /** id العنوان في وصلة. فاضي = عنوان جديد لسه متحفظش */
   id: string;
   /** اسم يميّز العنوان — "الفرع الرئيسي"، "المخزن" */
   label: string;
@@ -37,8 +42,16 @@ export interface BusinessAddress {
   lng: number;
 }
 
+/**
+ * نشاط تجاري — وجود واحد على الأقل بيحوّل الحساب لحساب شركة.
+ * المستخدم ممكن يكون عنده أكتر من نشاط.
+ */
 export interface Business {
-  id: string;
+  /**
+   * id حساب النشاط في وصلة. ده المعرّف الموحّد حسب السكيمة: العناوين،
+   * والمحلات والأصناف في أسواق، كلها بتتربط بيه.
+   */
+  accountId: string;
   name: string;
   /** اختصار قصير للنشاط — بيظهر كشارة جنب الاسم */
   abbreviation: string;
@@ -52,88 +65,137 @@ export interface Business {
 
 interface AuthContextValue {
   user: WaslaUser | null;
-  /** أنشطة المستخدم الحالي التجارية — فاضية لو معملش ولا واحد */
+  /** أنشطة المستخدم الحالي — آخر نسخة معروفة لحد ما وصلة ترد */
   businesses: Business[];
-  createBusiness: (b: Pick<Business, 'name' | 'abbreviation'>) => Business;
-  deleteBusiness: (id: string) => void;
-  /** بترجّع العنوان بالـid اللي اتولّد له */
-  addAddress: (businessId: string, address: Omit<BusinessAddress, 'id'>) => BusinessAddress;
-  updateAddress: (businessId: string, address: BusinessAddress) => void;
-  removeAddress: (businessId: string, addressId: string) => void;
+  /** بنستنى رد وصلة على قايمة الأنشطة */
+  businessesLoading: boolean;
+  /** تحميل القايمة فشل. أخطاء الحفظ مش هنا — بتترمي للي نادى */
+  businessesError: string;
+  /** توكن وصلة انتهى: المعروض لسه صحيح، بس الحفظ محتاج تسجيل دخول تاني */
+  sessionExpired: boolean;
+  createBusiness: (input: Pick<Business, 'name' | 'abbreviation'>) => Promise<Business>;
+  addAddress: (accountId: string, fields: Omit<BusinessAddress, 'id'>) => Promise<BusinessAddress>;
+  updateAddress: (accountId: string, address: BusinessAddress) => Promise<void>;
+  removeAddress: (accountId: string, addressId: string) => Promise<void>;
   /** الأسعار بتتبني عليه — الزائر والفرد زي بعض، الشركة بتشوف أسعار الكميات */
   accountType: AccountType;
   /** هل وصلة متوصّلة فعلاً؟ لو لأ بنشتغل بوضع تجريبي واضح للعميل */
   connected: boolean;
   signIn: (intent: AuthIntent) => Promise<void>;
-  setUser: (u: WaslaUser) => void;
+  /** المستخدم رجع من وصلة بهويته وتوكن الوصول */
+  completeSignIn: (user: WaslaUser, session: WaslaSession) => void;
   signOut: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-function loadUser(): WaslaUser | null {
+const USER_KEY = 'aswaq_user';
+const SESSION_KEY = 'aswaq_session';
+
+/**
+ * آخر قايمة أنشطة جت من وصلة، لكل مستخدم لوحده.
+ * من غيرها، أول ما الصفحة تفتح أو التوكن ينتهي القايمة بتفضى — والشركة
+ * بتشوف أسعار الأفراد لحد ما تسجّل دخول تاني.
+ */
+const cacheKey = (sub: string) => `aswaq_businesses_cache_${sub}`;
+
+function load<T>(key: string): T | null {
   try {
-    const raw = localStorage.getItem('aswaq_user');
-    return raw ? (JSON.parse(raw) as WaslaUser) : null;
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : null;
   } catch {
     return null;
   }
 }
 
-/** مفتاح لكل مستخدم — عشان أنشطة حد ما تظهرش لحد تاني على نفس الجهاز */
-const businessKey = (sub: string) => `aswaq_businesses_${sub}`;
-
-/**
- * الشكل المحفوظ على الأجهزة. النشاط كان بياخد عنوان واحد اسمه address، وبقى
- * بياخد قايمة، فبنحوّل القديم بدل ما يضيع على اللي مسجّل نشاطه قبل التغيير.
- */
-type StoredBusiness = Omit<Business, 'addresses'> & {
-  addresses?: BusinessAddress[];
-  address?: Omit<BusinessAddress, 'id'> & { id?: string };
-};
-
-function normalize(stored: StoredBusiness[]): Business[] {
-  return stored.map(({ address, addresses, ...rest }) => ({
-    ...rest,
-    addresses:
-      addresses ??
-      (address ? [{ ...address, id: address.id || crypto.randomUUID() }] : []),
-  }));
-}
-
-function loadBusinesses(sub: string | undefined): Business[] {
-  if (!sub) return [];
+function save(key: string, value: unknown) {
   try {
-    const raw = localStorage.getItem(businessKey(sub));
-    const parsed: unknown = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? normalize(parsed as StoredBusiness[]) : [];
+    if (value === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, JSON.stringify(value));
   } catch {
-    return [];
+    // المتصفح قافل التخزين — الموقع يفضل شغال، بس من غير تذكّر
   }
 }
 
+const isLive = (session: WaslaSession | null): session is WaslaSession =>
+  Boolean(session && session.expiresAt > Date.now());
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUserState] = useState<WaslaUser | null>(loadUser);
-  const [businesses, setBusinesses] = useState<Business[]>(() => loadBusinesses(loadUser()?.sub));
+  const [user, setUser] = useState<WaslaUser | null>(() => load<WaslaUser>(USER_KEY));
+  const [session, setSession] = useState<WaslaSession | null>(() => load<WaslaSession>(SESSION_KEY));
+  const [businesses, setBusinesses] = useState<Business[]>(() => {
+    const sub = load<WaslaUser>(USER_KEY)?.sub;
+    return (sub && load<Business[]>(cacheKey(sub))) || [];
+  });
+  const [businessesLoading, setBusinessesLoading] = useState(false);
+  const [businessesError, setBusinessesError] = useState('');
+  const [sessionExpired, setSessionExpired] = useState(false);
 
+  useEffect(() => save(USER_KEY, user), [user]);
+  useEffect(() => save(SESSION_KEY, session), [session]);
+
+  // القايمة من وصلة مع كل مستخدم أو توكن جديد
   useEffect(() => {
-    if (user) localStorage.setItem('aswaq_user', JSON.stringify(user));
-    else localStorage.removeItem('aswaq_user');
-    // الأنشطة بتتقرا من جديد مع كل تغيير مستخدم
-    setBusinesses(loadBusinesses(user?.sub));
-  }, [user]);
+    if (!user || user.demo) {
+      setBusinesses([]);
+      return;
+    }
+    setBusinesses(load<Business[]>(cacheKey(user.sub)) ?? []);
+    setBusinessesError('');
 
-  const setUser = useCallback((u: WaslaUser) => {
-    setUserState(u);
-  }, []);
+    if (!isLive(session)) {
+      setSessionExpired(true);
+      return;
+    }
 
-  /** كل تعديل بيتكتب على المتصفح فوراً — مفيش سيرفر بيحفظ الأنشطة لسه */
+    let cancelled = false;
+    setBusinessesLoading(true);
+    fetchBusinesses(session.accessToken)
+      .then((list) => {
+        if (cancelled) return;
+        setBusinesses(list);
+        save(cacheKey(user.sub), list);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        if (err instanceof SessionExpiredError) setSessionExpired(true);
+        else setBusinessesError(err instanceof Error ? err.message : 'مقدرناش نجيب أنشطتك من وصلة.');
+      })
+      .finally(() => {
+        if (!cancelled) setBusinessesLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user, session]);
+
+  /**
+   * كل عملية حفظ بتعدّي من هنا: بتاخد التوكن، ولو وصلة قالت إنه انتهى
+   * بترفع علامة sessionExpired عشان الصفحة تعرض "سجّل دخول تاني".
+   */
+  const withToken = useCallback(
+    async <T,>(call: (token: string) => Promise<T>): Promise<T> => {
+      if (user?.demo) {
+        throw new ApiError(0, 'الأنشطة التجارية محتاجة تسجيل دخول حقيقي بوصلة — النسخة دي شغالة بوضع تجريبي.');
+      }
+      try {
+        if (!isLive(session)) throw new SessionExpiredError();
+        return await call(session.accessToken);
+      } catch (err) {
+        if (err instanceof SessionExpiredError) setSessionExpired(true);
+        throw err;
+      }
+    },
+    [user, session],
+  );
+
+  /** بنحدّث الحالة والنسخة المحفوظة مع بعض */
   const commit = useCallback(
     (update: (prev: Business[]) => Business[]) => {
-      if (!user) return;
       setBusinesses((prev) => {
         const next = update(prev);
-        localStorage.setItem(businessKey(user.sub), JSON.stringify(next));
+        if (user) save(cacheKey(user.sub), next);
         return next;
       });
     },
@@ -141,54 +203,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const createBusiness = useCallback(
-    (b: Pick<Business, 'name' | 'abbreviation'>) => {
-      if (!user) throw new Error('لازم تسجّل دخول الأول');
-      const record: Business = {
-        ...b,
-        // العناوين بتتضاف بعدين من صفحة النشاط — التسجيل نفسه اسم واختصار وبس
-        addresses: [],
-        id: crypto.randomUUID(),
-        createdAt: new Date().toISOString(),
-      };
-      commit((prev) => [...prev, record]);
-      return record;
+    async (input: Pick<Business, 'name' | 'abbreviation'>) => {
+      const created = await withToken((token) => postBusiness(token, input));
+      commit((prev) => [...prev, created]);
+      return created;
     },
-    [user, commit],
-  );
-
-  const deleteBusiness = useCallback(
-    (id: string) => commit((prev) => prev.filter((b) => b.id !== id)),
-    [commit],
+    [withToken, commit],
   );
 
   /** تعديل عناوين نشاط واحد من غير ما نلمس الباقي */
   const mapAddresses = useCallback(
-    (businessId: string, update: (list: BusinessAddress[]) => BusinessAddress[]) =>
+    (accountId: string, update: (list: BusinessAddress[]) => BusinessAddress[]) =>
       commit((prev) =>
-        prev.map((b) => (b.id === businessId ? { ...b, addresses: update(b.addresses) } : b)),
+        prev.map((b) => (b.accountId === accountId ? { ...b, addresses: update(b.addresses) } : b)),
       ),
     [commit],
   );
 
   const addAddress = useCallback(
-    (businessId: string, address: Omit<BusinessAddress, 'id'>) => {
-      const record: BusinessAddress = { ...address, id: crypto.randomUUID() };
-      mapAddresses(businessId, (list) => [...list, record]);
-      return record;
+    async (accountId: string, fields: Omit<BusinessAddress, 'id'>) => {
+      const created = await withToken((token) => postAddress(token, accountId, fields));
+      mapAddresses(accountId, (list) => [...list, created]);
+      return created;
     },
-    [mapAddresses],
+    [withToken, mapAddresses],
   );
 
   const updateAddress = useCallback(
-    (businessId: string, address: BusinessAddress) =>
-      mapAddresses(businessId, (list) => list.map((a) => (a.id === address.id ? address : a))),
-    [mapAddresses],
+    async (accountId: string, address: BusinessAddress) => {
+      const saved = await withToken((token) => putAddress(token, accountId, address));
+      mapAddresses(accountId, (list) => list.map((a) => (a.id === saved.id ? saved : a)));
+    },
+    [withToken, mapAddresses],
   );
 
   const removeAddress = useCallback(
-    (businessId: string, addressId: string) =>
-      mapAddresses(businessId, (list) => list.filter((a) => a.id !== addressId)),
-    [mapAddresses],
+    async (accountId: string, addressId: string) => {
+      await withToken((token) => deleteAddress(token, accountId, addressId));
+      mapAddresses(accountId, (list) => list.filter((a) => a.id !== addressId));
+    },
+    [withToken, mapAddresses],
   );
 
   const signIn = useCallback(async (intent: AuthIntent) => {
@@ -196,8 +250,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await redirectToWasla(window.location.pathname + window.location.search);
       return;
     }
-    // وصلة مش متوصّلة (النسخة المنشورة) — جلسة تجريبية معلّمة بوضوح
-    setUserState({
+    // وصلة مش متوصّلة — جلسة تجريبية معلّمة بوضوح
+    setUser({
       sub: 'demo-user',
       name: intent === 'register' ? 'حساب جديد (تجريبي)' : 'مستخدم تجريبي',
       email: 'demo@aswaq.local',
@@ -205,25 +259,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const signOut = useCallback(() => {
-    setUserState(null);
-    setBusinesses([]);
+  const completeSignIn = useCallback((u: WaslaUser, s: WaslaSession) => {
+    setUser(u);
+    setSession(s);
+    setSessionExpired(false);
   }, []);
+
+  const signOut = useCallback(() => {
+    // الجهاز ممكن يكون مشترك — بيانات الأنشطة متفضلش بعد الخروج
+    if (user) save(cacheKey(user.sub), null);
+    setUser(null);
+    setSession(null);
+    setBusinesses([]);
+    setSessionExpired(false);
+  }, [user]);
 
   return (
     <AuthContext.Provider
       value={{
         user,
         businesses,
+        businessesLoading,
+        businessesError,
+        sessionExpired,
         createBusiness,
-        deleteBusiness,
         addAddress,
         updateAddress,
         removeAddress,
         accountType: businesses.length > 0 ? 'COMPANY' : 'INDIVIDUAL',
         connected: waslaConfigured,
         signIn,
-        setUser,
+        completeSignIn,
         signOut,
       }}
     >

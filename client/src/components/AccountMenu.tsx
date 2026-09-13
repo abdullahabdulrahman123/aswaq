@@ -94,10 +94,10 @@ export function AccountMenu() {
           {businesses.length > 0 && (
             <ul className="border-b border-stone-100 pb-1.5 dark:border-white/5">
               {businesses.slice(0, MAX_IN_MENU).map((b) => (
-                <li key={b.id}>
+                <li key={b.accountId}>
                   <Link
                     role="menuitem"
-                    to={`/business/${b.id}`}
+                    to={`/business/${b.accountId}`}
                     onClick={() => setOpen(false)}
                     className="flex w-full items-center gap-2 py-1.5 pe-4 ps-8 text-start text-sm text-stone-600 transition hover:bg-stone-50 dark:text-stone-300 dark:hover:bg-white/5"
                   >
