@@ -18,6 +18,8 @@ import type { AccountType } from '../lib/pricing';
  * النشاط التجاري نفسه (اسمه واختصاره وعناوينه) متسجّل في وصلة بطلب العميل:
  * البيانات الأساسية في مكان واحد لكل التطبيقات. أسواق بياخد منه قرار واحد:
  * اللي عنده نشاط يبقى شركة، والباقي أفراد.
+ *
+ * واللي عنده أكتر من نشاط بيختار واحد يشتغل بيه من قائمة الحساب (selectedBusiness).
  */
 
 export type AuthIntent = 'login' | 'register';
@@ -71,6 +73,12 @@ interface AuthContextValue {
   businessesLoading: boolean;
   /** تحميل القايمة فشل. أخطاء الحفظ مش هنا — بتترمي للي نادى */
   businessesError: string;
+  /**
+   * النشاط اللي المستخدم شغّال بيه دلوقتي — بيتختار من قائمة الحساب.
+   * أول نشاط لو لسه مختارش، أو لو اللي اختاره اتمسح. null = مفيش أنشطة.
+   */
+  selectedBusiness: Business | null;
+  selectBusiness: (accountId: string) => void;
   /** توكن وصلة انتهى: المعروض لسه صحيح، بس الحفظ محتاج تسجيل دخول تاني */
   sessionExpired: boolean;
   createBusiness: (input: Pick<Business, 'name' | 'abbreviation'>) => Promise<Business>;
@@ -98,6 +106,10 @@ const SESSION_KEY = 'aswaq_session';
  * بتشوف أسعار الأفراد لحد ما تسجّل دخول تاني.
  */
 const cacheKey = (sub: string) => `aswaq_businesses_cache_${sub}`;
+
+/** النشاط المختار لكل مستخدم — بيفضل محفوظ بين الزيارات */
+const SELECTED_PREFIX = 'aswaq_selected_business_';
+const selectedKey = (sub: string) => `${SELECTED_PREFIX}${sub}`;
 
 function load<T>(key: string): T | null {
   try {
@@ -127,6 +139,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const sub = load<WaslaUser>(USER_KEY)?.sub;
     return (sub && load<Business[]>(cacheKey(sub))) || [];
   });
+  const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(() => {
+    const sub = load<WaslaUser>(USER_KEY)?.sub;
+    return sub ? load<string>(selectedKey(sub)) : null;
+  });
   const [businessesLoading, setBusinessesLoading] = useState(false);
   const [businessesError, setBusinessesError] = useState('');
   const [sessionExpired, setSessionExpired] = useState(false);
@@ -150,10 +166,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const nextSession = load<WaslaSession>(SESSION_KEY);
       setUser((prev) => (same(prev, nextUser) ? prev : nextUser));
       setSession((prev) => (same(prev, nextSession) ? prev : nextSession));
+      setSelectedBusinessId(nextUser ? load<string>(selectedKey(nextUser.sub)) : null);
       if (isLive(nextSession)) setSessionExpired(false);
     };
     const onStorage = (event: StorageEvent) => {
-      if (event.key === null || event.key === USER_KEY || event.key === SESSION_KEY) sync();
+      if (
+        event.key === null ||
+        event.key === USER_KEY ||
+        event.key === SESSION_KEY ||
+        event.key.startsWith(SELECTED_PREFIX)
+      ) {
+        sync();
+      }
     };
     const onVisible = () => {
       if (document.visibilityState === 'visible') sync();
@@ -173,6 +197,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     setBusinesses(load<Business[]>(cacheKey(user.sub)) ?? []);
+    setSelectedBusinessId(load<string>(selectedKey(user.sub)));
     setBusinessesError('');
 
     if (!isLive(session)) {
@@ -234,13 +259,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user],
   );
 
+  const selectBusiness = useCallback(
+    (accountId: string) => {
+      setSelectedBusinessId(accountId);
+      if (user) save(selectedKey(user.sub), accountId);
+    },
+    [user],
+  );
+
   const createBusiness = useCallback(
     async (input: Pick<Business, 'name' | 'abbreviation'>) => {
       const created = await withToken((token) => postBusiness(token, input));
       commit((prev) => [...prev, created]);
+      // اللي لسه عامل نشاط غالباً عايز يشتغل بيه
+      selectBusiness(created.accountId);
       return created;
     },
-    [withToken, commit],
+    [withToken, commit, selectBusiness],
   );
 
   /** تعديل عناوين نشاط واحد من غير ما نلمس الباقي */
@@ -306,6 +341,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSessionExpired(false);
   }, [user]);
 
+  // اللي اتختار لو لسه موجود، وإلا أول نشاط — فمفيش حالة "مختار حاجة مش موجودة"
+  const selectedBusiness = businesses.find((b) => b.accountId === selectedBusinessId) ?? businesses[0] ?? null;
+
   return (
     <AuthContext.Provider
       value={{
@@ -313,6 +351,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         businesses,
         businessesLoading,
         businessesError,
+        selectedBusiness,
+        selectBusiness,
         sessionExpired,
         createBusiness,
         addAddress,

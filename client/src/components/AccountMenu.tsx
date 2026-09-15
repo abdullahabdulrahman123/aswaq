@@ -1,13 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-
-/** أقصى عدد نشاطات بتظهر أسماؤها في القائمة قبل ما نختصر */
-const MAX_IN_MENU = 5;
+import { Notch, fieldClass } from './OutlinedField';
 
 /** قائمة الحساب — كل حاجة تخص المستخدم جوه أسواق */
 export function AccountMenu() {
-  const { user, businesses, signOut } = useAuth();
+  const { user, businesses, businessesLoading, selectedBusiness, selectBusiness, signOut } = useAuth();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -78,48 +76,41 @@ export function AccountMenu() {
           </Link>
 
           {/*
-            الزرار ده عنوان للمجموعة اللي تحته — الدخول على نشاط بيبقى من
-            اسمه نفسه، ووجهته لسه بتتحدد. فمفيش صفحة وراه.
+            النشاط المختار — المستخدم بيشتغل بنشاط واحد في المرة، واللي جاي
+            (المحلات والأصناف) هيتبني عليه.
+            قايمة منسدلة من المتصفح نفسه: على الموبايل بتفتح منتقي النظام،
+            ومهما كان عدد الأنشطة القائمة مبتطوّلش.
           */}
-          <div className="flex items-center justify-between gap-2 px-4 py-2.5 text-sm">
-            <span>نشاطاتي التجارية</span>
-            {businesses.length > 0 && (
-              <span className="rounded-md bg-stone-100 px-1.5 py-0.5 text-xs tabular-nums text-stone-500 dark:bg-white/10 dark:text-stone-400">
-                {businesses.length}
-              </span>
-            )}
-          </div>
-
-          {/*
-            أسماء النشاطات — دي هي مدخل الدخول على صفحة النشاط، اللي منها
-            بيتضافوا العناوين.
-            بنعرض أول MAX_IN_MENU وبس: دي قائمة منسدلة من الناڤبار، ولو
-            المستخدم عنده عشرين نشاط هتطوّل لحد ما تخرج بره الشاشة.
-          */}
-          {businesses.length > 0 && (
-            <ul className="border-b border-stone-100 pb-1.5 dark:border-white/5">
-              {businesses.slice(0, MAX_IN_MENU).map((b) => (
-                <li key={b.accountId}>
-                  <Link
-                    role="menuitem"
-                    to={`/business/${b.accountId}`}
-                    onClick={() => setOpen(false)}
-                    className="flex w-full items-center gap-2 py-1.5 pe-4 ps-8 text-start text-sm text-stone-600 transition hover:bg-stone-50 dark:text-stone-300 dark:hover:bg-white/5"
-                  >
-                    <span className="shrink-0 rounded bg-brand-50 px-1.5 py-0.5 font-display text-[11px] font-bold text-brand-800 dark:bg-brand-500/15 dark:text-brand-200">
-                      {b.abbreviation}
-                    </span>
-                    <span className="truncate">{b.name}</span>
-                  </Link>
-                </li>
-              ))}
-
-              {businesses.length > MAX_IN_MENU && (
-                <li className="py-1.5 pe-4 ps-8 text-xs text-stone-400">
-                  وكمان {businesses.length - MAX_IN_MENU}…
-                </li>
-              )}
-            </ul>
+          {selectedBusiness ? (
+            <div className="px-4 pb-3 pt-4">
+              <label className="relative block">
+                <select
+                  value={selectedBusiness.accountId}
+                  onChange={(e) => selectBusiness(e.target.value)}
+                  className={`${fieldClass} text-sm`}
+                >
+                  {businesses.map((b) => (
+                    <option key={b.accountId} value={b.accountId}>
+                      {b.abbreviation} — {b.name}
+                    </option>
+                  ))}
+                </select>
+                <Notch>النشاط التجاري</Notch>
+              </label>
+              {/* الأسماء كانت هي المدخل لصفحة النشاط — دلوقتي اللينك ده */}
+              <Link
+                role="menuitem"
+                to={`/business/${selectedBusiness.accountId}`}
+                onClick={() => setOpen(false)}
+                className="mt-2 inline-block text-xs font-medium text-brand-700 hover:underline dark:text-brand-400"
+              >
+                صفحة النشاط وعناوينه ←
+              </Link>
+            </div>
+          ) : (
+            <div className="px-4 py-2.5 text-xs text-stone-400">
+              {businessesLoading ? 'بنجيب أنشطتك…' : 'معندكش أنشطة تجارية لسه'}
+            </div>
           )}
 
           <button
