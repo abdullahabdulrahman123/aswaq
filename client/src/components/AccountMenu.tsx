@@ -33,24 +33,29 @@ export function AccountMenu() {
 
   return (
     <div ref={wrapRef} className="relative">
+      {/* زرار ☰ جنب اللوجو — اسم الحساب بقى جوه القائمة نفسها */}
       <button
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="flex max-w-[160px] items-center gap-1.5 rounded-lg border border-stone-300 px-2.5 py-1.5 text-xs font-medium hover:border-brand-400 dark:border-white/15"
+        aria-label="القائمة"
+        className="flex h-9 w-9 items-center justify-center rounded-lg text-stone-700 transition hover:bg-stone-100 dark:text-stone-200 dark:hover:bg-white/10"
       >
-        <span className="truncate">{label}</span>
-        {user.demo && <span className="shrink-0 text-amber-600 dark:text-amber-400">(تجريبي)</span>}
-        <span aria-hidden="true" className="shrink-0 text-stone-400">▾</span>
+        <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <path d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
       </button>
 
       {open && (
         <div
           role="menu"
-          className="absolute end-0 top-full z-40 mt-1.5 w-64 overflow-hidden rounded-xl border border-stone-200 bg-white shadow-card dark:border-white/10 dark:bg-surface-card"
+          className="absolute start-0 top-full z-40 mt-1.5 w-64 overflow-hidden rounded-xl border border-stone-200 bg-white shadow-card dark:border-white/10 dark:bg-surface-card"
         >
           <div className="border-b border-stone-200 px-4 py-3 dark:border-white/10">
-            <div className="truncate text-sm font-semibold">{label}</div>
+            <div className="flex items-center gap-1.5 text-sm font-semibold">
+              <span className="truncate">{label}</span>
+              {user.demo && <span className="shrink-0 text-xs font-medium text-amber-600 dark:text-amber-400">(تجريبي)</span>}
+            </div>
             {user.email && <div className="truncate text-xs text-stone-400">{user.email}</div>}
           </div>
 
