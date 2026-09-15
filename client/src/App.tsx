@@ -7,6 +7,7 @@ import { HomePage } from './pages/HomePage';
 import { ProductPage } from './pages/ProductPage';
 import { VendorPage } from './pages/VendorPage';
 import { CartPage } from './pages/CartPage';
+import { OrdersPage } from './pages/OrdersPage';
 import { AccountPage } from './pages/AccountPage';
 import { BusinessNewPage } from './pages/BusinessNewPage';
 import { BusinessPage } from './pages/BusinessPage';
@@ -32,6 +33,7 @@ export function App() {
           <Route path="/product/:id" element={<ProductPage />} />
           <Route path="/vendor/:id" element={<VendorPage />} />
           <Route path="/cart" element={<CartPage />} />
+          <Route path="/orders" element={<OrdersPage />} />
           <Route path="/account" element={<AccountPage />} />
           {/* new قبل :id عشان متتقراش كـid لنشاط */}
           <Route path="/business/new" element={<BusinessNewPage />} />

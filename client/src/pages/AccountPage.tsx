@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
  *
  * أغلب المستخدمين مشترين مش بائعين، فأي كلام عن البيع والنشاط التجاري
  * مبيظهرش غير بعد ما يكون فيه نشاط فعلاً. اللي من غير نشاط بيشوف
- * بياناته وبس — إنشاء النشاط وإدارته بقوا في صفحاتهم من قائمة الحساب.
+ * بياناته وبس — إنشاء النشاط وإدارته بقوا في صفحاتهم من القائمة ☰ جنب اللوجو.
  */
 export function AccountPage() {
   const { user, businesses, signIn } = useAuth();
@@ -58,7 +58,7 @@ export function AccountPage() {
         <section className="mt-5 rounded-2xl border border-stone-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
           <h2 className="font-display text-lg font-bold">النشاط التجاري</h2>
           <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
-            عندك {businesses.length} نشاط مسجّل — تلاقيهم في قائمة حسابك فوق.
+            عندك {businesses.length} نشاط مسجّل — تلاقيهم في القائمة ☰ فوق.
           </p>
         </section>
       )}
