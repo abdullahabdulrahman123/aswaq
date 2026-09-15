@@ -79,10 +79,10 @@ export function redirectUri(): string {
 }
 
 /**
- * يوجّه المتصفح لوصلة. `intent` بيتحفظ محلياً عشان نرجّع المستخدم
+ * يوجّه المتصفح لوصلة. `returnTo` بيتحفظ محلياً عشان نرجّع المستخدم
  * لنفس المكان اللي كان فيه بعد ما يخلّص.
  */
-export async function redirectToWasla(returnTo: string): Promise<void> {
+export async function redirectToWasla(returnTo: string, intent: 'login' | 'register'): Promise<void> {
   if (!ISSUER) throw new Error('VITE_WASLA_ISSUER غير مضبوط');
 
   const verifier = base64UrlEncode(crypto.getRandomValues(new Uint8Array(32)));
@@ -109,6 +109,15 @@ export async function redirectToWasla(returnTo: string): Promise<void> {
     code_challenge: challenge,
     code_challenge_method: 'S256',
     state,
+    /*
+     * الخروج من أسواق بيمسح بيانات أسواق بس — جلسة وصلة بتفضل في المتصفح.
+     * من غير prompt=login وصلة كانت بتعرف المستخدم وترجّعه على حسابه القديم
+     * على طول، حتى لو داس «إنشاء حساب». كده صفحة وصلة بتظهر دايماً، وهي اللي
+     * بتعرض «متابعة باسم …» لو الجهاز فاكره.
+     */
+    prompt: 'login',
+    // وصلة بتفتح على فورم الحساب الجديد على طول لما يبقى signup
+    screen_hint: intent === 'register' ? 'signup' : 'login',
   });
 
   window.location.href = `${ISSUER}/auth?${params.toString()}`;

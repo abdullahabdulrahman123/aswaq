@@ -279,7 +279,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = useCallback(async (intent: AuthIntent) => {
     if (waslaConfigured) {
-      await redirectToWasla(window.location.pathname + window.location.search);
+      await redirectToWasla(window.location.pathname + window.location.search, intent);
       return;
     }
     // وصلة مش متوصّلة — جلسة تجريبية معلّمة بوضوح
