@@ -11,6 +11,7 @@ import { OrdersPage } from './pages/OrdersPage';
 import { AccountPage } from './pages/AccountPage';
 import { BusinessNewPage } from './pages/BusinessNewPage';
 import { BusinessPage } from './pages/BusinessPage';
+import { ItemNewPage } from './pages/ItemNewPage';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 
 /** نرجع لأعلى الصفحة عند تغيير المسار — من غير الفلاتر عشان متقفزش مع كل فلتر */
@@ -38,6 +39,7 @@ export function App() {
           {/* new قبل :id عشان متتقراش كـid لنشاط */}
           <Route path="/business/new" element={<BusinessNewPage />} />
           <Route path="/business/:id" element={<BusinessPage />} />
+          <Route path="/business/:accountId/items/new" element={<ItemNewPage />} />
           <Route path="/auth/wasla/callback" element={<AuthCallbackPage />} />
           <Route path="*" element={<HomePage />} />
         </Routes>

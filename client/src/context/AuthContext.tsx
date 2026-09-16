@@ -79,6 +79,11 @@ interface AuthContextValue {
    */
   selectedBusiness: Business | null;
   selectBusiness: (accountId: string) => void;
+  /**
+   * بينفّذ نداء محتاج توكن وصلة (زي أصناف أسواق)، ولو التوكن انتهى بيعلّم
+   * الجلسة كمنتهية عشان التنبيه يظهر في الصفحة.
+   */
+  withToken: <T>(call: (token: string) => Promise<T>) => Promise<T>;
   /** توكن وصلة انتهى: المعروض لسه صحيح، بس الحفظ محتاج تسجيل دخول تاني */
   sessionExpired: boolean;
   createBusiness: (input: Pick<Business, 'name' | 'abbreviation'>) => Promise<Business>;
@@ -353,6 +358,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         businessesError,
         selectedBusiness,
         selectBusiness,
+        withToken,
         sessionExpired,
         createBusiness,
         addAddress,

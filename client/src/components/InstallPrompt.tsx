@@ -139,51 +139,59 @@ export function InstallPrompt() {
   if (!showInstall && !showIOSSteps) return null;
 
   return (
-    <aside
-      aria-label="تثبيت أسواق"
-      className="fixed inset-x-3 bottom-3 z-40 mx-auto max-w-md rounded-2xl border border-stone-200 bg-white p-4 shadow-card dark:border-white/10 dark:bg-surface-card sm:inset-x-auto sm:bottom-4 sm:end-4 sm:w-96"
-    >
-      <div className="flex items-start gap-3">
-        <img
-          src={`${import.meta.env.BASE_URL}icons/icon-192.png`}
-          alt=""
-          width={44}
-          height={44}
-          className="h-11 w-11 shrink-0 rounded-xl"
-        />
-        <div className="min-w-0 flex-1">
-          <h2 className="font-display text-sm font-bold">ثبّت أسواق على جهازك</h2>
-          {showInstall ? (
-            <p className="mt-1 text-xs leading-relaxed text-stone-500 dark:text-stone-400">
-              افتحه من سطح المكتب أو شاشة التطبيقات زي أي تطبيق — من غير متجر ومن غير ما يشيل مساحة.
-            </p>
-          ) : (
-            <p className="mt-1 text-xs leading-relaxed text-stone-500 dark:text-stone-400">
-              دوس على زرار المشاركة <ShareIcon /> في المتصفح، وبعدين اختار
-              «إضافة إلى الشاشة الرئيسية».
-            </p>
-          )}
+    <>
+      {/*
+        الإشعار ثابت في آخر الشاشة، فكان بيقعد فوق آخر حاجة في الصفحة —
+        زرار «احفظ الصنف» مثلاً كان تحته والضغط بيروح للإشعار.
+        المساحة دي بتخلي الصفحة تنزل تحته.
+      */}
+      <div aria-hidden="true" className="h-44 shrink-0 sm:h-40" />
+      <aside
+        aria-label="تثبيت أسواق"
+        className="fixed inset-x-3 bottom-3 z-40 mx-auto max-w-md rounded-2xl border border-stone-200 bg-white p-4 shadow-card dark:border-white/10 dark:bg-surface-card sm:inset-x-auto sm:bottom-4 sm:end-4 sm:w-96"
+      >
+        <div className="flex items-start gap-3">
+          <img
+            src={`${import.meta.env.BASE_URL}icons/icon-192.png`}
+            alt=""
+            width={44}
+            height={44}
+            className="h-11 w-11 shrink-0 rounded-xl"
+          />
+          <div className="min-w-0 flex-1">
+            <h2 className="font-display text-sm font-bold">ثبّت أسواق على جهازك</h2>
+            {showInstall ? (
+              <p className="mt-1 text-xs leading-relaxed text-stone-500 dark:text-stone-400">
+                افتحه من سطح المكتب أو شاشة التطبيقات زي أي تطبيق — من غير متجر ومن غير ما يشيل مساحة.
+              </p>
+            ) : (
+              <p className="mt-1 text-xs leading-relaxed text-stone-500 dark:text-stone-400">
+                دوس على زرار المشاركة <ShareIcon /> في المتصفح، وبعدين اختار
+                «إضافة إلى الشاشة الرئيسية».
+              </p>
+            )}
+          </div>
         </div>
-      </div>
 
-      <div className="mt-3 flex justify-end gap-2">
-        <button
-          type="button"
-          onClick={snooze}
-          className="rounded-lg px-3 py-2 text-xs font-medium text-stone-500 transition hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-200"
-        >
-          {showInstall ? 'مش دلوقتي' : 'تمام'}
-        </button>
-        {showInstall && (
+        <div className="mt-3 flex justify-end gap-2">
           <button
             type="button"
-            onClick={install}
-            className="rounded-lg bg-brand-500 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-600"
+            onClick={snooze}
+            className="rounded-lg px-3 py-2 text-xs font-medium text-stone-500 transition hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-200"
           >
-            تثبيت
+            {showInstall ? 'مش دلوقتي' : 'تمام'}
           </button>
-        )}
-      </div>
-    </aside>
+          {showInstall && (
+            <button
+              type="button"
+              onClick={install}
+              className="rounded-lg bg-brand-500 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-600"
+            >
+              تثبيت
+            </button>
+          )}
+        </div>
+      </aside>
+    </>
   );
 }

@@ -79,6 +79,21 @@ export function MainMenu() {
               {businessesLoading ? 'بنجيب أنشطتك…' : 'معندكش أنشطة تجارية لسه'}
             </div>
           )}
+
+          {/* تحكم في النشاط المختار — أول زرار إضافة صنف، وهيتزاد عليها بعدين */}
+          {selectedBusiness && (
+            <div className="border-t border-stone-100 pb-1 dark:border-white/5">
+              <div className="px-4 pt-2.5 text-[11px] font-medium text-stone-400">تحكم في النشاط</div>
+              <Link
+                role="menuitem"
+                to={`/business/${selectedBusiness.accountId}/items/new`}
+                onClick={close}
+                className="block px-4 py-2.5 text-sm transition hover:bg-stone-50 dark:hover:bg-white/5"
+              >
+                إضافة صنف
+              </Link>
+            </div>
+          )}
         </div>
       )}
     </div>
