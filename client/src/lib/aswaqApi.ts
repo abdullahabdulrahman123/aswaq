@@ -42,6 +42,15 @@ export interface NewItem {
   units: ItemUnit[];
 }
 
+/**
+ * التعديل بيبعت الصنف كله، والسيرفر بيرجّع الناقص لقيمته الافتراضية —
+ * عشان كده بنبعت rate وisOwner زي ما هما بدل ما يترجّعوا للأول.
+ */
+export interface EditItem extends NewItem {
+  rate: number;
+  isOwner: boolean;
+}
+
 const MESSAGES: Record<number, string> = {
   400: 'البيانات فيها حاجة مش مظبوطة. راجعها وجرّب تاني.',
   404: 'مش لاقيين النشاط ده — يمكن يكون اتحذف.',
@@ -79,6 +88,11 @@ export async function fetchItems(token: string, accountId: string): Promise<Item
   return items;
 }
 
+export async function fetchItem(token: string, accountId: string, itemId: string): Promise<Item> {
+  const { item } = await request<{ item: Item }>(`${itemsPath(accountId)}/${encodeURIComponent(itemId)}`, token);
+  return item;
+}
+
 /** 409 = فيه صنف بنفس الاسم عند النشاط ده */
 export async function postItem(token: string, accountId: string, input: NewItem): Promise<Item> {
   const { item } = await request<{ item: Item }>(itemsPath(accountId), token, {
@@ -86,4 +100,21 @@ export async function postItem(token: string, accountId: string, input: NewItem)
     body: JSON.stringify(input),
   });
   return item;
+}
+
+export async function putItem(
+  token: string,
+  accountId: string,
+  itemId: string,
+  input: EditItem,
+): Promise<Item> {
+  const { item } = await request<{ item: Item }>(`${itemsPath(accountId)}/${encodeURIComponent(itemId)}`, token, {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  });
+  return item;
+}
+
+export async function deleteItem(token: string, accountId: string, itemId: string): Promise<void> {
+  await request<void>(`${itemsPath(accountId)}/${encodeURIComponent(itemId)}`, token, { method: 'DELETE' });
 }

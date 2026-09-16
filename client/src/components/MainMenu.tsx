@@ -92,6 +92,14 @@ export function MainMenu() {
               >
                 إضافة صنف
               </Link>
+              <Link
+                role="menuitem"
+                to={`/business/${selectedBusiness.accountId}/items`}
+                onClick={close}
+                className="block px-4 py-2.5 text-sm transition hover:bg-stone-50 dark:hover:bg-white/5"
+              >
+                الأصناف
+              </Link>
             </div>
           )}
         </div>
