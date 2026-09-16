@@ -1,10 +1,11 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Notch, fieldClass } from '../components/OutlinedField';
 import { SessionExpiredNotice } from '../components/SessionExpiredNotice';
 import { ApiError, SessionExpiredError } from '../lib/waslaApi';
 import { aswaqApiConfigured, fetchItem, postItem, putItem, type Item, type ItemUnit } from '../lib/aswaqApi';
+import { uploadImage, uploadsConfigured, UploadError } from '../lib/cloudinary';
 
 /**
  * إضافة صنف أو تعديله — نفس الفورم، والفرق إن فيه itemId في الرابط ولا لأ.
@@ -72,6 +73,7 @@ export function ItemFormPage() {
   const [error, setError] = useState('');
   const [saved, setSaved] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const business = businesses.find((b) => b.accountId === accountId);
 
@@ -101,6 +103,24 @@ export function ItemFormPage() {
       cancelled = true;
     };
   }, [accountId, itemId, withToken]);
+
+  /** الصورة بتترفع أول ما تتختار، واللي بيتحفظ مع الصنف هو رابطها */
+  async function handlePick(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    // بنفضّي الخانة عشان لو اختار نفس الملف تاني الحدث يشتغل
+    e.target.value = '';
+    if (!file) return;
+
+    setError('');
+    setUploading(true);
+    try {
+      setPicture(await uploadImage(file));
+    } catch (err) {
+      setError(err instanceof UploadError ? err.message : 'مقدرناش نرفع الصورة. جرّب تاني.');
+    } finally {
+      setUploading(false);
+    }
+  }
 
   function setUnitField(index: number, field: keyof UnitDraft, value: string) {
     setUnits((prev) => prev.map((unit, i) => (i === index ? { ...unit, [field]: value } : unit)));
@@ -282,20 +302,47 @@ export function ItemFormPage() {
             <Notch>اسم الصنف</Notch>
           </label>
 
-          <label className="relative mt-6 block">
-            <input
-              value={picture}
-              onChange={(e) => {
-                setPicture(e.target.value);
-                setError('');
-              }}
-              type="url"
-              maxLength={2000}
-              placeholder="https://…"
-              className={fieldClass}
-            />
-            <Notch>رابط صورة (اختياري)</Notch>
-          </label>
+          {/* الصورة بتترفع أول ما تتختار، والصنف بيتحفظ برابطها */}
+          <div className="mt-7">
+            <span className="mb-2 block text-xs font-medium text-stone-500 dark:text-stone-400">
+              صورة الصنف (اختياري)
+            </span>
+
+            <div className="flex flex-wrap items-center gap-3">
+              {picture ? (
+                <img src={picture} alt="" className="h-16 w-16 shrink-0 rounded-xl object-cover" />
+              ) : (
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border border-dashed border-stone-300 text-[11px] text-stone-400 dark:border-white/20">
+                  مفيش صورة
+                </div>
+              )}
+
+              {uploadsConfigured ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <label
+                    className={`rounded-xl border border-stone-300 px-4 py-2.5 text-sm font-medium transition dark:border-white/15 ${
+                      uploading ? 'cursor-progress opacity-70' : 'cursor-pointer hover:border-brand-400'
+                    }`}
+                  >
+                    {uploading ? 'بنرفع…' : picture ? 'غيّر الصورة' : 'اختار صورة'}
+                    <input type="file" accept="image/*" disabled={uploading} onChange={handlePick} className="hidden" />
+                  </label>
+
+                  {picture && !uploading && (
+                    <button
+                      type="button"
+                      onClick={() => setPicture('')}
+                      className="rounded-xl px-3 py-2.5 text-sm font-medium text-red-700 transition hover:underline dark:text-red-300"
+                    >
+                      شيل الصورة
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-stone-400">رفع الصور مش متظبط في النسخة دي.</p>
+              )}
+            </div>
+          </div>
 
           <div className="mt-8 border-t border-stone-200 pt-5 dark:border-white/10">
             <h2 className="font-display text-lg font-bold">الوحدات</h2>
@@ -379,10 +426,10 @@ export function ItemFormPage() {
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || uploading}
               className="rounded-xl bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:cursor-progress disabled:opacity-70"
             >
-              {submitting ? 'بنحفظ…' : editing ? 'احفظ التعديل' : 'احفظ الصنف'}
+              {submitting ? 'بنحفظ…' : uploading ? 'بنرفع الصورة…' : editing ? 'احفظ التعديل' : 'احفظ الصنف'}
             </button>
             <button
               type="button"

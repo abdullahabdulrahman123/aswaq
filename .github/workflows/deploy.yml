@@ -46,6 +46,9 @@ jobs:
           VITE_WASLA_ACCOUNT_ORIGIN: ${{ vars.WASLA_ACCOUNT_ORIGIN }}
           # سيرفر أسواق (الأصناف) — من غيره صفحة إضافة صنف بتقول إنه مش متوصّل
           VITE_ASWAQ_API_ORIGIN: ${{ vars.ASWAQ_API_ORIGIN }}
+          # صور الأصناف — من غيرهم زرار رفع الصورة بيتخفي
+          VITE_CLOUDINARY_CLOUD_NAME: ${{ vars.CLOUDINARY_CLOUD_NAME }}
+          VITE_CLOUDINARY_UPLOAD_PRESET: ${{ vars.CLOUDINARY_UPLOAD_PRESET }}
           VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
 
       # GitHub Pages بيرجّع 404.html لأي مسار مش موجود كملف —
