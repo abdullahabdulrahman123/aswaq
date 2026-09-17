@@ -19,8 +19,16 @@ import type { ReactNode } from 'react';
  * الإطار من جوه بدل ما يزوّد عرض العنصر — الإطار التقيل لو زوّد بكسل واحد
  * كانت الخانات هتنطّ وإحنا بننقّل بينها.
  */
-export const fieldClass =
-  'peer w-full rounded-xl border border-stone-300 bg-transparent px-3 py-3 outline-none transition focus:border-brand-500 focus:ring-1 focus:ring-inset focus:ring-brand-500 dark:border-white/20';
+const fieldBase =
+  'peer w-full rounded-xl border border-stone-300 bg-transparent outline-none transition focus:border-brand-500 focus:ring-1 focus:ring-inset focus:ring-brand-500 dark:border-white/20';
+
+export const fieldClass = `${fieldBase} px-3 py-3`;
+
+/**
+ * خانة ضيقة — لما خانتين أو أربعة بيبقوا في صف واحد على الموبايل
+ * (وحدات الصنف). استخدمها مع <Notch compact>.
+ */
+export const compactFieldClass = `${fieldBase} px-2 py-2.5 text-sm`;
 
 /**
  * اسم الخانة، قاعد على خط الإطار.
@@ -29,9 +37,13 @@ export const fieldClass =
  * الخانة قاعدة عليه، فبتغطّي الخط تحتها. يعني لو خلفية الكارت اتغيّرت لازم
  * تتغيّر هنا كمان.
  */
-export function Notch({ children }: { children: ReactNode }) {
+export function Notch({ children, compact = false }: { children: ReactNode; compact?: boolean }) {
   return (
-    <span className="pointer-events-none absolute -top-2 start-3 bg-white px-1 text-xs font-medium text-stone-500 transition-colors peer-focus:text-brand-600 peer-disabled:text-stone-400 dark:bg-surface-card dark:text-stone-400 dark:peer-focus:text-brand-400">
+    <span
+      className={`pointer-events-none absolute -top-2 whitespace-nowrap bg-white font-medium text-stone-500 transition-colors peer-focus:text-brand-600 peer-disabled:text-stone-400 dark:bg-surface-card dark:text-stone-400 dark:peer-focus:text-brand-400 ${
+        compact ? 'start-1.5 px-0.5 text-[11px]' : 'start-3 px-1 text-xs'
+      }`}
+    >
       {children}
     </span>
   );

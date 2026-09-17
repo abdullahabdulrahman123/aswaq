@@ -14,8 +14,10 @@ export const aswaqApiConfigured = Boolean(ORIGIN);
 /** وحدة بيع للصنف. الأسعار بالقرش، وnull = لسه متحددش */
 export interface ItemUnit {
   name: string;
-  /** كام من أصغر وحدة جوه الوحدة دي — لازم تكون فيه وحدة بـ1 */
+  /** كام من أصغر وحدة جوه الوحدة دي — لازم تكون فيه وحدة بـ1. ممكن كسر للوزن والحجم */
   unitContent: number;
+  /** متوسط تكلفة الوحدة بالقرش — بيتكتب بإيد */
+  avgCost: number | null;
   rate: number | null;
   onSWP: number | null;
   onSRP: number | null;

@@ -15,7 +15,14 @@ import { egp } from '../data/catalog';
 const PRICE_FIELDS = ['onSWP', 'onSRP', 'onLWP', 'onLRP'] as const;
 
 function UnitLine({ unit }: { unit: ItemUnit }) {
-  const prices = PRICE_FIELDS.filter((field) => unit[field] !== null);
+  const values: [label: string, text: string][] = [];
+  // أصناف اتحفظت قبل avg ممكن متكونش فيها الحقل خالص، فـ!= null مش !== null
+  if (unit.avgCost != null) values.push(['avg', egp(unit.avgCost)]);
+  if (unit.rate != null) values.push(['rate', String(unit.rate)]);
+  for (const field of PRICE_FIELDS) {
+    const price = unit[field];
+    if (price !== null) values.push([field, egp(price)]);
+  }
 
   return (
     <li className="rounded-lg bg-stone-50 px-3 py-2.5 dark:bg-white/5">
@@ -26,12 +33,12 @@ function UnitLine({ unit }: { unit: ItemUnit }) {
         </span>
       </div>
 
-      {prices.length > 0 ? (
+      {values.length > 0 ? (
         <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
-          {prices.map((field) => (
-            <span key={field} className="text-xs text-stone-600 dark:text-stone-300">
-              <span className="text-stone-400">{field}</span>{' '}
-              <span className="font-medium tabular-nums">{egp(unit[field] as number)}</span>
+          {values.map(([label, text]) => (
+            <span key={label} className="text-xs text-stone-600 dark:text-stone-300">
+              <span className="text-stone-400">{label}</span>{' '}
+              <span className="font-medium tabular-nums">{text}</span>
             </span>
           ))}
         </div>

@@ -10,7 +10,10 @@ const money = z.number().int().min(0).max(2_147_483_647);
 
 const unitSchema = z.object({
   name: z.string().trim().min(1).max(40),
-  unitContent: z.number().int().min(1),
+  /** ممكن كسر: الوحدة ممكن تكون وزن أو حجم (نص كيلو = 0.5) */
+  unitContent: z.number().positive().max(1_000_000),
+  /** متوسط تكلفة الوحدة — بيتكتب بإيد، غير avgCost بتاع الصنف */
+  avgCost: money.nullable().default(null),
   rate: z.number().nullable().default(null),
   onSWP: money.nullable().default(null),
   onSRP: money.nullable().default(null),
@@ -35,7 +38,7 @@ const unitsSchema = z
     }
   });
 
-/** avgCost مش هنا عن قصد: بيتحسب من المشتريات، محدش بيكتبه */
+/** avgCost بتاع الصنف مش هنا عن قصد: بيتحسب من المشتريات، محدش بيكتبه */
 const itemFields = {
   name: z.string().trim().min(1).max(120),
   picture: z.string().trim().url().max(2000).nullable().default(null),
