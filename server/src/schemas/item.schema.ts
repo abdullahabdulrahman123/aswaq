@@ -10,12 +10,14 @@ const money = z.number().int().min(0).max(2_147_483_647);
 
 const unitSchema = z.object({
   name: z.string().trim().min(1).max(40),
-  kind: z.enum(['COUNT', 'WEIGHT', 'VOLUME']).default('COUNT'),
-  /** ممكن كسر: الوحدة ممكن تكون وزن أو حجم (نص كيلو = 0.5) */
-  unitContent: z.number().positive().max(1_000_000),
+  /** كل الوحدات بالعدد: كام من أصغر وحدة */
+  unitContent: z.number().int().min(1).max(1_000_000),
   /** متوسط تكلفة الوحدة — بيتكتب بإيد، غير avgCost بتاع الصنف */
   avgCost: money.nullable().default(null),
   rate: z.number().nullable().default(null),
+  /** جرام وسم³ للوحدة الواحدة — لحساب حمولة العربية */
+  weight: z.number().min(0).max(1_000_000_000).nullable().default(null),
+  volume: z.number().min(0).max(1_000_000_000).nullable().default(null),
   onSWP: money.nullable().default(null),
   onSRP: money.nullable().default(null),
   onLWP: money.nullable().default(null),

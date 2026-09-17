@@ -4,31 +4,19 @@ import { useAuth } from '../context/AuthContext';
 import { Notch, compactFieldClass, fieldClass } from '../components/OutlinedField';
 import { SessionExpiredNotice } from '../components/SessionExpiredNotice';
 import { ApiError, SessionExpiredError } from '../lib/waslaApi';
-import {
-  aswaqApiConfigured,
-  fetchItem,
-  postItem,
-  putItem,
-  type Item,
-  type ItemUnit,
-  type UnitKind,
-} from '../lib/aswaqApi';
+import { aswaqApiConfigured, fetchItem, postItem, putItem, type Item, type ItemUnit } from '../lib/aswaqApi';
 import { uploadImage, uploadsConfigured, UploadError } from '../lib/cloudinary';
-import {
-  PRICE_FIELDS,
-  PRICE_GROUPS,
-  PRICE_LABELS,
-  UNIT_KINDS,
-  unitKindInfo,
-  unitKindOf,
-  type PriceField,
-} from '../lib/itemUnits';
+import { PRICE_FIELDS, PRICE_GROUPS, PRICE_LABELS, type PriceField } from '../lib/itemUnits';
 
 /**
  * إضافة صنف أو تعديله — نفس الفورم، والفرق إن فيه itemId في الرابط ولا لأ.
  *
- * الصنف بيتباع بوحدات: "علبة" جواها ١٢ "قطعة" مثلاً. الكميات كلها بتتحسب
- * بأصغر وحدة، فلازم تكون فيه وحدة محتواها ١ — وده شرط السيرفر كمان.
+ * الصنف بيتباع بوحدات، وكل الوحدات بالعدد: محتوى الوحدة = كام من أصغر وحدة
+ * (الكرتونة فيها ١٢ قطعة، والدستة ممكن تكون هي أصغر وحدة بمحتوى ١). لازم تكون
+ * فيه وحدة محتواها ١ — وده شرط السيرفر كمان.
+ *
+ * الوزن والحجم بتوع الوحدة الواحدة: التحميل على العربية بيقف عند أقصى وزن
+ * أو أقصى حجم، والحديد بيوصل للوزن والإسفنج بيوصل للحجم.
  *
  * الأسعار بتتكتب بالجنيه وبتتبعت بالقرش (أعداد صحيحة)، عشان الكسور العشرية
  * متلعبش في الحساب.
@@ -36,19 +24,23 @@ import {
 
 interface UnitDraft extends Record<PriceField, string> {
   name: string;
-  kind: UnitKind;
   unitContent: string;
   /** بالجنيه في الخانة، وبيتبعت بالقرش */
   avgCost: string;
   rate: string;
+  /** بالجرام */
+  weight: string;
+  /** بالسنتيمتر المكعب */
+  volume: string;
 }
 
-const emptyUnit = (unitContent: string, kind: UnitKind = 'COUNT'): UnitDraft => ({
+const emptyUnit = (unitContent: string): UnitDraft => ({
   name: '',
-  kind,
   unitContent,
   avgCost: '',
   rate: '',
+  weight: '',
+  volume: '',
   onSWP: '',
   onSRP: '',
   onLWP: '',
@@ -64,17 +56,28 @@ function toPiastres(value: string): number | null | undefined {
   return Math.round(pounds * 100);
 }
 
+/** رقم اختياري مش سالب (الوزن والحجم). فاضي = null · غلط = undefined */
+function toAmount(value: string): number | null | undefined {
+  const clean = value.trim();
+  if (!clean) return null;
+  const amount = Number(clean);
+  return Number.isFinite(amount) && amount >= 0 ? amount : undefined;
+}
+
 /** قرش → جنيه للكتابة في الخانة. ١٤٠٠٠ → "140" و١٢٥٠ → "12.50" */
 const toPounds = (piastres: number | null): string =>
   piastres === null ? '' : (piastres / 100).toFixed(2).replace(/\.00$/, '');
 
+/** أصناف اتحفظت قبل الحقول دي ممكن متكونش فيها خالص، فـ== null مش === null */
+const toText = (value: number | null | undefined): string => (value == null ? '' : String(value));
+
 const toDraft = (unit: ItemUnit): UnitDraft => ({
   name: unit.name,
-  kind: unitKindOf(unit.kind),
   unitContent: String(unit.unitContent),
-  // أصناف اتحفظت قبل avg ممكن متكونش فيها الحقل خالص
   avgCost: toPounds(unit.avgCost ?? null),
-  rate: unit.rate == null ? '' : String(unit.rate),
+  rate: toText(unit.rate),
+  weight: toText(unit.weight),
+  volume: toText(unit.volume),
   onSWP: toPounds(unit.onSWP),
   onSRP: toPounds(unit.onSRP),
   onLWP: toPounds(unit.onLWP),
@@ -146,13 +149,9 @@ export function ItemFormPage() {
     }
   }
 
-  function setUnitField(index: number, field: Exclude<keyof UnitDraft, 'kind'>, value: string) {
+  function setUnitField(index: number, field: keyof UnitDraft, value: string) {
     setUnits((prev) => prev.map((unit, i) => (i === index ? { ...unit, [field]: value } : unit)));
     setError('');
-  }
-
-  function setUnitKind(index: number, kind: UnitKind) {
-    setUnits((prev) => prev.map((unit, i) => (i === index ? { ...unit, kind } : unit)));
   }
 
   /** الوحدات جاهزة للسيرفر، أو رسالة غلط تتعرض للمستخدم */
@@ -163,10 +162,10 @@ export function ItemFormPage() {
       const unitName = unit.name.trim();
       if (!unitName) return 'اكتب اسم كل وحدة.';
 
-      // مش لازم عدد صحيح: الوحدة ممكن تكون وزن أو حجم (نص كيلو = 0.5)
+      // كل الوحدات بالعدد: كام من أصغر وحدة، فمفيش كسور
       const content = Number(unit.unitContent);
-      if (!unit.unitContent.trim() || !Number.isFinite(content) || content <= 0) {
-        return `محتوى وحدة «${unitName}» لازم يكون رقم أكبر من صفر — ينفع كسر للوزن والحجم، زي 0.5.`;
+      if (!Number.isInteger(content) || content < 1) {
+        return `محتوى وحدة «${unitName}» لازم يكون عدد صحيح من ١ فأكتر — كام من أصغر وحدة.`;
       }
 
       const avgCost = toPiastres(unit.avgCost);
@@ -176,6 +175,11 @@ export function ItemFormPage() {
       const rate = rateText ? Number(rateText) : null;
       if (rate !== null && !Number.isFinite(rate)) return `rate في وحدة «${unitName}» مش رقم مظبوط.`;
 
+      const weight = toAmount(unit.weight);
+      if (weight === undefined) return `weight في وحدة «${unitName}» لازم يكون رقم بالجرام.`;
+      const volume = toAmount(unit.volume);
+      if (volume === undefined) return `volume في وحدة «${unitName}» لازم يكون رقم بالسنتيمتر المكعب.`;
+
       const prices = {} as Record<PriceField, number | null>;
       for (const field of PRICE_FIELDS) {
         const price = toPiastres(unit[field]);
@@ -183,7 +187,7 @@ export function ItemFormPage() {
         prices[field] = price;
       }
 
-      built.push({ name: unitName, kind: unit.kind, unitContent: content, avgCost, rate, ...prices });
+      built.push({ name: unitName, unitContent: content, avgCost, rate, weight, volume, ...prices });
     }
 
     if (!built.some((unit) => unit.unitContent === 1)) {
@@ -318,10 +322,14 @@ export function ItemFormPage() {
           </Link>
         </div>
       ) : (
-        /* p-3 على الموبايل: الكارت جواه كروت الوحدات، والهوامش كانت بتتجمع وتضيّق الخانات */
+        /*
+         * على الموبايل الفورم بعرض الشاشة كله (-mx-4) ومن غير كارت جوه كارت:
+         * الهوامش المتداخلة كانت بتاكل حوالي ٤٠ بكسل من كل ناحية والخانات بتضيق.
+         * من sm وطالع يرجع كارت عادي.
+         */
         <form
           onSubmit={handleSubmit}
-          className="rounded-2xl border border-stone-200 bg-white p-3 dark:border-white/10 dark:bg-surface-card sm:p-5"
+          className="-mx-4 border-y border-stone-200 bg-white px-4 py-4 dark:border-white/10 dark:bg-surface-card sm:mx-0 sm:rounded-2xl sm:border sm:p-5"
         >
           {/* mt-2 على الأولى: اسم الخانة طالع فوق حدّها بـ٨ بكسل */}
           <label className="relative mt-2 block">
@@ -384,39 +392,19 @@ export function ItemFormPage() {
           <div className="mt-8 border-t border-stone-200 pt-5 dark:border-white/10">
             <h2 className="font-display text-lg font-bold">الوحدات</h2>
             <p className="mt-1 text-xs leading-relaxed text-stone-400">
-              اختار نوع كل وحدة: عدد (قطعة، علبة) أو وزن (كيلو، جرام) أو حجم (لتر). لازم تكون فيه
-              وحدة محتواها ١ — دي أصغر وحدة، والباقي بيتحسب بيها: علبة فيها 12 قطعة، أو نص كيلو
-              فيه 0.5 كيلو. الأسعار وخانة avg بالجنيه، وسيبهم فاضيين لو لسه متحددوش.
+              محتوى كل وحدة = كام من أصغر وحدة: الكرتونة فيها 12 قطعة، والدستة ممكن تكون هي أصغر
+              وحدة بمحتوى ١. لازم تكون فيه وحدة محتواها ١. خانة weight بالجرام وخانة volume
+              بالسنتيمتر المكعب للوحدة الواحدة. الأسعار وavg بالجنيه، وسيب اللي لسه متحددش فاضي.
             </p>
 
             {units.map((unit, index) => (
-              <div key={index} className="mt-4 rounded-xl border border-stone-200 p-3 dark:border-white/10 sm:p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-stone-400">وحدة {index + 1}</span>
-                    {/* نوع الوحدة — عدد أو وزن أو حجم */}
-                    <div
-                      role="group"
-                      aria-label="نوع الوحدة"
-                      className="flex rounded-lg border border-stone-200 p-0.5 dark:border-white/10"
-                    >
-                      {UNIT_KINDS.map((kind) => (
-                        <button
-                          key={kind.value}
-                          type="button"
-                          aria-pressed={unit.kind === kind.value}
-                          onClick={() => setUnitKind(index, kind.value)}
-                          className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-                            unit.kind === kind.value
-                              ? 'bg-brand-500 text-white'
-                              : 'text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-200'
-                          }`}
-                        >
-                          {kind.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+              /* على الموبايل خط فاصل بس بين الوحدات بدل بوكس — عشان الهوامش */
+              <div
+                key={index}
+                className="mt-5 border-t border-stone-200 pt-4 dark:border-white/10 sm:rounded-xl sm:border sm:p-4"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-medium text-stone-400">وحدة {index + 1}</span>
                   {units.length > 1 && (
                     <button
                       type="button"
@@ -431,14 +419,14 @@ export function ItemFormPage() {
                   )}
                 </div>
 
-                {/* صف: الاسم والمحتوى · صف: avg و rate — كلهم خانتين خانتين حتى على الموبايل */}
-                <div className="mt-4 grid grid-cols-2 gap-x-2 gap-y-4">
+                {/* صف: الاسم والمحتوى */}
+                <div className="mt-4 grid grid-cols-2 gap-2">
                   <label className="relative block">
                     <input
                       value={unit.name}
                       onChange={(e) => setUnitField(index, 'name', e.target.value)}
                       maxLength={40}
-                      placeholder={unitKindInfo(unit.kind).examples}
+                      placeholder="قطعة، دستة، كرتونة…"
                       className={compactFieldClass}
                     />
                     <Notch compact>اسم الوحدة</Notch>
@@ -448,13 +436,16 @@ export function ItemFormPage() {
                     <input
                       value={unit.unitContent}
                       onChange={(e) => setUnitField(index, 'unitContent', e.target.value)}
-                      inputMode="decimal"
+                      inputMode="numeric"
                       placeholder="1"
                       className={compactFieldClass}
                     />
                     <Notch compact>محتواها بأصغر وحدة</Notch>
                   </label>
+                </div>
 
+                {/* صف: avg و rate و weight و volume */}
+                <div className="mt-4 grid grid-cols-4 gap-1.5">
                   <label className="relative block">
                     <input
                       value={unit.avgCost}
@@ -476,10 +467,34 @@ export function ItemFormPage() {
                     />
                     <Notch compact>rate</Notch>
                   </label>
+
+                  <label className="relative block">
+                    <input
+                      value={unit.weight}
+                      onChange={(e) => setUnitField(index, 'weight', e.target.value)}
+                      inputMode="decimal"
+                      placeholder="0"
+                      className={compactFieldClass}
+                    />
+                    <Notch compact>weight</Notch>
+                    <span className="mt-1 block text-center text-[10px] text-stone-400">بالجرام</span>
+                  </label>
+
+                  <label className="relative block">
+                    <input
+                      value={unit.volume}
+                      onChange={(e) => setUnitField(index, 'volume', e.target.value)}
+                      inputMode="decimal"
+                      placeholder="0"
+                      className={compactFieldClass}
+                    />
+                    <Notch compact>volume</Notch>
+                    <span className="mt-1 block text-center text-[10px] text-stone-400">بالسم³</span>
+                  </label>
                 </div>
 
                 {/* الأسعار الأربعة في صف واحد: المحل (جملة، قطاعي) والأونلاين (جملة، قطاعي) */}
-                <div className="mt-4 grid grid-cols-2 gap-3">
+                <div className="mt-3 grid grid-cols-2 gap-3">
                   {PRICE_GROUPS.map((group) => (
                     <div key={group.label}>
                       <div className="mb-2.5 text-center text-[11px] font-medium text-stone-400">{group.label}</div>
@@ -506,9 +521,8 @@ export function ItemFormPage() {
 
             <button
               type="button"
-              // الوحدة الجديدة بتاخد نوع الأولى — غالباً الصنف كله بيتباع بنفس النوع
-              onClick={() => setUnits((prev) => [...prev, emptyUnit('', prev[0]?.kind)])}
-              className="mt-4 rounded-xl border border-dashed border-stone-300 px-4 py-2.5 text-sm font-medium text-stone-600 transition hover:border-brand-400 dark:border-white/20 dark:text-stone-300"
+              onClick={() => setUnits((prev) => [...prev, emptyUnit('')])}
+              className="mt-5 rounded-xl border border-dashed border-stone-300 px-4 py-2.5 text-sm font-medium text-stone-600 transition hover:border-brand-400 dark:border-white/20 dark:text-stone-300"
             >
               + وحدة تانية
             </button>

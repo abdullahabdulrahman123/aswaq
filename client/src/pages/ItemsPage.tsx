@@ -5,7 +5,10 @@ import { SessionExpiredNotice } from '../components/SessionExpiredNotice';
 import { ApiError, SessionExpiredError } from '../lib/waslaApi';
 import { aswaqApiConfigured, deleteItem, fetchItems, type Item, type ItemUnit } from '../lib/aswaqApi';
 import { egp } from '../data/catalog';
-import { PRICE_FIELDS, PRICE_LABELS, unitKindInfo, unitKindOf } from '../lib/itemUnits';
+import { PRICE_FIELDS, PRICE_LABELS } from '../lib/itemUnits';
+
+/** وزن وحجم — ١٢٠٠ → "1,200" */
+const amount = (value: number) => value.toLocaleString('en-EG', { maximumFractionDigits: 2 });
 
 /**
  * أصناف النشاط المختار — العرض والتعديل والمسح.
@@ -17,6 +20,8 @@ function UnitLine({ unit }: { unit: ItemUnit }) {
   // أصناف اتحفظت قبل avg ممكن متكونش فيها الحقل خالص، فـ!= null مش !== null
   if (unit.avgCost != null) values.push(['avg', egp(unit.avgCost)]);
   if (unit.rate != null) values.push(['rate', String(unit.rate)]);
+  if (unit.weight != null) values.push(['weight', `${amount(unit.weight)} جم`]);
+  if (unit.volume != null) values.push(['volume', `${amount(unit.volume)} سم³`]);
   for (const field of PRICE_FIELDS) {
     const price = unit[field];
     if (price !== null) values.push([PRICE_LABELS[field], egp(price)]);
@@ -27,7 +32,6 @@ function UnitLine({ unit }: { unit: ItemUnit }) {
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <span className="text-sm font-semibold">{unit.name}</span>
         <span className="text-xs text-stone-400">
-          {unitKindInfo(unitKindOf(unit.kind)).label} ·{' '}
           {unit.unitContent === 1 ? 'أصغر وحدة' : `فيها ${unit.unitContent}`}
         </span>
       </div>

@@ -1,7 +1,5 @@
-import type { UnitKind } from './aswaqApi';
-
 /**
- * أسماء وحدات الصنف وأسعاره زي ما بتظهر للمستخدم — فورم الصنف وصفحة الأصناف.
+ * أسماء أسعار الصنف زي ما بتظهر للمستخدم — فورم الصنف وصفحة الأصناف.
  */
 
 /** الأسعار الأربعة — S في المحل و L أونلاين، W جملة و R قطاعي */
@@ -35,14 +33,3 @@ export const PRICE_GROUPS: { label: string; fields: { field: PriceField; label: 
     ],
   },
 ];
-
-export const UNIT_KINDS: { value: UnitKind; label: string; examples: string }[] = [
-  { value: 'COUNT', label: 'عدد', examples: 'قطعة، علبة…' },
-  { value: 'WEIGHT', label: 'وزن', examples: 'كيلو، جرام…' },
-  { value: 'VOLUME', label: 'حجم', examples: 'لتر، مللي…' },
-];
-
-/** وحدات اتحفظت قبل ما النوع يتضاف ملهاش kind — بتتعامل كعدد */
-export const unitKindOf = (kind: UnitKind | null | undefined): UnitKind => kind ?? 'COUNT';
-
-export const unitKindInfo = (kind: UnitKind) => UNIT_KINDS.find((k) => k.value === kind) ?? UNIT_KINDS[0];
