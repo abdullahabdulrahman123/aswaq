@@ -10,6 +10,7 @@ const money = z.number().int().min(0).max(2_147_483_647);
 
 const unitSchema = z.object({
   name: z.string().trim().min(1).max(40),
+  kind: z.enum(['COUNT', 'WEIGHT', 'VOLUME']).default('COUNT'),
   /** ممكن كسر: الوحدة ممكن تكون وزن أو حجم (نص كيلو = 0.5) */
   unitContent: z.number().positive().max(1_000_000),
   /** متوسط تكلفة الوحدة — بيتكتب بإيد، غير avgCost بتاع الصنف */

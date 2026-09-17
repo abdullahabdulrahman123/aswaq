@@ -11,9 +11,14 @@ const ORIGIN = (import.meta.env.VITE_ASWAQ_API_ORIGIN ?? '').trim().replace(/\/+
 /** سيرفر الأصناف متوصّل؟ لو لأ الصفحات بتقول كده بدل ما ترمي خطأ */
 export const aswaqApiConfigured = Boolean(ORIGIN);
 
+/** نوع الوحدة — عدد (قطعة، علبة) أو وزن (كيلو) أو حجم (لتر) */
+export type UnitKind = 'COUNT' | 'WEIGHT' | 'VOLUME';
+
 /** وحدة بيع للصنف. الأسعار بالقرش، وnull = لسه متحددش */
 export interface ItemUnit {
   name: string;
+  /** null في وحدات اتحفظت قبل ما النوع يتضاف — بتتعامل كعدد */
+  kind: UnitKind | null;
   /** كام من أصغر وحدة جوه الوحدة دي — لازم تكون فيه وحدة بـ1. ممكن كسر للوزن والحجم */
   unitContent: number;
   /** متوسط تكلفة الوحدة بالقرش — بيتكتب بإيد */

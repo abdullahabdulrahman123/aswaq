@@ -5,14 +5,12 @@ import { SessionExpiredNotice } from '../components/SessionExpiredNotice';
 import { ApiError, SessionExpiredError } from '../lib/waslaApi';
 import { aswaqApiConfigured, deleteItem, fetchItems, type Item, type ItemUnit } from '../lib/aswaqApi';
 import { egp } from '../data/catalog';
+import { PRICE_FIELDS, PRICE_LABELS, unitKindInfo, unitKindOf } from '../lib/itemUnits';
 
 /**
  * أصناف النشاط المختار — العرض والتعديل والمسح.
  * الإضافة في صفحتها (ItemFormPage)، والاتنين من قائمة ☰.
  */
-
-/** أسماء الأسعار زي ما العميل كتبها في مخططه */
-const PRICE_FIELDS = ['onSWP', 'onSRP', 'onLWP', 'onLRP'] as const;
 
 function UnitLine({ unit }: { unit: ItemUnit }) {
   const values: [label: string, text: string][] = [];
@@ -21,7 +19,7 @@ function UnitLine({ unit }: { unit: ItemUnit }) {
   if (unit.rate != null) values.push(['rate', String(unit.rate)]);
   for (const field of PRICE_FIELDS) {
     const price = unit[field];
-    if (price !== null) values.push([field, egp(price)]);
+    if (price !== null) values.push([PRICE_LABELS[field], egp(price)]);
   }
 
   return (
@@ -29,6 +27,7 @@ function UnitLine({ unit }: { unit: ItemUnit }) {
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <span className="text-sm font-semibold">{unit.name}</span>
         <span className="text-xs text-stone-400">
+          {unitKindInfo(unitKindOf(unit.kind)).label} ·{' '}
           {unit.unitContent === 1 ? 'أصغر وحدة' : `فيها ${unit.unitContent}`}
         </span>
       </div>

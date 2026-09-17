@@ -4,8 +4,25 @@ import { useAuth } from '../context/AuthContext';
 import { Notch, compactFieldClass, fieldClass } from '../components/OutlinedField';
 import { SessionExpiredNotice } from '../components/SessionExpiredNotice';
 import { ApiError, SessionExpiredError } from '../lib/waslaApi';
-import { aswaqApiConfigured, fetchItem, postItem, putItem, type Item, type ItemUnit } from '../lib/aswaqApi';
+import {
+  aswaqApiConfigured,
+  fetchItem,
+  postItem,
+  putItem,
+  type Item,
+  type ItemUnit,
+  type UnitKind,
+} from '../lib/aswaqApi';
 import { uploadImage, uploadsConfigured, UploadError } from '../lib/cloudinary';
+import {
+  PRICE_FIELDS,
+  PRICE_GROUPS,
+  PRICE_LABELS,
+  UNIT_KINDS,
+  unitKindInfo,
+  unitKindOf,
+  type PriceField,
+} from '../lib/itemUnits';
 
 /**
  * إضافة صنف أو تعديله — نفس الفورم، والفرق إن فيه itemId في الرابط ولا لأ.
@@ -17,20 +34,18 @@ import { uploadImage, uploadsConfigured, UploadError } from '../lib/cloudinary';
  * متلعبش في الحساب.
  */
 
-/** أسماء الأسعار زي ما العميل كتبها في مخططه */
-const PRICE_FIELDS = ['onSWP', 'onSRP', 'onLWP', 'onLRP'] as const;
-type PriceField = (typeof PRICE_FIELDS)[number];
-
 interface UnitDraft extends Record<PriceField, string> {
   name: string;
+  kind: UnitKind;
   unitContent: string;
   /** بالجنيه في الخانة، وبيتبعت بالقرش */
   avgCost: string;
   rate: string;
 }
 
-const emptyUnit = (unitContent: string): UnitDraft => ({
+const emptyUnit = (unitContent: string, kind: UnitKind = 'COUNT'): UnitDraft => ({
   name: '',
+  kind,
   unitContent,
   avgCost: '',
   rate: '',
@@ -55,6 +70,7 @@ const toPounds = (piastres: number | null): string =>
 
 const toDraft = (unit: ItemUnit): UnitDraft => ({
   name: unit.name,
+  kind: unitKindOf(unit.kind),
   unitContent: String(unit.unitContent),
   // أصناف اتحفظت قبل avg ممكن متكونش فيها الحقل خالص
   avgCost: toPounds(unit.avgCost ?? null),
@@ -130,9 +146,13 @@ export function ItemFormPage() {
     }
   }
 
-  function setUnitField(index: number, field: keyof UnitDraft, value: string) {
+  function setUnitField(index: number, field: Exclude<keyof UnitDraft, 'kind'>, value: string) {
     setUnits((prev) => prev.map((unit, i) => (i === index ? { ...unit, [field]: value } : unit)));
     setError('');
+  }
+
+  function setUnitKind(index: number, kind: UnitKind) {
+    setUnits((prev) => prev.map((unit, i) => (i === index ? { ...unit, kind } : unit)));
   }
 
   /** الوحدات جاهزة للسيرفر، أو رسالة غلط تتعرض للمستخدم */
@@ -159,11 +179,11 @@ export function ItemFormPage() {
       const prices = {} as Record<PriceField, number | null>;
       for (const field of PRICE_FIELDS) {
         const price = toPiastres(unit[field]);
-        if (price === undefined) return `سعر ${field} في وحدة «${unitName}» مش رقم مظبوط.`;
+        if (price === undefined) return `سعر «${PRICE_LABELS[field]}» في وحدة «${unitName}» مش رقم مظبوط.`;
         prices[field] = price;
       }
 
-      built.push({ name: unitName, unitContent: content, avgCost, rate, ...prices });
+      built.push({ name: unitName, kind: unit.kind, unitContent: content, avgCost, rate, ...prices });
     }
 
     if (!built.some((unit) => unit.unitContent === 1)) {
@@ -364,15 +384,39 @@ export function ItemFormPage() {
           <div className="mt-8 border-t border-stone-200 pt-5 dark:border-white/10">
             <h2 className="font-display text-lg font-bold">الوحدات</h2>
             <p className="mt-1 text-xs leading-relaxed text-stone-400">
-              الوحدة ممكن تكون عدد (قطعة، علبة) أو وزن (كيلو، جرام) أو حجم (لتر). لازم تكون فيه
+              اختار نوع كل وحدة: عدد (قطعة، علبة) أو وزن (كيلو، جرام) أو حجم (لتر). لازم تكون فيه
               وحدة محتواها ١ — دي أصغر وحدة، والباقي بيتحسب بيها: علبة فيها 12 قطعة، أو نص كيلو
               فيه 0.5 كيلو. الأسعار وخانة avg بالجنيه، وسيبهم فاضيين لو لسه متحددوش.
             </p>
 
             {units.map((unit, index) => (
               <div key={index} className="mt-4 rounded-xl border border-stone-200 p-3 dark:border-white/10 sm:p-4">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-medium text-stone-400">وحدة {index + 1}</span>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-stone-400">وحدة {index + 1}</span>
+                    {/* نوع الوحدة — عدد أو وزن أو حجم */}
+                    <div
+                      role="group"
+                      aria-label="نوع الوحدة"
+                      className="flex rounded-lg border border-stone-200 p-0.5 dark:border-white/10"
+                    >
+                      {UNIT_KINDS.map((kind) => (
+                        <button
+                          key={kind.value}
+                          type="button"
+                          aria-pressed={unit.kind === kind.value}
+                          onClick={() => setUnitKind(index, kind.value)}
+                          className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
+                            unit.kind === kind.value
+                              ? 'bg-brand-500 text-white'
+                              : 'text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-200'
+                          }`}
+                        >
+                          {kind.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   {units.length > 1 && (
                     <button
                       type="button"
@@ -394,7 +438,7 @@ export function ItemFormPage() {
                       value={unit.name}
                       onChange={(e) => setUnitField(index, 'name', e.target.value)}
                       maxLength={40}
-                      placeholder="كيلو، علبة…"
+                      placeholder={unitKindInfo(unit.kind).examples}
                       className={compactFieldClass}
                     />
                     <Notch compact>اسم الوحدة</Notch>
@@ -434,19 +478,27 @@ export function ItemFormPage() {
                   </label>
                 </div>
 
-                {/* الأسعار الأربعة في صف واحد */}
-                <div className="mt-4 grid grid-cols-4 gap-1.5 sm:gap-2">
-                  {PRICE_FIELDS.map((field) => (
-                    <label key={field} className="relative block">
-                      <input
-                        value={unit[field]}
-                        onChange={(e) => setUnitField(index, field, e.target.value)}
-                        inputMode="decimal"
-                        placeholder="0.00"
-                        className={compactFieldClass}
-                      />
-                      <Notch compact>{field}</Notch>
-                    </label>
+                {/* الأسعار الأربعة في صف واحد: المحل (جملة، قطاعي) والأونلاين (جملة، قطاعي) */}
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  {PRICE_GROUPS.map((group) => (
+                    <div key={group.label}>
+                      <div className="mb-2.5 text-center text-[11px] font-medium text-stone-400">{group.label}</div>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {group.fields.map(({ field, label }) => (
+                          <label key={field} className="relative block">
+                            <input
+                              value={unit[field]}
+                              onChange={(e) => setUnitField(index, field, e.target.value)}
+                              inputMode="decimal"
+                              placeholder="0.00"
+                              aria-label={PRICE_LABELS[field]}
+                              className={compactFieldClass}
+                            />
+                            <Notch compact>{label}</Notch>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -454,7 +506,8 @@ export function ItemFormPage() {
 
             <button
               type="button"
-              onClick={() => setUnits((prev) => [...prev, emptyUnit('')])}
+              // الوحدة الجديدة بتاخد نوع الأولى — غالباً الصنف كله بيتباع بنفس النوع
+              onClick={() => setUnits((prev) => [...prev, emptyUnit('', prev[0]?.kind)])}
               className="mt-4 rounded-xl border border-dashed border-stone-300 px-4 py-2.5 text-sm font-medium text-stone-600 transition hover:border-brand-400 dark:border-white/20 dark:text-stone-300"
             >
               + وحدة تانية
