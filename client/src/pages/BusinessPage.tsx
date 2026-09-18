@@ -176,7 +176,7 @@ export function BusinessPage() {
           </>
         ) : (
           <p className="mt-4 rounded-xl border border-dashed border-stone-300 px-4 py-6 text-center text-sm text-stone-400 dark:border-white/15">
-            مفيش عناوين لسه — دوس «إضافة عنوان» وضيف فرع أو مخزن أو مكتب.
+            مفيش عناوين لسه — دوس «إضافة عنوان» وضيف مخزن أو متجر.
           </p>
         )}
       </section>

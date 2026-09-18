@@ -15,10 +15,12 @@ import {
 /** وسط القاهرة — نقطة بداية الخريطة قبل ما المستخدم يحدد حاجة */
 const DEFAULT_POINT = { lat: 30.0444, lng: 31.2357 };
 
-/** المسودة اللي بتبدأ بيها أي إضافة جديدة */
+/** المسودة اللي بتبدأ بيها أي إضافة جديدة — النوع من غير اختيار عشان يختاره بنفسه */
 export const EMPTY_ADDRESS: BusinessAddress = {
   id: '',
   label: '',
+  isStore: false,
+  isWarehouse: false,
   description: '',
   country: 'مصر',
   governorate: '',
@@ -29,6 +31,22 @@ export const EMPTY_ADDRESS: BusinessAddress = {
   lat: DEFAULT_POINT.lat,
   lng: DEFAULT_POINT.lng,
 };
+
+/** بترتيب كلام العميل: «مخزن أو متجر أو الاتنين» */
+const KINDS = [
+  { key: 'isWarehouse', label: 'مخزن' },
+  { key: 'isStore', label: 'متجر' },
+] as const;
+
+/**
+ * نسخة الأنشطة المتخزّنة على الجهاز من قبل ما النوع يتضاف مفيهاش الحقلين،
+ * لحد ما وصلة ترد بالجديد — فبنبدأ المسودة بـtrue/false صريحين.
+ */
+const toDraft = (address: BusinessAddress): BusinessAddress => ({
+  ...address,
+  isStore: address.isStore === true,
+  isWarehouse: address.isWarehouse === true,
+});
 
 interface Props {
   open: boolean;
@@ -54,7 +72,7 @@ interface Props {
 export function AddressDialog({ open, value, mode, onSave, onClose }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
-  const [draft, setDraft] = useState<BusinessAddress>(value);
+  const [draft, setDraft] = useState<BusinessAddress>(() => toDraft(value));
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [locating, setLocating] = useState(false);
@@ -72,7 +90,7 @@ export function AddressDialog({ open, value, mode, onSave, onClose }: Props) {
   // كل فتحة تبدأ من العنوان المحفوظ — عشان الإلغاء يرجّع الأصل فعلاً
   useEffect(() => {
     if (!open) return;
-    setDraft(value);
+    setDraft(toDraft(value));
     setError('');
     setSaving(false);
     setLocateError('');
@@ -133,6 +151,10 @@ export function AddressDialog({ open, value, mode, onSave, onClose }: Props) {
 
   async function handleSave() {
     if (saving) return;
+    if (!draft.isStore && !draft.isWarehouse) {
+      setError('اختار نوع العنوان: مخزن أو متجر أو الاتنين.');
+      return;
+    }
     if (!draft.governorate || !draft.city.trim()) {
       setError('اختار المحافظة والمدينة.');
       return;
@@ -222,7 +244,36 @@ export function AddressDialog({ open, value, mode, onSave, onClose }: Props) {
 
           {/* gap أوسع من العادي: اسم كل خانة طالع فوق حدّها بـ٨ بكسل */}
           <div className="mt-6 grid gap-5 sm:grid-cols-2">
-            {/* أول خانة: الاسم ده بيقول نوع المكان — فرع؟ مخزن؟ مكتب؟ */}
+            {/* أول حاجة: المكان ده بيعمل إيه. مربعات مش اختيار واحد — نفس المكان ممكن يبقى الاتنين */}
+            <fieldset className="sm:col-span-2">
+              <legend className="mb-2 block text-xs font-medium text-stone-500 dark:text-stone-400">
+                نوع العنوان
+              </legend>
+              <div className="grid grid-cols-2 gap-3">
+                {KINDS.map(({ key, label }) => (
+                  <label
+                    key={key}
+                    className={`flex cursor-pointer items-center gap-2.5 rounded-xl border px-4 py-3 text-sm font-medium transition ${
+                      draft[key]
+                        ? 'border-brand-500 bg-brand-50 text-brand-800 dark:border-brand-400 dark:bg-brand-500/15 dark:text-brand-200'
+                        : 'border-stone-300 hover:border-stone-400 dark:border-white/15 dark:hover:border-white/30'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={draft[key]}
+                      onChange={(e) => setField(key, e.target.checked)}
+                      className="h-4 w-4 shrink-0 accent-brand-500"
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+              <span className="mt-1.5 block text-xs text-stone-400">
+                تقدر تختار الاتنين لو نفس المكان مخزن ومتجر مع بعض.
+              </span>
+            </fieldset>
+
             <label className="relative block sm:col-span-2">
               <input
                 value={draft.label}
@@ -233,7 +284,7 @@ export function AddressDialog({ open, value, mode, onSave, onClose }: Props) {
               />
               <Notch>اسم العنوان</Notch>
               <span className="mt-1.5 block text-xs text-stone-400">
-                نوع المكان أو اللي يفرّقه عن غيره — «الفرع الرئيسي»، «المخزن»، «المكتب».
+                اسم يفرّقه عن باقي عناوينك — «الفرع الرئيسي»، «مخزن العبور».
               </span>
             </label>
 

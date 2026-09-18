@@ -29,8 +29,14 @@ export type AuthIntent = 'login' | 'register';
 export interface BusinessAddress {
   /** id العنوان في وصلة. فاضي = عنوان جديد لسه متحفظش */
   id: string;
-  /** اسم يميّز العنوان — "الفرع الرئيسي"، "المخزن" */
+  /** اسم يميّز العنوان — "الفرع الرئيسي"، "مخزن العبور" */
   label: string;
+  /**
+   * نوع المكان: متجر، أو مخزن، أو الاتنين. الفورم بيلزم يختار واحد على الأقل،
+   * بس العناوين اللي اتسجّلت قبل ما النوع يتضاف بترجع الاتنين false.
+   */
+  isStore: boolean;
+  isWarehouse: boolean;
   /** وصف حر يساعد في الوصول */
   description: string;
   country: string;

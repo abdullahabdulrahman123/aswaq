@@ -13,6 +13,32 @@ interface Props {
   onDelete: () => Promise<void>;
 }
 
+const hasKind = (a: BusinessAddress) => a.isStore || a.isWarehouse;
+
+/** نوع العنوان كشارات — القديم اللي اتسجّل قبل ما النوع يتضاف بيبان إنه ناقص */
+function KindBadges({ address }: { address: BusinessAddress }) {
+  if (!hasKind(address)) {
+    return (
+      <span className="shrink-0 rounded-md bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+        من غير نوع
+      </span>
+    );
+  }
+  const kinds = [address.isWarehouse && 'مخزن', address.isStore && 'متجر'].filter((k): k is string => Boolean(k));
+  return (
+    <>
+      {kinds.map((kind) => (
+        <span
+          key={kind}
+          className="shrink-0 rounded-md bg-stone-100 px-1.5 py-0.5 text-[11px] font-medium text-stone-600 dark:bg-white/10 dark:text-stone-300"
+        >
+          {kind}
+        </span>
+      ))}
+    </>
+  );
+}
+
 /** صف تفصيلة واحدة جوه العنوان المفتوح */
 function Row({ label, value }: { label: string; value: string }) {
   if (!value) return null;
@@ -59,16 +85,14 @@ export function AddressCard({ address, onEdit, onDelete }: Props) {
       >
         {/* min-w-0 شرط عشان truncate تشتغل جوه flex */}
         <span className="min-w-0 flex-1">
-          {address.label && (
-            <span className="block truncate font-display text-sm font-bold">{address.label}</span>
-          )}
-          <span
-            className={`block truncate text-sm ${
-              address.label ? 'mt-0.5 text-stone-500 dark:text-stone-400' : ''
-            }`}
-          >
-            {summary}
+          {/* النوع دايماً في أول سطر، والاسم قبله لو فيه */}
+          <span className="flex min-w-0 items-center gap-1.5">
+            {address.label && (
+              <span className="truncate font-display text-sm font-bold">{address.label}</span>
+            )}
+            <KindBadges address={address} />
           </span>
+          <span className="mt-0.5 block truncate text-sm text-stone-500 dark:text-stone-400">{summary}</span>
         </span>
         <span
           aria-hidden="true"
@@ -100,6 +124,12 @@ export function AddressCard({ address, onEdit, onDelete }: Props) {
               <span dir="ltr" className="font-mono tabular-nums">{address.lng.toFixed(6)}</span>
             </span>
           </p>
+
+          {!hasKind(address) && (
+            <p className="mt-3 text-xs text-amber-700 dark:text-amber-300">
+              العنوان ده اتسجّل قبل ما نضيف النوع — دوس «تعديل» واختار مخزن أو متجر.
+            </p>
+          )}
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button
