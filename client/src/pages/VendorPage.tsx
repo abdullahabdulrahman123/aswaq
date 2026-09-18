@@ -2,10 +2,12 @@ import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ProductCard } from '../components/ProductCard';
 import { useCart } from '../context/CartContext';
+import { useCurrentSeller } from '../context/SellerContext';
 import {
   productsOfVendor,
   categoryById,
   topVendors,
+  vendorAsSeller,
   vendorById,
   vendorOffers,
   vendorInitials,
@@ -30,6 +32,9 @@ export function VendorPage() {
     () => (catFilter === 'all' ? vendorProducts : vendorProducts.filter((p) => p.category === catFilter)),
     [vendorProducts, catFilter],
   );
+
+  // جوه صفحة الشركة: هي «الطرف التاني» على شمال الناڤبار
+  useCurrentSeller(vendor ? vendorAsSeller(vendor) : null);
 
   if (!vendor) {
     return (

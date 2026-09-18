@@ -3,6 +3,7 @@ import { Link, useLocation, useParams } from 'react-router-dom';
 import { useAuth, type BusinessAddress } from '../context/AuthContext';
 import { AddressDialog, EMPTY_ADDRESS } from '../components/AddressDialog';
 import { AddressCard } from '../components/AddressCard';
+import { PicturePicker } from '../components/PicturePicker';
 import { SessionExpiredNotice } from '../components/SessionExpiredNotice';
 import { SessionExpiredError } from '../lib/waslaApi';
 
@@ -23,6 +24,7 @@ export function BusinessPage() {
     addAddress,
     updateAddress,
     removeAddress,
+    setBusinessPicture,
     signIn,
   } = useAuth();
   // بنيجي هنا على طول بعد التسجيل — بنقول للمستخدم إنه تم قبل ما يسأل
@@ -125,15 +127,17 @@ export function BusinessPage() {
 
       <SessionExpiredNotice />
 
-      <div className="flex items-start gap-3">
-        <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-brand-50 font-display text-xs font-bold text-brand-800 dark:bg-brand-500/15 dark:text-brand-200">
-          <span className="truncate px-1">{business.abbreviation}</span>
-        </div>
-        <div className="min-w-0">
-          <h1 className="font-display text-2xl font-bold sm:text-3xl">{business.name}</h1>
-          <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">نشاط تجاري على أسواق</p>
-        </div>
-      </div>
+      {/* اللوجو ده هو اللي في الناڤبار لما يتعامل بالنشاط، وقدام المشترين بعدين */}
+      <PicturePicker
+        kind="business"
+        picture={business.picture}
+        fallback={business.abbreviation}
+        onSave={(picture) => setBusinessPicture(business.accountId, picture)}
+        noun="لوجو"
+      >
+        <h1 className="font-display text-2xl font-bold sm:text-3xl">{business.name}</h1>
+        <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">نشاط تجاري على أسواق · {business.abbreviation}</p>
+      </PicturePicker>
 
       <section className="mt-7 rounded-2xl border border-stone-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
         <div className="flex flex-wrap items-center justify-between gap-3">

@@ -14,6 +14,8 @@
  * كل المبالغ بالقروش (integer) — الكسور العشرية بتعمل فروق بتتراكم مع العمولات.
  */
 
+import type { Seller } from '../context/SellerContext';
+
 export type CategoryId =
   | 'grocery'
   | 'beverages'
@@ -254,6 +256,14 @@ export function vendorInitials(name: string): string {
   if (words.length >= 2) return words[0].charAt(0) + words[1].charAt(0);
   return (words[0] ?? cleaned).slice(0, 2);
 }
+
+/** الشركة كـ«طرف تاني» في الناڤبار — الشركات التجريبية مالهاش لوجو، فبتظهر حروفها */
+export const vendorAsSeller = (vendor: Vendor): Seller => ({
+  id: vendor.id,
+  name: vendor.name,
+  initials: vendorInitials(vendor.name),
+  href: `/vendor/${vendor.id}`,
+});
 
 export const egp = (piastres: number) => {
   const value = piastres / 100;

@@ -4,6 +4,7 @@ import { ProductArt } from '../components/ProductArt';
 import { ProductCard } from '../components/ProductCard';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { useCurrentSeller } from '../context/SellerContext';
 import { unitPrice, nextTier, seesTierPricing } from '../lib/pricing';
 import {
   bestOffer,
@@ -14,6 +15,7 @@ import {
   productById,
   products,
   variantsOf,
+  vendorAsSeller,
   vendorById,
   vendorInitials,
 } from '../data/catalog';
@@ -40,6 +42,14 @@ export function ProductPage() {
     setOfferId(bestOffer(offersForVariant(variantId), cartVendorId ?? undefined)?.id ?? '');
   }, [variantId, cartVendorId]);
 
+  const variant = sizes.find((v) => v.id === variantId) ?? sizes[0];
+  const variantOffers = offersForVariant(variant?.id ?? '');
+  const offer = variantOffers.find((o) => o.id === offerId) ?? variantOffers[0];
+  const vendor = offer ? vendorById(offer.vendorId) : undefined;
+
+  // المنتج بيتباع من شركة معيّنة (العرض المختار): هي «الطرف التاني» في الناڤبار
+  useCurrentSeller(vendor ? vendorAsSeller(vendor) : null);
+
   if (!product) {
     return (
       <div className="mx-auto max-w-6xl px-4 py-20 text-center">
@@ -50,13 +60,9 @@ export function ProductPage() {
 
   const brand = brandById(product.brandId);
   const category = categoryById(product.category);
-  const variant = sizes.find((v) => v.id === variantId) ?? sizes[0];
-  const variantOffers = offersForVariant(variant?.id ?? '');
-  const offer = variantOffers.find((o) => o.id === offerId) ?? variantOffers[0];
 
   if (!offer || !variant) return null;
 
-  const vendor = vendorById(offer.vendorId);
   const out = offer.stock === 0;
   const price = unitPrice(offer, qty, accountType);
   const upcoming = seesTierPricing(accountType) ? nextTier(offer, qty) : undefined;

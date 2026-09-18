@@ -23,6 +23,19 @@ export class UploadError extends Error {
   }
 }
 
+/**
+ * نسخة صغيرة من صورة على Cloudinary على قد المكان اللي هتتعرض فيه: الأصلية
+ * ممكن تبقى كام ميجا، وصورة الحساب بتتحمّل في الناڤبار مع كل صفحة. ضعف
+ * المقاس عشان شاشات الموبايل. أي رابط تاني بيرجع زي ما هو.
+ */
+export function thumbnail(url: string, size: number): string {
+  const px = Math.round(size * 2);
+  return url.replace(
+    /^(https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/)/,
+    `$1c_fill,w_${px},h_${px},f_auto,q_auto/`,
+  );
+}
+
 /** بيرفع الصورة ويرجّع رابطها الدائم */
 export async function uploadImage(file: File): Promise<string> {
   if (!uploadsConfigured) throw new UploadError('رفع الصور مش متظبط في النسخة دي.');

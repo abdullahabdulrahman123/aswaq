@@ -5,6 +5,7 @@ import { App } from './App';
 import { ThemeProvider } from './context/ThemeContext';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
+import { SellerProvider } from './context/SellerContext';
 import './index.css';
 
 createRoot(document.getElementById('root')!).render(
@@ -13,7 +14,9 @@ createRoot(document.getElementById('root')!).render(
       <ThemeProvider>
         <AuthProvider>
           <CartProvider>
-            <App />
+            <SellerProvider>
+              <App />
+            </SellerProvider>
           </CartProvider>
         </AuthProvider>
       </ThemeProvider>

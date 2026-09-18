@@ -1,14 +1,17 @@
 import { useAuth } from '../context/AuthContext';
+import { personInitial } from '../components/Avatar';
+import { PicturePicker } from '../components/PicturePicker';
+import { SessionExpiredNotice } from '../components/SessionExpiredNotice';
 
 /**
- * صفحة الحساب في أسواق.
+ * صفحة الحساب في أسواق — ومنها صورة الحساب اللي بتظهر في الناڤبار.
  *
  * أغلب المستخدمين مشترين مش بائعين، فأي كلام عن البيع والنشاط التجاري
- * مبيظهرش غير بعد ما يكون فيه نشاط فعلاً. اللي من غير نشاط بيشوف
- * بياناته وبس — إنشاء النشاط وإدارته بقوا في صفحاتهم من القائمة ☰ جنب اللوجو.
+ * مبيظهرش غير بعد ما يكون فيه نشاط فعلاً. إنشاء النشاط وإدارته في المنيو
+ * اللي بتفتح من الصورة فوق.
  */
 export function AccountPage() {
-  const { user, businesses, signIn } = useAuth();
+  const { user, businesses, signIn, setUserPicture } = useAuth();
 
   if (!user) {
     return (
@@ -31,24 +34,31 @@ export function AccountPage() {
     <div className="mx-auto max-w-2xl px-4 py-8">
       <h1 className="font-display text-2xl font-bold sm:text-3xl">حسابي</h1>
 
-      {/* الهوية — من وصلة */}
-      <section className="mt-6 rounded-2xl border border-stone-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">
-            <div className="font-display text-lg font-bold">
-              {user.name ?? 'مستخدم'}
-              {user.demo && <span className="ms-2 text-sm font-normal text-amber-600 dark:text-amber-400">(تجريبي)</span>}
-            </div>
-            {user.email && <div className="mt-0.5 truncate text-sm text-stone-500 dark:text-stone-400">{user.email}</div>}
-            {/* الشارة للشركات بس — المشتري العادي مش محتاج تصنيف */}
-            {businesses.length > 0 && (
-              <div className="mt-2 inline-block rounded-md bg-accent-50 px-2 py-0.5 text-xs font-medium text-accent-700 dark:bg-accent-500/15 dark:text-accent-300">
-                حساب شركة
-              </div>
-            )}
-          </div>
+      <div className="mt-5">
+        <SessionExpiredNotice />
+      </div>
 
-        </div>
+      {/* الهوية — من وصلة، والصورة دي هي اللي في الناڤبار لما يتعامل بحسابه */}
+      <section className="rounded-2xl border border-stone-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
+        <PicturePicker
+          kind="person"
+          picture={user.picture}
+          fallback={personInitial(user.name, user.email)}
+          onSave={setUserPicture}
+          noun="صورة"
+        >
+          <div className="font-display text-lg font-bold">
+            {user.name ?? 'مستخدم'}
+            {user.demo && <span className="ms-2 text-sm font-normal text-amber-600 dark:text-amber-400">(تجريبي)</span>}
+          </div>
+          {user.email && <div className="mt-0.5 truncate text-sm text-stone-500 dark:text-stone-400">{user.email}</div>}
+          {/* الشارة للشركات بس — المشتري العادي مش محتاج تصنيف */}
+          {businesses.length > 0 && (
+            <div className="mt-2 inline-block rounded-md bg-accent-50 px-2 py-0.5 text-xs font-medium text-accent-700 dark:bg-accent-500/15 dark:text-accent-300">
+              حساب شركة
+            </div>
+          )}
+        </PicturePicker>
         <p className="mt-4 border-t border-stone-200 pt-3 text-xs leading-relaxed text-stone-400 dark:border-white/10">
           تعديل بياناتك الشخصية وكلمة السر هيتضاف في مرحلة جاية.
         </p>
@@ -58,7 +68,8 @@ export function AccountPage() {
         <section className="mt-5 rounded-2xl border border-stone-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
           <h2 className="font-display text-lg font-bold">النشاط التجاري</h2>
           <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
-            عندك {businesses.length} نشاط مسجّل — تلاقيهم في القائمة ☰ فوق.
+            عندك {businesses.length} نشاط مسجّل. دوس على صورتك فوق عشان تتعامل بأي واحد
+            فيهم أو بحسابك الشخصي.
           </p>
         </section>
       )}

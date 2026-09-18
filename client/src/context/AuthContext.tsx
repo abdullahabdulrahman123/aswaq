@@ -4,10 +4,14 @@ import {
   ApiError,
   deleteAddress,
   fetchBusinesses,
+  fetchProfile,
+  patchBusinessPicture,
+  patchProfilePicture,
   postAddress,
   postBusiness,
   putAddress,
   SessionExpiredError,
+  type WaslaProfile,
 } from '../lib/waslaApi';
 import { accessToken, endSession, saveSession, SESSION_KEY, sessionUsable } from '../lib/waslaSession';
 import type { AccountType } from '../lib/pricing';
@@ -16,11 +20,11 @@ import type { AccountType } from '../lib/pricing';
  * الزبون يتصفح كزائر عادي، وتسجيل الدخول مطلوب عند إتمام الطلب فقط.
  * التسجيل كله عبر وصلة — أسواق مش بيخزّن كلمات سر.
  *
- * النشاط التجاري نفسه (اسمه واختصاره وعناوينه) متسجّل في وصلة بطلب العميل:
- * البيانات الأساسية في مكان واحد لكل التطبيقات. أسواق بياخد منه قرار واحد:
- * اللي عنده نشاط يبقى شركة، والباقي أفراد.
+ * النشاط التجاري نفسه (اسمه واختصاره وصورته وعناوينه) متسجّل في وصلة بطلب
+ * العميل: البيانات الأساسية في مكان واحد لكل التطبيقات.
  *
- * واللي عنده أكتر من نشاط بيختار واحد يشتغل بيه من قائمة الحساب (selectedBusiness).
+ * صاحب الأنشطة بيختار يتعامل بإيه من المنيو اللي في صورته فوق: بحسابه الشخصي
+ * (أسعار القطاعي) أو بنشاط من أنشطته (أسعار الجملة) — selectedBusiness.
  */
 
 export type AuthIntent = 'login' | 'register';
@@ -62,8 +66,10 @@ export interface Business {
    */
   accountId: string;
   name: string;
-  /** اختصار قصير للنشاط — بيظهر كشارة جنب الاسم */
+  /** اختصار قصير للنشاط — بيظهر كشارة جنب الاسم، ومكان اللوجو لو مفيش */
   abbreviation: string;
+  /** لوجو النشاط (رابط Cloudinary). null = لسه مترفعش */
+  picture: string | null;
   /**
    * النشاط ممكن يكون له أكتر من مكان (فرع، مخزن، مكتب)، وممكن يتسجّل من
    * غير عنوان خالص ويتضاف بعدين من صفحة النشاط.
@@ -81,11 +87,16 @@ interface AuthContextValue {
   /** تحميل القايمة فشل. أخطاء الحفظ مش هنا — بتترمي للي نادى */
   businessesError: string;
   /**
-   * النشاط اللي المستخدم شغّال بيه دلوقتي — بيتختار من قائمة الحساب.
-   * أول نشاط لو لسه مختارش، أو لو اللي اختاره اتمسح. null = مفيش أنشطة.
+   * المستخدم بيتعامل بإيه دلوقتي: نشاط من أنشطته، أو null = بحسابه الشخصي.
+   * أول نشاط لو لسه مختارش، أو لو اللي اختاره اتمسح.
    */
   selectedBusiness: Business | null;
-  selectBusiness: (accountId: string) => void;
+  /** null = حسابي الشخصي */
+  selectBusiness: (accountId: string | null) => void;
+  /** صورة الحساب في وصلة. null = شيلها. بيرمي لو الحفظ فشل */
+  setUserPicture: (picture: string | null) => Promise<void>;
+  /** لوجو النشاط في وصلة. null = شيله. بيرمي لو الحفظ فشل */
+  setBusinessPicture: (accountId: string, picture: string | null) => Promise<void>;
   /**
    * بينفّذ نداء محتاج توكن وصلة (زي أصناف أسواق). التوكن بيتجدّد لوحده لو
    * خلص، ولو التجديد نفسه اترفض بيعلّم الجلسة كمنتهية عشان التنبيه يظهر.
@@ -97,7 +108,10 @@ interface AuthContextValue {
   addAddress: (accountId: string, fields: Omit<BusinessAddress, 'id'>) => Promise<BusinessAddress>;
   updateAddress: (accountId: string, address: BusinessAddress) => Promise<void>;
   removeAddress: (accountId: string, addressId: string) => Promise<void>;
-  /** الأسعار بتتبني عليه — الزائر والفرد زي بعض، الشركة بتشوف أسعار الكميات */
+  /**
+   * الأسعار بتتبني عليه: الزائر والحساب الشخصي قطاعي، واللي بيتعامل بنشاط
+   * بيشوف أسعار الكميات.
+   */
   accountType: AccountType;
   /** هل وصلة متوصّلة فعلاً؟ لو لأ بنشتغل بوضع تجريبي واضح للعميل */
   connected: boolean;
@@ -118,9 +132,19 @@ const USER_KEY = 'aswaq_user';
  */
 const cacheKey = (sub: string) => `aswaq_businesses_cache_${sub}`;
 
-/** النشاط المختار لكل مستخدم — بيفضل محفوظ بين الزيارات */
+/** المستخدم بيتعامل بإيه: id نشاط أو PERSONAL — بيفضل محفوظ بين الزيارات */
 const SELECTED_PREFIX = 'aswaq_selected_business_';
 const selectedKey = (sub: string) => `${SELECTED_PREFIX}${sub}`;
+/** اختار حسابه الشخصي. مش شكل id نشاط، فمبيتلخبطش معاه */
+const PERSONAL = 'personal';
+
+/** بيانات وصلة الجديدة فوق المستخدم الحالي — نفس الكائن لو مفيش فرق */
+function mergeProfile(prev: WaslaUser | null, profile: WaslaProfile): WaslaUser | null {
+  if (!prev || prev.sub !== profile.sub) return prev;
+  const picture = profile.picture ?? undefined;
+  if (prev.name === profile.name && prev.email === profile.email && prev.picture === picture) return prev;
+  return { ...prev, name: profile.name, email: profile.email, picture };
+}
 
 function load<T>(key: string): T | null {
   try {
@@ -153,6 +177,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [businessesLoading, setBusinessesLoading] = useState(false);
   const [businessesError, setBusinessesError] = useState('');
   const [sessionExpired, setSessionExpired] = useState(false);
+
+  // التحميل مربوط بالمستخدم نفسه مش بالكائن: تغيير صورته مبيعيدش تحميل أنشطته
+  const sub = user?.sub;
+  const demo = Boolean(user?.demo);
 
   // الجلسة نفسها مش هنا: waslaSession.ts بيكتبها في التخزين على طول (شوف السبب هناك)
   useEffect(() => save(USER_KEY, user), [user]);
@@ -202,8 +230,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    */
   const withToken = useCallback(
     async <T,>(call: (token: string) => Promise<T>): Promise<T> => {
-      if (user?.demo) {
-        throw new ApiError(0, 'الأنشطة التجارية محتاجة تسجيل دخول حقيقي بوصلة — النسخة دي شغالة بوضع تجريبي.');
+      if (demo) {
+        throw new ApiError(0, 'الحفظ محتاج تسجيل دخول حقيقي بوصلة — النسخة دي شغالة بوضع تجريبي.');
       }
       try {
         const token = await accessToken();
@@ -220,18 +248,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw err;
       }
     },
-    [user],
+    [demo],
   );
 
   // القايمة من وصلة مع كل مستخدم أو دخول جديد — مش مع كل تجديد للتوكن
   useEffect(() => {
-    if (!user || user.demo) {
+    if (!sub || demo) {
       setBusinesses([]);
       setBusinessesLoading(false);
       return;
     }
-    setBusinesses(load<Business[]>(cacheKey(user.sub)) ?? []);
-    setSelectedBusinessId(load<string>(selectedKey(user.sub)));
+    setBusinesses(load<Business[]>(cacheKey(sub)) ?? []);
+    setSelectedBusinessId(load<string>(selectedKey(sub)));
     setBusinessesError('');
 
     // الجلسة خلصت ومتجدّدتش: المعروض من الكاش لحد ما يسجّل دخول تاني
@@ -246,7 +274,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then((list) => {
         if (cancelled) return;
         setBusinesses(list);
-        save(cacheKey(user.sub), list);
+        save(cacheKey(sub), list);
       })
       .catch((err: unknown) => {
         // انتهاء الجلسة بيظهر لوحده كتنبيه — withToken رفع sessionExpired
@@ -260,7 +288,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [user, sessionExpired, withToken]);
+  }, [sub, demo, sessionExpired, withToken]);
+
+  /*
+   * الاسم والصورة ممكن يتغيّروا بعد الدخول (صورة اترفعت من جهاز تاني مثلاً)،
+   * فبنسأل وصلة عنهم مع كل فتحة. لو مردتش، اللي من وقت الدخول يفضل معروض.
+   */
+  useEffect(() => {
+    if (!sub || demo || sessionExpired) return;
+    let cancelled = false;
+    withToken(fetchProfile)
+      .then((profile) => {
+        if (!cancelled) setUser((prev) => mergeProfile(prev, profile));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [sub, demo, sessionExpired, withToken]);
 
   /** بنحدّث الحالة والنسخة المحفوظة مع بعض */
   const commit = useCallback(
@@ -275,11 +320,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const selectBusiness = useCallback(
-    (accountId: string) => {
-      setSelectedBusinessId(accountId);
-      if (user) save(selectedKey(user.sub), accountId);
+    (accountId: string | null) => {
+      const value = accountId ?? PERSONAL;
+      setSelectedBusinessId(value);
+      if (user) save(selectedKey(user.sub), value);
     },
     [user],
+  );
+
+  const setUserPicture = useCallback(
+    async (picture: string | null) => {
+      const profile = await withToken((token) => patchProfilePicture(token, picture));
+      setUser((prev) => mergeProfile(prev, profile));
+    },
+    [withToken],
+  );
+
+  const setBusinessPicture = useCallback(
+    async (accountId: string, picture: string | null) => {
+      const saved = await withToken((token) => patchBusinessPicture(token, accountId, picture));
+      commit((prev) => prev.map((b) => (b.accountId === accountId ? { ...b, picture: saved.picture } : b)));
+    },
+    [withToken, commit],
   );
 
   const createBusiness = useCallback(
@@ -356,8 +418,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSessionExpired(false);
   }, [user]);
 
-  // اللي اتختار لو لسه موجود، وإلا أول نشاط — فمفيش حالة "مختار حاجة مش موجودة"
-  const selectedBusiness = businesses.find((b) => b.accountId === selectedBusinessId) ?? businesses[0] ?? null;
+  /*
+   * PERSONAL = حسابه الشخصي. غير كده اللي اتختار لو لسه موجود، وإلا أول نشاط —
+   * فمفيش حالة "مختار حاجة مش موجودة". اللي معندوش أنشطة شخصي على طول.
+   */
+  const selectedBusiness =
+    selectedBusinessId === PERSONAL
+      ? null
+      : (businesses.find((b) => b.accountId === selectedBusinessId) ?? businesses[0] ?? null);
 
   return (
     <AuthContext.Provider
@@ -368,13 +436,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         businessesError,
         selectedBusiness,
         selectBusiness,
+        setUserPicture,
+        setBusinessPicture,
         withToken,
         sessionExpired,
         createBusiness,
         addAddress,
         updateAddress,
         removeAddress,
-        accountType: businesses.length > 0 ? 'COMPANY' : 'INDIVIDUAL',
+        accountType: selectedBusiness ? 'COMPANY' : 'INDIVIDUAL',
         connected: waslaConfigured,
         signIn,
         completeSignIn,

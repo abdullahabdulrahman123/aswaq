@@ -58,6 +58,38 @@ async function request<T>(path: string, token: string, init: RequestInit = {}): 
 
 const businessPath = (accountId: string) => `/api/businesses/${encodeURIComponent(accountId)}`;
 
+/** المستخدم زي ما وصلة بتعرضه — نفس أسماء الـclaims اللي في id_token */
+export interface WaslaProfile {
+  sub: string;
+  name: string;
+  email: string;
+  picture: string | null;
+}
+
+/** الاسم والصورة ممكن يتغيّروا من جهاز تاني بعد الدخول */
+export async function fetchProfile(token: string): Promise<WaslaProfile> {
+  const { user } = await request<{ user: WaslaProfile }>('/api/me', token);
+  return user;
+}
+
+/** null = شيل الصورة */
+export async function patchProfilePicture(token: string, picture: string | null): Promise<WaslaProfile> {
+  const { user } = await request<{ user: WaslaProfile }>('/api/me', token, {
+    method: 'PATCH',
+    body: JSON.stringify({ picture }),
+  });
+  return user;
+}
+
+/** لوجو النشاط. null = شيل اللوجو */
+export async function patchBusinessPicture(token: string, accountId: string, picture: string | null): Promise<Business> {
+  const { business } = await request<{ business: Business }>(businessPath(accountId), token, {
+    method: 'PATCH',
+    body: JSON.stringify({ picture }),
+  });
+  return business;
+}
+
 export async function fetchBusinesses(token: string): Promise<Business[]> {
   const { businesses } = await request<{ businesses: Business[] }>('/api/businesses', token);
   return businesses;
