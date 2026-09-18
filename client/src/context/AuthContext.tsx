@@ -9,6 +9,7 @@ import {
   putAddress,
   SessionExpiredError,
 } from '../lib/waslaApi';
+import { accessToken, endSession, saveSession, SESSION_KEY, sessionUsable } from '../lib/waslaSession';
 import type { AccountType } from '../lib/pricing';
 
 /**
@@ -80,11 +81,11 @@ interface AuthContextValue {
   selectedBusiness: Business | null;
   selectBusiness: (accountId: string) => void;
   /**
-   * بينفّذ نداء محتاج توكن وصلة (زي أصناف أسواق)، ولو التوكن انتهى بيعلّم
-   * الجلسة كمنتهية عشان التنبيه يظهر في الصفحة.
+   * بينفّذ نداء محتاج توكن وصلة (زي أصناف أسواق). التوكن بيتجدّد لوحده لو
+   * خلص، ولو التجديد نفسه اترفض بيعلّم الجلسة كمنتهية عشان التنبيه يظهر.
    */
   withToken: <T>(call: (token: string) => Promise<T>) => Promise<T>;
-  /** توكن وصلة انتهى: المعروض لسه صحيح، بس الحفظ محتاج تسجيل دخول تاني */
+  /** الجلسة خلصت ومتجدّدتش: المعروض لسه صحيح، بس الحفظ محتاج تسجيل دخول تاني */
   sessionExpired: boolean;
   createBusiness: (input: Pick<Business, 'name' | 'abbreviation'>) => Promise<Business>;
   addAddress: (accountId: string, fields: Omit<BusinessAddress, 'id'>) => Promise<BusinessAddress>;
@@ -103,7 +104,6 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 const USER_KEY = 'aswaq_user';
-const SESSION_KEY = 'aswaq_session';
 
 /**
  * آخر قايمة أنشطة جت من وصلة، لكل مستخدم لوحده.
@@ -134,12 +134,8 @@ function save(key: string, value: unknown) {
   }
 }
 
-const isLive = (session: WaslaSession | null): session is WaslaSession =>
-  Boolean(session && session.expiresAt > Date.now());
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<WaslaUser | null>(() => load<WaslaUser>(USER_KEY));
-  const [session, setSession] = useState<WaslaSession | null>(() => load<WaslaSession>(SESSION_KEY));
   const [businesses, setBusinesses] = useState<Business[]>(() => {
     const sub = load<WaslaUser>(USER_KEY)?.sub;
     return (sub && load<Business[]>(cacheKey(sub))) || [];
@@ -152,14 +148,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [businessesError, setBusinessesError] = useState('');
   const [sessionExpired, setSessionExpired] = useState(false);
 
+  // الجلسة نفسها مش هنا: waslaSession.ts بيكتبها في التخزين على طول (شوف السبب هناك)
   useEffect(() => save(USER_KEY, user), [user]);
-  useEffect(() => save(SESSION_KEY, session), [session]);
 
   /*
    * تسجيل الدخول ممكن يخلص في شباك غير اللي المستخدم فاتحه: تاب تاني، أو —
    * في أسواق المتثبّت كتطبيق على أندرويد — الشباك الصغير اللي بيفتح فوق
    * التطبيق لأي رابط برّه نطاقه (زي وصلة). التخزين واحد بين الاتنين، فبنقرا
-   * الجلسة تاني أول ما تتغيّر أو المستخدم يرجع للشباك ده. من غير كده التطبيق
+   * المستخدم تاني أول ما يتغيّر أو المستخدم يرجع للشباك ده. من غير كده التطبيق
    * كان بيفضل عارض إنه مش مسجّل لحد ما يتقفل ويتفتح.
    *
    * بنرجّع نفس الكائن لو مفيش تغيير فعلي، عشان منعيدش تحميل الأنشطة على الفاضي.
@@ -168,11 +164,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
     const sync = () => {
       const nextUser = load<WaslaUser>(USER_KEY);
-      const nextSession = load<WaslaSession>(SESSION_KEY);
       setUser((prev) => (same(prev, nextUser) ? prev : nextUser));
-      setSession((prev) => (same(prev, nextSession) ? prev : nextSession));
       setSelectedBusinessId(nextUser ? load<string>(selectedKey(nextUser.sub)) : null);
-      if (isLive(nextSession)) setSessionExpired(false);
+      // شباك تاني سجّل دخول: التنبيه هنا ملوش لازمة
+      if (sessionUsable()) setSessionExpired(false);
     };
     const onStorage = (event: StorageEvent) => {
       if (
@@ -195,33 +190,62 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // القايمة من وصلة مع كل مستخدم أو توكن جديد
+  /**
+   * كل نداء بتوكن بيعدّي من هنا: بياخد توكن صالح (وبيجدّده لو خلص)، ولو
+   * التجديد نفسه اترفض بيرفع sessionExpired عشان الصفحة تعرض "سجّل دخول تاني".
+   */
+  const withToken = useCallback(
+    async <T,>(call: (token: string) => Promise<T>): Promise<T> => {
+      if (user?.demo) {
+        throw new ApiError(0, 'الأنشطة التجارية محتاجة تسجيل دخول حقيقي بوصلة — النسخة دي شغالة بوضع تجريبي.');
+      }
+      try {
+        const token = await accessToken();
+        try {
+          return await call(token);
+        } catch (err) {
+          // السيرفر رفض توكن ساعته لسه مخلصتش: نجدّد مرة ونعيد.
+          // الـ401 بيرجع قبل أي حفظ، فالإعادة مبتكررش حاجة.
+          if (!(err instanceof SessionExpiredError)) throw err;
+          return await call(await accessToken(token));
+        }
+      } catch (err) {
+        if (err instanceof SessionExpiredError) setSessionExpired(true);
+        throw err;
+      }
+    },
+    [user],
+  );
+
+  // القايمة من وصلة مع كل مستخدم أو دخول جديد — مش مع كل تجديد للتوكن
   useEffect(() => {
     if (!user || user.demo) {
       setBusinesses([]);
+      setBusinessesLoading(false);
       return;
     }
     setBusinesses(load<Business[]>(cacheKey(user.sub)) ?? []);
     setSelectedBusinessId(load<string>(selectedKey(user.sub)));
     setBusinessesError('');
 
-    if (!isLive(session)) {
-      setSessionExpired(true);
+    // الجلسة خلصت ومتجدّدتش: المعروض من الكاش لحد ما يسجّل دخول تاني
+    if (sessionExpired) {
+      setBusinessesLoading(false);
       return;
     }
 
     let cancelled = false;
     setBusinessesLoading(true);
-    fetchBusinesses(session.accessToken)
+    withToken(fetchBusinesses)
       .then((list) => {
         if (cancelled) return;
         setBusinesses(list);
         save(cacheKey(user.sub), list);
       })
       .catch((err: unknown) => {
-        if (cancelled) return;
-        if (err instanceof SessionExpiredError) setSessionExpired(true);
-        else setBusinessesError(err instanceof Error ? err.message : 'مقدرناش نجيب أنشطتك من وصلة.');
+        // انتهاء الجلسة بيظهر لوحده كتنبيه — withToken رفع sessionExpired
+        if (cancelled || err instanceof SessionExpiredError) return;
+        setBusinessesError(err instanceof Error ? err.message : 'مقدرناش نجيب أنشطتك من وصلة.');
       })
       .finally(() => {
         if (!cancelled) setBusinessesLoading(false);
@@ -230,27 +254,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [user, session]);
-
-  /**
-   * كل عملية حفظ بتعدّي من هنا: بتاخد التوكن، ولو وصلة قالت إنه انتهى
-   * بترفع علامة sessionExpired عشان الصفحة تعرض "سجّل دخول تاني".
-   */
-  const withToken = useCallback(
-    async <T,>(call: (token: string) => Promise<T>): Promise<T> => {
-      if (user?.demo) {
-        throw new ApiError(0, 'الأنشطة التجارية محتاجة تسجيل دخول حقيقي بوصلة — النسخة دي شغالة بوضع تجريبي.');
-      }
-      try {
-        if (!isLive(session)) throw new SessionExpiredError();
-        return await call(session.accessToken);
-      } catch (err) {
-        if (err instanceof SessionExpiredError) setSessionExpired(true);
-        throw err;
-      }
-    },
-    [user, session],
-  );
+  }, [user, sessionExpired, withToken]);
 
   /** بنحدّث الحالة والنسخة المحفوظة مع بعض */
   const commit = useCallback(
@@ -332,16 +336,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const completeSignIn = useCallback((u: WaslaUser, s: WaslaSession) => {
+    saveSession(s);
     setUser(u);
-    setSession(s);
     setSessionExpired(false);
   }, []);
 
   const signOut = useCallback(() => {
     // الجهاز ممكن يكون مشترك — بيانات الأنشطة متفضلش بعد الخروج
     if (user) save(cacheKey(user.sub), null);
+    endSession();
     setUser(null);
-    setSession(null);
     setBusinesses([]);
     setSessionExpired(false);
   }, [user]);

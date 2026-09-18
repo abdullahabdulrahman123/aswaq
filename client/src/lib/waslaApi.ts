@@ -19,7 +19,10 @@ export class ApiError extends Error {
   }
 }
 
-/** التوكن انتهى (وصلة بتديه ساعة) أو اتلغى — لازم تسجيل دخول تاني */
+/**
+ * السيرفر رفض التوكن (401). withToken بيجدّده ويعيد مرة، فالخطأ ده بيوصل
+ * للصفحة بس لو التجديد نفسه اترفض — يعني لازم تسجيل دخول تاني.
+ */
 export class SessionExpiredError extends ApiError {
   constructor() {
     super(401, 'جلستك مع وصلة انتهت. سجّل دخول تاني وكمّل.');

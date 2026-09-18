@@ -55,7 +55,7 @@ function UnitLine({ unit }: { unit: ItemUnit }) {
 export function ItemsPage() {
   const { accountId = '' } = useParams<{ accountId: string }>();
   const { state } = useLocation() as { state?: { saved?: string } };
-  const { user, businesses, businessesLoading, signIn, withToken } = useAuth();
+  const { user, businesses, businessesLoading, signIn, withToken, sessionExpired } = useAuth();
 
   /** null = لسه بنجيب */
   const [items, setItems] = useState<Item[] | null>(null);
@@ -65,8 +65,9 @@ export function ItemsPage() {
 
   const business = businesses.find((b) => b.accountId === accountId);
 
+  // الجلسة خلصت؟ بنستنى لحد ما يسجّل دخول (هنا أو في شباك تاني) ونجيبها ساعتها
   useEffect(() => {
-    if (!user) return;
+    if (!user || sessionExpired) return;
     let cancelled = false;
 
     setError('');
@@ -83,7 +84,7 @@ export function ItemsPage() {
     return () => {
       cancelled = true;
     };
-  }, [accountId, user, withToken]);
+  }, [accountId, user, withToken, sessionExpired]);
 
   async function handleDelete(item: Item) {
     setDeletingId(item.id);
@@ -173,7 +174,8 @@ export function ItemsPage() {
       )}
 
       {items === null ? (
-        <p className="text-sm text-stone-500 dark:text-stone-400">بنجيب الأصناف…</p>
+        // تنبيه الجلسة فوق كفاية — «بنجيب» هنا كانت هتفضل ظاهرة على الفاضي
+        !sessionExpired && <p className="text-sm text-stone-500 dark:text-stone-400">بنجيب الأصناف…</p>
       ) : items.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-stone-300 p-8 text-center dark:border-white/15">
           <p className="text-sm text-stone-500 dark:text-stone-400">لسه مفيش أصناف في النشاط ده.</p>

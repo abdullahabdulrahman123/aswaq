@@ -56,6 +56,11 @@ export interface WaslaSession {
   accessToken: string;
   /** بالمللي ثانية */
   expiresAt: number;
+  /**
+   * بيجيب توكن وصول جديد لما القديم يخلص، من غير ما المستخدم يعمل حاجة.
+   * وصلة بتغيّره مع كل تجديد. مش موجود في الجلسات اللي اتعملت قبل ما يتضاف.
+   */
+  refreshToken?: string;
 }
 
 function base64UrlEncode(buffer: ArrayBuffer | Uint8Array): string {
@@ -142,6 +147,23 @@ export function consumeReturnTo(): string {
 /** وصلة بتدي توكن الوصول ساعة — ده الافتراضي لو الرد مقالش */
 const DEFAULT_TOKEN_SECONDS = 3600;
 
+interface TokenResponse {
+  id_token?: string;
+  access_token?: string;
+  expires_in?: number;
+  refresh_token?: string;
+}
+
+/** رد /token كجلسة. previousRefreshToken بيفضل لو وصلة مبعتتش واحد جديد */
+function toSession(data: TokenResponse, previousRefreshToken?: string): WaslaSession {
+  if (!data.access_token) throw new Error('وصلة مرجّعتش توكن الوصول');
+  return {
+    accessToken: data.access_token,
+    expiresAt: Date.now() + (data.expires_in ?? DEFAULT_TOKEN_SECONDS) * 1000,
+    refreshToken: data.refresh_token ?? previousRefreshToken,
+  };
+}
+
 export async function exchangeCode(code: string): Promise<{ idToken: string; session: WaslaSession }> {
   if (!ISSUER) throw new Error('VITE_WASLA_ISSUER غير مضبوط');
   const verifier = localStorage.getItem('aswaq_wasla_verifier') ?? '';
@@ -163,16 +185,60 @@ export async function exchangeCode(code: string): Promise<{ idToken: string; ses
   localStorage.removeItem('aswaq_wasla_verifier');
   localStorage.removeItem('aswaq_wasla_state');
 
-  const data = (await res.json()) as { id_token?: string; access_token?: string; expires_in?: number };
+  const data = (await res.json()) as TokenResponse;
   if (!data.id_token || !data.access_token) throw new Error('وصلة مرجّعتش التوكنات المطلوبة');
 
-  return {
-    idToken: data.id_token,
-    session: {
-      accessToken: data.access_token,
-      expiresAt: Date.now() + (data.expires_in ?? DEFAULT_TOKEN_SECONDS) * 1000,
-    },
-  };
+  return { idToken: data.id_token, session: toSession(data) };
+}
+
+/** وصلة رفضت التجديد: الـrefresh token انتهى أو اتلغى (خروج، أو الحساب اتمسح) */
+export class RefreshRejectedError extends Error {
+  constructor() {
+    super('وصلة رفضت تجديد الجلسة');
+    this.name = 'RefreshRejectedError';
+  }
+}
+
+/**
+ * توكن وصول جديد من غير ما المستخدم يعمل حاجة. وصلة بتلغي الـrefresh token
+ * اللي اتبعت وبترجّع واحد جديد لازم يتحفظ مكانه — شوف waslaSession.ts.
+ * خطأ الشبكة بيترمي زي ما هو: الجلسة سليمة، الطلب بس موصلش.
+ */
+export async function refreshSession(refreshToken: string): Promise<WaslaSession> {
+  if (!ISSUER) throw new Error('VITE_WASLA_ISSUER غير مضبوط');
+
+  const res = await fetch(`${ISSUER}/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+      client_id: CLIENT_ID,
+    }),
+  });
+
+  // 400 invalid_grant = التوكن خلص أو اتلغى. غيره (500، سيرفر لسه بيصحى) مؤقت
+  if (res.status === 400 || res.status === 401) throw new RefreshRejectedError();
+  if (!res.ok) throw new Error(`تجديد الجلسة فشل (${res.status})`);
+
+  return toSession((await res.json()) as TokenResponse, refreshToken);
+}
+
+/**
+ * الخروج بيلغي الـrefresh token في وصلة، مش بس بيمسحه من الجهاز — لو كان
+ * اتنسخ في حتة، خلاص مبقاش ينفع. مش بنستنى الرد: الخروج من الجهاز حصل
+ * خلاص، وkeepalive بيكمّل الطلب لو الصفحة اتقفلت على طول.
+ */
+export function revokeRefreshToken(refreshToken: string): void {
+  if (!ISSUER) return;
+  fetch(`${ISSUER}/token/revocation`, {
+    method: 'POST',
+    keepalive: true,
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ token: refreshToken, token_type_hint: 'refresh_token', client_id: CLIENT_ID }),
+  }).catch(() => {
+    // مفيش نت: التوكن بيموت لوحده بعد ٣٠ يوم من غير استخدام
+  });
 }
 
 /** فك الـpayload بدون تحقق من التوقيع — انظر الملاحظة الأمنية أعلى الملف */
