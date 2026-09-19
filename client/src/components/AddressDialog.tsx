@@ -15,12 +15,9 @@ import {
 /** وسط القاهرة — نقطة بداية الخريطة قبل ما المستخدم يحدد حاجة */
 const DEFAULT_POINT = { lat: 30.0444, lng: 31.2357 };
 
-/** المسودة اللي بتبدأ بيها أي إضافة جديدة — النوع من غير اختيار عشان يختاره بنفسه */
+/** المسودة اللي بيبدأ بيها أي عنوان جديد */
 export const EMPTY_ADDRESS: BusinessAddress = {
   id: '',
-  label: '',
-  isStore: false,
-  isWarehouse: false,
   description: '',
   country: 'مصر',
   governorate: '',
@@ -32,49 +29,32 @@ export const EMPTY_ADDRESS: BusinessAddress = {
   lng: DEFAULT_POINT.lng,
 };
 
-/** بترتيب كلام العميل: «مخزن أو متجر أو الاتنين» */
-const KINDS = [
-  { key: 'isWarehouse', label: 'مخزن' },
-  { key: 'isStore', label: 'متجر' },
-] as const;
-
-/**
- * نسخة الأنشطة المتخزّنة على الجهاز من قبل ما النوع يتضاف مفيهاش الحقلين،
- * لحد ما وصلة ترد بالجديد — فبنبدأ المسودة بـtrue/false صريحين.
- */
-const toDraft = (address: BusinessAddress): BusinessAddress => ({
-  ...address,
-  isStore: address.isStore === true,
-  isWarehouse: address.isWarehouse === true,
-});
-
 interface Props {
   open: boolean;
   /** العنوان الحالي — بيتنسخ لمسودة جوه الدايالوج */
   value: BusinessAddress;
-  /** بيغيّر العنوان والزرار بس — الخانات واحدة في الحالتين */
-  mode: 'add' | 'edit';
-  /** بيخلص لما وصلة ترد، وبيرمي لو الحفظ فشل — النافذة بتعرض الخطأ وتفضل مفتوحة */
-  onSave: (address: BusinessAddress) => Promise<void>;
+  /** اسم المقر اللي العنوان ده بتاعه — بيظهر تحت العنوان لو مكتوب */
+  premisesName: string;
+  /** «تم»: العنوان بيرجع لفورم المقر، والحفظ الفعلي بيحصل مع المقر نفسه */
+  onDone: (address: BusinessAddress) => void;
   onClose: () => void;
 }
 
 /**
- * نافذة تحديد العنوان.
+ * «حدد العنوان» — عنوان المقر على الخريطة وتفاصيله. بتتفتح من فورم المقر
+ * (PremisesDialog)، و«تم» بيرجّع العنوان للفورم؛ الحفظ بيحصل مع المقر.
  *
  * الشغل كله على *مسودة* جوه الدايالوج: التعديل مبيوصلش للفورم اللي بره غير
- * لما المستخدم يدوس حفظ. فالإلغاء بيرجّع كل حاجة زي ما كانت — وده المتوقع
- * من أي نافذة فيها حفظ وإلغاء.
+ * لما المستخدم يدوس «تم». فالرجوع بيسيب كل حاجة زي ما كانت.
  *
  * بنستخدم عنصر <dialog> الأصلي مش div عادي: بيدينا حبس التركيز جوه النافذة،
  * وقفل بزرار Esc، وخلفية معتمة — كل ده من غير كود ولا مكتبة.
  */
-export function AddressDialog({ open, value, mode, onSave, onClose }: Props) {
+export function AddressDialog({ open, value, premisesName, onDone, onClose }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
-  const [draft, setDraft] = useState<BusinessAddress>(() => toDraft(value));
+  const [draft, setDraft] = useState<BusinessAddress>(value);
   const [error, setError] = useState('');
-  const [saving, setSaving] = useState(false);
   const [locating, setLocating] = useState(false);
   const [locateError, setLocateError] = useState('');
   const [located, setLocated] = useState(false);
@@ -87,12 +67,11 @@ export function AddressDialog({ open, value, mode, onSave, onClose }: Props) {
     if (!open && d.open) d.close();
   }, [open]);
 
-  // كل فتحة تبدأ من العنوان المحفوظ — عشان الإلغاء يرجّع الأصل فعلاً
+  // كل فتحة تبدأ من العنوان اللي في فورم المقر — عشان الرجوع يسيب الأصل فعلاً
   useEffect(() => {
     if (!open) return;
-    setDraft(toDraft(value));
+    setDraft(value);
     setError('');
-    setSaving(false);
     setLocateError('');
     setLocated(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -149,35 +128,20 @@ export function AddressDialog({ open, value, mode, onSave, onClose }: Props) {
     }
   }
 
-  async function handleSave() {
-    if (saving) return;
-    if (!draft.isStore && !draft.isWarehouse) {
-      setError('اختار نوع العنوان: مخزن أو متجر أو الاتنين.');
-      return;
-    }
+  function handleDone() {
     if (!draft.governorate || !draft.city.trim()) {
       setError('اختار المحافظة والمدينة.');
       return;
     }
-
-    setSaving(true);
-    setError('');
-    try {
-      await onSave({
-        ...draft,
-        label: draft.label.trim(),
-        description: draft.description.trim(),
-        country: draft.country.trim(),
-        city: draft.city.trim(),
-        district: draft.district.trim(),
-        street: draft.street.trim(),
-        landmark: draft.landmark.trim(),
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'مقدرناش نحفظ العنوان. جرّب تاني.');
-    } finally {
-      setSaving(false);
-    }
+    onDone({
+      ...draft,
+      description: draft.description.trim(),
+      country: draft.country.trim(),
+      city: draft.city.trim(),
+      district: draft.district.trim(),
+      street: draft.street.trim(),
+      landmark: draft.landmark.trim(),
+    });
   }
 
   const cities = citiesOf(draft.governorate);
@@ -187,7 +151,7 @@ export function AddressDialog({ open, value, mode, onSave, onClose }: Props) {
       ref={dialogRef}
       // الإغلاق ممكن ييجي من Esc كمان، مش من زرار الإلغاء بس
       onClose={onClose}
-      aria-label="عنوان النشاط"
+      aria-label="حدد العنوان"
       /*
        * العرض في style مش كلاس: Tailwind مبيطلّعش كلاس فيه فاصلة جوه min()،
        * فالنافذة كانت بتفضل بعرض صفر والخريطة تترسم 2px.
@@ -199,9 +163,7 @@ export function AddressDialog({ open, value, mode, onSave, onClose }: Props) {
       {open && (
         <div className="max-h-[85vh] overflow-y-auto p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-display text-lg font-bold">
-              {mode === 'add' ? 'إضافة عنوان' : 'تعديل العنوان'}
-            </h2>
+            <h2 className="font-display text-lg font-bold">حدد العنوان</h2>
             <button
               type="button"
               onClick={handleLocate}
@@ -213,6 +175,7 @@ export function AddressDialog({ open, value, mode, onSave, onClose }: Props) {
           </div>
 
           <p className="mt-1.5 text-xs leading-relaxed text-stone-400">
+            {premisesName && <>عنوان «{premisesName}». </>}
             زرار تحديد الموقع بيملا الدولة والمحافظة والمدينة. تقدر تعدّلهم بعدها،
             وتقدر تكتب العنوان كله بإيدك من غير ما تستخدمه.
           </p>
@@ -236,58 +199,15 @@ export function AddressDialog({ open, value, mode, onSave, onClose }: Props) {
               locating={locating}
               hint={
                 canLookupAnyPoint
-                  ? 'اسحب الدبوس أو دوس على الخريطة لتحديد مكان نشاطك بالظبط — الأسماء هتتحدّث لوحدها.'
-                  : 'اسحب الدبوس أو دوس على الخريطة لتحديد مكان نشاطك بالظبط. الأسماء تحت مش هتتغيّر لوحدها — عدّلها بإيدك لو محتاج.'
+                  ? 'اسحب الدبوس أو دوس على الخريطة لتحديد مكان المقر بالظبط — الأسماء هتتحدّث لوحدها.'
+                  : 'اسحب الدبوس أو دوس على الخريطة لتحديد مكان المقر بالظبط. الأسماء تحت مش هتتغيّر لوحدها — عدّلها بإيدك لو محتاج.'
               }
             />
           </div>
 
           {/* gap أوسع من العادي: اسم كل خانة طالع فوق حدّها بـ٨ بكسل */}
+          {/* اسم المقر ونوعه مش هنا — دول في فورم المقر نفسه، والعنوان خاصية من خواصه */}
           <div className="mt-6 grid gap-5 sm:grid-cols-2">
-            {/* أول حاجة: المكان ده بيعمل إيه. مربعات مش اختيار واحد — نفس المكان ممكن يبقى الاتنين */}
-            <fieldset className="sm:col-span-2">
-              <legend className="mb-2 block text-xs font-medium text-stone-500 dark:text-stone-400">
-                نوع العنوان
-              </legend>
-              <div className="grid grid-cols-2 gap-3">
-                {KINDS.map(({ key, label }) => (
-                  <label
-                    key={key}
-                    className={`flex cursor-pointer items-center gap-2.5 rounded-xl border px-4 py-3 text-sm font-medium transition ${
-                      draft[key]
-                        ? 'border-brand-500 bg-brand-50 text-brand-800 dark:border-brand-400 dark:bg-brand-500/15 dark:text-brand-200'
-                        : 'border-stone-300 hover:border-stone-400 dark:border-white/15 dark:hover:border-white/30'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={draft[key]}
-                      onChange={(e) => setField(key, e.target.checked)}
-                      className="h-4 w-4 shrink-0 accent-brand-500"
-                    />
-                    {label}
-                  </label>
-                ))}
-              </div>
-              <span className="mt-1.5 block text-xs text-stone-400">
-                تقدر تختار الاتنين لو نفس المكان مخزن ومتجر مع بعض.
-              </span>
-            </fieldset>
-
-            <label className="relative block sm:col-span-2">
-              <input
-                value={draft.label}
-                onChange={(e) => setField('label', e.target.value)}
-                maxLength={60}
-                placeholder="مثال: الفرع الرئيسي"
-                className={fieldClass}
-              />
-              <Notch>اسم العنوان</Notch>
-              <span className="mt-1.5 block text-xs text-stone-400">
-                اسم يفرّقه عن باقي عناوينك — «الفرع الرئيسي»، «مخزن العبور».
-              </span>
-            </label>
-
             <label className="relative block">
               <select
                 value={draft.country}
@@ -396,18 +316,17 @@ export function AddressDialog({ open, value, mode, onSave, onClose }: Props) {
           <div className="mt-6 flex flex-wrap gap-3 border-t border-stone-200 pt-5 dark:border-white/10">
             <button
               type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="rounded-xl bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:cursor-progress disabled:opacity-70"
+              onClick={handleDone}
+              className="rounded-xl bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-600"
             >
-              {saving ? 'بنحفظ…' : mode === 'add' ? 'إضافة العنوان' : 'حفظ التعديل'}
+              تم
             </button>
             <button
               type="button"
               onClick={onClose}
               className="rounded-xl border border-stone-300 px-6 py-3 text-sm font-medium transition hover:border-stone-400 dark:border-white/15"
             >
-              إلغاء
+              رجوع
             </button>
           </div>
         </div>

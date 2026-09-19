@@ -1,0 +1,71 @@
+import type { Premises } from '../context/AuthContext';
+import { oneLine } from '../lib/address';
+import { PinIcon } from './PinIcon';
+
+/** نوع المقر كشارات — المقر اللي اتعمل من عنوان قديم بيبان إن نوعه ناقص */
+function KindBadges({ premises }: { premises: Premises }) {
+  if (!premises.isStore && !premises.isWarehouse) {
+    return (
+      <span className="shrink-0 rounded-md bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+        من غير نوع
+      </span>
+    );
+  }
+  const kinds = [premises.isWarehouse && 'مخزن', premises.isStore && 'متجر'].filter((k): k is string => Boolean(k));
+  return (
+    <>
+      {kinds.map((kind) => (
+        <span
+          key={kind}
+          className="shrink-0 rounded-md bg-stone-100 px-1.5 py-0.5 text-[11px] font-medium text-stone-600 dark:bg-white/10 dark:text-stone-300"
+        >
+          {kind}
+        </span>
+      ))}
+    </>
+  );
+}
+
+/**
+ * مقر واحد في ليستة مقرات النشاط: اسمه ونوعه، وتحته ملخص قصير لعنوانه (بطلب
+ * العميل). سطر واحد مقصوص عشان النشاط ممكن يكون له عشر فروع. الدوسة بتفتح
+ * المقر في فورمه للتعديل.
+ */
+export function PremisesCard({ premises, onOpen }: { premises: Premises; onOpen: () => void }) {
+  const summary = (premises.address && oneLine(premises.address)) || 'من غير عنوان';
+
+  return (
+    <li className="overflow-hidden rounded-xl border border-stone-200 bg-white dark:border-white/10 dark:bg-white/5">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex w-full items-center gap-3 px-4 py-3 text-start transition hover:bg-stone-50 dark:hover:bg-white/5"
+      >
+        {/* min-w-0 شرط عشان truncate تشتغل جوه flex */}
+        <span className="min-w-0 flex-1">
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="truncate font-display text-sm font-bold">{premises.name}</span>
+            <KindBadges premises={premises} />
+          </span>
+          <span className="mt-0.5 flex min-w-0 items-center gap-1 text-sm text-stone-500 dark:text-stone-400">
+            <PinIcon className="h-3.5 w-3.5 shrink-0 text-stone-400" />
+            <span className="truncate">{summary}</span>
+          </span>
+        </span>
+        {/* RTL: «افتح» بيشاور على الشمال */}
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          className="h-4 w-4 shrink-0 text-stone-400"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="m15 6-6 6 6 6" />
+        </svg>
+      </button>
+    </li>
+  );
+}

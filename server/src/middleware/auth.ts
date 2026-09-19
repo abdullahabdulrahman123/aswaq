@@ -6,7 +6,11 @@ export interface WaslaBusiness {
   accountId: string;
   name: string;
   abbreviation: string;
-  addresses: { id: string }[];
+  /**
+   * مقرات النشاط، وعنوان كل مقر جواه. اختياري: نسخة محفوظة من قبل المقرات
+   * كانت بتيجي بـaddresses بدلها — ساعتها بنسأل وصلة من جديد.
+   */
+  premises?: { address: { id: string } | null }[];
 }
 
 declare global {

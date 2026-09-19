@@ -15,7 +15,7 @@ import type { Coords } from '../lib/geolocate';
  * بدل الصور — أخف وميعتمدش على أي ملف.
  */
 
-const PIN = L.divIcon({
+export const PIN = L.divIcon({
   className: '',
   html:
     '<div style="width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);' +

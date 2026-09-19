@@ -14,15 +14,15 @@ function toShopView(shop: Shop) {
 }
 
 /**
- * العنوان عايش في وصلة، فمفيش فهرس هنا يتأكد منه — بنتأكد إنه من
- * عناوين النشاط ده في رد وصلة. بيرجّع false بعد ما يرد بـ400.
+ * العنوان عايش في وصلة، فمفيش فهرس هنا يتأكد منه — بنتأكد إنه عنوان مقر من
+ * مقرات النشاط ده في رد وصلة. بيرجّع false بعد ما يرد بـ400.
  */
 async function ensureAddressBelongs(req: Request, res: Response, input: ShopInput): Promise<boolean> {
   const { addressId } = input;
   if (!addressId) return true;
 
   const business = await findManagedBusiness(req, req.business!.accountId, (b) =>
-    b.addresses.some((address) => address.id === addressId),
+    (b.premises ?? []).some((premises) => premises.address?.id === addressId),
   );
   if (business) return true;
 

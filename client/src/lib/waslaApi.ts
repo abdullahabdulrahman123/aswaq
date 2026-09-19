@@ -1,8 +1,8 @@
-import type { Business, BusinessAddress } from '../context/AuthContext';
+import type { Business, Premises } from '../context/AuthContext';
 import { waslaApiOrigin } from './waslaAuth';
 
 /**
- * بيانات النشاط التجاري الأساسية (الاسم، الاختصار، العناوين) عايشة في وصلة.
+ * بيانات النشاط التجاري الأساسية (الاسم، الاختصار، المقرات وعناوينها) عايشة في وصلة.
  *
  * كل طلب بيتبعت بتوكن الوصول اللي أسواق خده وقت تسجيل الدخول، ووصلة
  * بتتحقق منه من ناحيتها — مفيش حاجة بتتحقق هنا في المتصفح.
@@ -58,6 +58,12 @@ async function request<T>(path: string, token: string, init: RequestInit = {}): 
 
 const businessPath = (accountId: string) => `/api/businesses/${encodeURIComponent(accountId)}`;
 
+/**
+ * وصلة قبل المقرات كانت بترجّع addresses بدل premises. لحد ما النسختين يتنشروا
+ * الاتنين، الصفحات تشوف ليستة مقرات فاضية بدل ما تقع.
+ */
+const withPremises = (business: Business): Business => ({ ...business, premises: business.premises ?? [] });
+
 /** المستخدم زي ما وصلة بتعرضه — نفس أسماء الـclaims اللي في id_token */
 export interface WaslaProfile {
   sub: string;
@@ -87,12 +93,12 @@ export async function patchBusinessPicture(token: string, accountId: string, pic
     method: 'PATCH',
     body: JSON.stringify({ picture }),
   });
-  return business;
+  return withPremises(business);
 }
 
 export async function fetchBusinesses(token: string): Promise<Business[]> {
   const { businesses } = await request<{ businesses: Business[] }>('/api/businesses', token);
-  return businesses;
+  return businesses.map(withPremises);
 }
 
 /** 409 = الاختصار مستخدم في نشاط تاني عند نفس المستخدم */
@@ -104,37 +110,37 @@ export async function postBusiness(
     method: 'POST',
     body: JSON.stringify(input),
   });
-  return business;
+  return withPremises(business);
 }
 
-export async function postAddress(
-  token: string,
-  accountId: string,
-  fields: Omit<BusinessAddress, 'id'>,
-): Promise<BusinessAddress> {
-  const { address } = await request<{ address: BusinessAddress }>(
-    `${businessPath(accountId)}/addresses`,
+/** المقر زي ما وصلة بتستلمه: اسمه ونوعه وعنوانه، من غير الـids */
+function premisesBody({ name, isStore, isWarehouse, address }: Omit<Premises, 'id'>): string {
+  if (!address) throw new Error('المقر محتاج عنوان');
+  const { id: _addressId, ...fields } = address;
+  return JSON.stringify({ name, isStore, isWarehouse, address: fields });
+}
+
+/** المقر وعنوانه بيتحفظوا مع بعض — مفيش مقر من غير عنوان */
+export async function postPremises(token: string, accountId: string, premises: Omit<Premises, 'id'>): Promise<Premises> {
+  const { premises: saved } = await request<{ premises: Premises }>(`${businessPath(accountId)}/premises`, token, {
+    method: 'POST',
+    body: premisesBody(premises),
+  });
+  return saved;
+}
+
+export async function putPremises(token: string, accountId: string, { id, ...premises }: Premises): Promise<Premises> {
+  const { premises: saved } = await request<{ premises: Premises }>(
+    `${businessPath(accountId)}/premises/${encodeURIComponent(id)}`,
     token,
-    { method: 'POST', body: JSON.stringify(fields) },
+    { method: 'PUT', body: premisesBody(premises) },
   );
-  return address;
+  return saved;
 }
 
-export async function putAddress(
-  token: string,
-  accountId: string,
-  { id, ...fields }: BusinessAddress,
-): Promise<BusinessAddress> {
-  const { address } = await request<{ address: BusinessAddress }>(
-    `${businessPath(accountId)}/addresses/${encodeURIComponent(id)}`,
-    token,
-    { method: 'PUT', body: JSON.stringify(fields) },
-  );
-  return address;
-}
-
-export async function deleteAddress(token: string, accountId: string, addressId: string): Promise<void> {
-  await request<void>(`${businessPath(accountId)}/addresses/${encodeURIComponent(addressId)}`, token, {
+/** المقر وعنوانه بيتمسحوا مع بعض */
+export async function deletePremises(token: string, accountId: string, premisesId: string): Promise<void> {
+  await request<void>(`${businessPath(accountId)}/premises/${encodeURIComponent(premisesId)}`, token, {
     method: 'DELETE',
   });
 }

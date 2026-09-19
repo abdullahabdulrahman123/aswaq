@@ -11,7 +11,7 @@ const ABBR_MAX = 8;
 /**
  * تسجيل نشاط تجاري جديد — اسم واختصار وبس.
  *
- * العناوين مش جزء من التسجيل: النشاط ممكن يكون لسه مالوش مكان، وممكن يكون
+ * المقرات مش جزء من التسجيل: النشاط ممكن يكون لسه مالوش مكان، وممكن يكون
  * له كذا فرع. بيتضافوا من صفحة النشاط نفسها بعد ما يتسجّل.
  */
 export function BusinessNewPage() {
@@ -43,7 +43,7 @@ export function BusinessNewPage() {
     setSubmitting(true);
     try {
       const created = await createBusiness({ name: cleanName, abbreviation: cleanAbbr });
-      // على طول لصفحة النشاط — منها بيضيف العناوين
+      // على طول لصفحة النشاط — منها بيضيف المقرات
       navigate(`/business/${created.accountId}`, { state: { created: true } });
     } catch (err) {
       setSubmitting(false);
@@ -141,8 +141,8 @@ export function BusinessNewPage() {
         </div>
 
         <p className="mt-5 border-t border-stone-200 pt-4 text-xs leading-relaxed text-stone-400 dark:border-white/10">
-          العناوين بتتضاف بعد التسجيل من صفحة النشاط — تقدر تضيف أكتر من عنوان،
-          أو تسيبه من غير عنوان دلوقتي.
+          المقرات بتتضاف بعد التسجيل من صفحة النشاط — تقدر تضيف أكتر من مقر (فرع،
+          مخزن، متجر)، أو تسيبه من غير مقرات دلوقتي.
         </p>
       </form>
     </div>

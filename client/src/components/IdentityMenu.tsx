@@ -289,7 +289,7 @@ export function IdentityMenu() {
                 )}
               </div>
 
-              {/* ٣) تحكم في النشاط اللي بيتعامل بيه — الأصناف والعناوين */}
+              {/* ٣) تحكم في النشاط اللي بيتعامل بيه — الأصناف والمقرات */}
               {selectedBusiness && (
                 <div className={sectionClass}>
                   <div className={headingClass}>تحكم في النشاط</div>
@@ -300,7 +300,7 @@ export function IdentityMenu() {
                     إضافة صنف
                   </Link>
                   <Link role="menuitem" to={`/business/${selectedBusiness.accountId}`} onClick={close} className={itemClass}>
-                    صفحة النشاط واللوجو والعناوين
+                    صفحة النشاط واللوجو والمقرات
                   </Link>
                 </div>
               )}

@@ -1,17 +1,17 @@
 import { useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
-import { useAuth, type BusinessAddress } from '../context/AuthContext';
-import { AddressDialog, EMPTY_ADDRESS } from '../components/AddressDialog';
-import { AddressCard } from '../components/AddressCard';
+import { useAuth, type Premises } from '../context/AuthContext';
+import { EMPTY_PREMISES, PremisesDialog } from '../components/PremisesDialog';
+import { PremisesCard } from '../components/PremisesCard';
 import { PicturePicker } from '../components/PicturePicker';
 import { SessionExpiredNotice } from '../components/SessionExpiredNotice';
-import { SessionExpiredError } from '../lib/waslaApi';
 
 /**
- * صفحة النشاط التجاري.
+ * صفحة النشاط التجاري — «بروفايل النشاط»، بطلب العميل: اسمه واختصاره
+ * ولوجوه، وتحتهم ليستة مقراته.
  *
- * التسجيل بياخد اسم واختصار وبس، والعناوين بتتضاف من هنا — نشاط ممكن يكون
- * له فرع ومخزن ومكتب، وممكن يفضل من غير عنوان لحد ما صاحبه يجهّز مكانه.
+ * التسجيل بياخد اسم واختصار وبس، والمقرات بتتضاف من هنا — نشاط ممكن يكون
+ * له فرع ومخزن ومتجر، وممكن يفضل من غير مقرات لحد ما صاحبه يجهّز مكانه.
  * كل ده متخزّن في وصلة، وأسواق بيعرضه ويبعت التعديلات.
  */
 export function BusinessPage() {
@@ -21,19 +21,17 @@ export function BusinessPage() {
     businesses,
     businessesLoading,
     businessesError,
-    addAddress,
-    updateAddress,
-    removeAddress,
+    addPremises,
+    updatePremises,
+    removePremises,
     setBusinessPicture,
     signIn,
   } = useAuth();
   // بنيجي هنا على طول بعد التسجيل — بنقول للمستخدم إنه تم قبل ما يسأل
   const justCreated = Boolean((useLocation().state as { created?: boolean } | null)?.created);
 
-  /** null = مقفول، عنوان بـid فاضي = إضافة، عنوان بـid = تعديل */
-  const [editing, setEditing] = useState<BusinessAddress | null>(null);
-  /** خطأ الحذف. أخطاء الإضافة والتعديل بتتعرض جوه النافذة نفسها */
-  const [deleteError, setDeleteError] = useState('');
+  /** null = مقفول، مقر بـid فاضي = إضافة، مقر بـid = تعديل */
+  const [editing, setEditing] = useState<Premises | null>(null);
 
   if (!user) {
     return (
@@ -96,32 +94,26 @@ export function BusinessPage() {
   }
 
   /** بترمي لو الحفظ فشل — النافذة بتمسك الخطأ وتعرضه وتفضل مفتوحة */
-  async function handleSave(address: BusinessAddress) {
+  async function handleSave(premises: Premises) {
     if (!business) return;
-    const { id: addressId, ...fields } = address;
-    if (addressId) await updateAddress(business.accountId, address);
-    else await addAddress(business.accountId, fields);
+    const { id: premisesId, ...fields } = premises;
+    if (premisesId) await updatePremises(business.accountId, premises);
+    else await addPremises(business.accountId, fields);
     setEditing(null);
   }
 
-  async function handleDelete(addressId: string) {
+  /** بترمي لو المسح فشل — زي الحفظ، الخطأ بيتعرض جوه النافذة */
+  async function handleDelete(premisesId: string) {
     if (!business) return;
-    setDeleteError('');
-    try {
-      await removeAddress(business.accountId, addressId);
-    } catch (err) {
-      // انتهاء الجلسة ليه تنبيه لوحده فوق
-      if (!(err instanceof SessionExpiredError)) {
-        setDeleteError(err instanceof Error ? err.message : 'مقدرناش نحذف العنوان. جرّب تاني.');
-      }
-    }
+    await removePremises(business.accountId, premisesId);
+    setEditing(null);
   }
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
       {justCreated && (
         <p className="mb-5 rounded-xl bg-accent-50 px-4 py-3 text-sm text-accent-700 dark:bg-accent-500/10 dark:text-accent-300">
-          اتسجّل النشاط. تقدر تضيف عناوينه دلوقتي أو في أي وقت بعدين.
+          اتسجّل النشاط. تقدر تضيف مقراته دلوقتي أو في أي وقت بعدين.
         </p>
       )}
 
@@ -142,54 +134,44 @@ export function BusinessPage() {
       <section className="mt-7 rounded-2xl border border-stone-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-display text-lg font-bold">
-            العناوين
-            {business.addresses.length > 0 && (
+            المقرات
+            {business.premises.length > 0 && (
               <span className="ms-2 rounded-md bg-stone-100 px-1.5 py-0.5 text-xs tabular-nums font-normal text-stone-500 dark:bg-white/10 dark:text-stone-400">
-                {business.addresses.length}
+                {business.premises.length}
               </span>
             )}
           </h2>
           <button
             type="button"
-            onClick={() => setEditing(EMPTY_ADDRESS)}
+            onClick={() => setEditing(EMPTY_PREMISES)}
             className="rounded-lg border border-stone-300 px-3 py-2 text-xs font-medium transition hover:border-brand-400 hover:text-brand-700 dark:border-white/15 dark:hover:text-brand-400"
           >
-            ＋ إضافة عنوان
+            ＋ إضافة مقر
           </button>
         </div>
 
-        {deleteError && (
-          <p role="alert" className="mt-4 rounded-lg bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-300">
-            {deleteError}
-          </p>
-        )}
-
-        {business.addresses.length > 0 ? (
+        {business.premises.length > 0 ? (
           <>
             <ul className="mt-4 grid gap-2.5">
-              {business.addresses.map((a) => (
-                <AddressCard
-                  key={a.id}
-                  address={a}
-                  onEdit={() => setEditing(a)}
-                  onDelete={() => handleDelete(a.id)}
-                />
+              {business.premises.map((p) => (
+                <PremisesCard key={p.id} premises={p} onOpen={() => setEditing(p)} />
               ))}
             </ul>
-            <p className="mt-3 text-xs text-stone-400">دوس على أي عنوان تشوفه بالكامل.</p>
+            <p className="mt-3 text-xs text-stone-400">دوس على أي مقر تفتحه وتعدّله.</p>
           </>
         ) : (
           <p className="mt-4 rounded-xl border border-dashed border-stone-300 px-4 py-6 text-center text-sm text-stone-400 dark:border-white/15">
-            مفيش عناوين لسه — دوس «إضافة عنوان» وضيف مخزن أو متجر.
+            مفيش مقرات لسه — دوس «إضافة مقر» وضيف فرع أو مخزن أو متجر.
           </p>
         )}
       </section>
 
-      <AddressDialog
+      <PremisesDialog
         open={editing !== null}
-        value={editing ?? EMPTY_ADDRESS}
+        value={editing ?? EMPTY_PREMISES}
         mode={editing?.id ? 'edit' : 'add'}
         onSave={handleSave}
+        onDelete={editing?.id ? () => handleDelete(editing.id) : undefined}
         onClose={() => setEditing(null)}
       />
     </div>

@@ -2,14 +2,14 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { redirectToWasla, waslaConfigured, type WaslaSession, type WaslaUser } from '../lib/waslaAuth';
 import {
   ApiError,
-  deleteAddress,
+  deletePremises,
   fetchBusinesses,
   fetchProfile,
   patchBusinessPicture,
   patchProfilePicture,
-  postAddress,
   postBusiness,
-  putAddress,
+  postPremises,
+  putPremises,
   SessionExpiredError,
   type WaslaProfile,
 } from '../lib/waslaApi';
@@ -20,7 +20,7 @@ import type { AccountType } from '../lib/pricing';
  * الزبون يتصفح كزائر عادي، وتسجيل الدخول مطلوب عند إتمام الطلب فقط.
  * التسجيل كله عبر وصلة — أسواق مش بيخزّن كلمات سر.
  *
- * النشاط التجاري نفسه (اسمه واختصاره وصورته وعناوينه) متسجّل في وصلة بطلب
+ * النشاط التجاري نفسه (اسمه واختصاره وصورته ومقراته) متسجّل في وصلة بطلب
  * العميل: البيانات الأساسية في مكان واحد لكل التطبيقات.
  *
  * صاحب الأنشطة بيختار يتعامل بإيه من المنيو اللي في صورته فوق: بحسابه الشخصي
@@ -29,18 +29,10 @@ import type { AccountType } from '../lib/pricing';
 
 export type AuthIntent = 'login' | 'register';
 
-/** عنوان النشاط — الدولة والمحافظة والمدينة من قوايم، والباقي كتابة حرة */
+/** عنوان مقر — الدولة والمحافظة والمدينة من قوايم، والباقي كتابة حرة */
 export interface BusinessAddress {
   /** id العنوان في وصلة. فاضي = عنوان جديد لسه متحفظش */
   id: string;
-  /** اسم يميّز العنوان — "الفرع الرئيسي"، "مخزن العبور" */
-  label: string;
-  /**
-   * نوع المكان: متجر، أو مخزن، أو الاتنين. الفورم بيلزم يختار واحد على الأقل،
-   * بس العناوين اللي اتسجّلت قبل ما النوع يتضاف بترجع الاتنين false.
-   */
-  isStore: boolean;
-  isWarehouse: boolean;
   /** وصف حر يساعد في الوصول */
   description: string;
   country: string;
@@ -56,12 +48,30 @@ export interface BusinessAddress {
 }
 
 /**
+ * مقر من مقرات النشاط — فرع، مخزن، متجر، زي «شركة الهلال فرع المنصورة». بطلب
+ * العميل: المقر هو المكان باسمه ونوعه، والعنوان خاصية من خواصه.
+ */
+export interface Premises {
+  /** id المقر في وصلة. فاضي = مقر جديد لسه متحفظش */
+  id: string;
+  name: string;
+  /**
+   * نوع المقر: متجر، أو مخزن، أو الاتنين. الفورم بيلزم يختار واحد على الأقل،
+   * بس المقرات اللي اتعملت من العناوين القديمة بترجع الاتنين false.
+   */
+  isStore: boolean;
+  isWarehouse: boolean;
+  /** null = لسه متحددش (مقر جديد في الفورم) — وصلة مبتحفظش مقر من غير عنوان */
+  address: BusinessAddress | null;
+}
+
+/**
  * نشاط تجاري — وجود واحد على الأقل بيحوّل الحساب لحساب شركة.
  * المستخدم ممكن يكون عنده أكتر من نشاط.
  */
 export interface Business {
   /**
-   * id حساب النشاط في وصلة. ده المعرّف الموحّد حسب السكيمة: العناوين،
+   * id حساب النشاط في وصلة. ده المعرّف الموحّد حسب السكيمة: المقرات،
    * والمحلات والأصناف في أسواق، كلها بتتربط بيه.
    */
   accountId: string;
@@ -71,10 +81,10 @@ export interface Business {
   /** لوجو النشاط (رابط Cloudinary). null = لسه مترفعش */
   picture: string | null;
   /**
-   * النشاط ممكن يكون له أكتر من مكان (فرع، مخزن، مكتب)، وممكن يتسجّل من
-   * غير عنوان خالص ويتضاف بعدين من صفحة النشاط.
+   * النشاط ممكن يكون له أكتر من مقر (فرع، مخزن، متجر)، وممكن يتسجّل من
+   * غير مقرات خالص وتتضاف بعدين من صفحة النشاط.
    */
-  addresses: BusinessAddress[];
+  premises: Premises[];
   createdAt: string;
 }
 
@@ -105,9 +115,9 @@ interface AuthContextValue {
   /** الجلسة خلصت ومتجدّدتش: المعروض لسه صحيح، بس الحفظ محتاج تسجيل دخول تاني */
   sessionExpired: boolean;
   createBusiness: (input: Pick<Business, 'name' | 'abbreviation'>) => Promise<Business>;
-  addAddress: (accountId: string, fields: Omit<BusinessAddress, 'id'>) => Promise<BusinessAddress>;
-  updateAddress: (accountId: string, address: BusinessAddress) => Promise<void>;
-  removeAddress: (accountId: string, addressId: string) => Promise<void>;
+  addPremises: (accountId: string, premises: Omit<Premises, 'id'>) => Promise<Premises>;
+  updatePremises: (accountId: string, premises: Premises) => Promise<void>;
+  removePremises: (accountId: string, premisesId: string) => Promise<void>;
   /**
    * الأسعار بتتبني عليه: الزائر والحساب الشخصي قطاعي، واللي بيتعامل بنشاط
    * بيشوف أسعار الكميات.
@@ -164,11 +174,19 @@ function save(key: string, value: unknown) {
   }
 }
 
+/**
+ * الأنشطة المحفوظة على الجهاز. النسخة اللي اتحفظت قبل المقرات مفيهاش premises
+ * (كان فيها addresses) — بتتعرض من غير مقرات لحد ما وصلة ترد، بدل ما الصفحة تقع.
+ */
+function loadBusinesses(sub: string): Business[] {
+  return (load<Business[]>(cacheKey(sub)) ?? []).map((b) => ({ ...b, premises: b.premises ?? [] }));
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<WaslaUser | null>(() => load<WaslaUser>(USER_KEY));
   const [businesses, setBusinesses] = useState<Business[]>(() => {
     const sub = load<WaslaUser>(USER_KEY)?.sub;
-    return (sub && load<Business[]>(cacheKey(sub))) || [];
+    return sub ? loadBusinesses(sub) : [];
   });
   const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(() => {
     const sub = load<WaslaUser>(USER_KEY)?.sub;
@@ -258,7 +276,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setBusinessesLoading(false);
       return;
     }
-    setBusinesses(load<Business[]>(cacheKey(sub)) ?? []);
+    setBusinesses(loadBusinesses(sub));
     setSelectedBusinessId(load<string>(selectedKey(sub)));
     setBusinessesError('');
 
@@ -355,38 +373,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [withToken, commit, selectBusiness],
   );
 
-  /** تعديل عناوين نشاط واحد من غير ما نلمس الباقي */
-  const mapAddresses = useCallback(
-    (accountId: string, update: (list: BusinessAddress[]) => BusinessAddress[]) =>
+  /** تعديل مقرات نشاط واحد من غير ما نلمس الباقي */
+  const mapPremises = useCallback(
+    (accountId: string, update: (list: Premises[]) => Premises[]) =>
       commit((prev) =>
-        prev.map((b) => (b.accountId === accountId ? { ...b, addresses: update(b.addresses) } : b)),
+        prev.map((b) => (b.accountId === accountId ? { ...b, premises: update(b.premises) } : b)),
       ),
     [commit],
   );
 
-  const addAddress = useCallback(
-    async (accountId: string, fields: Omit<BusinessAddress, 'id'>) => {
-      const created = await withToken((token) => postAddress(token, accountId, fields));
-      mapAddresses(accountId, (list) => [...list, created]);
+  const addPremises = useCallback(
+    async (accountId: string, premises: Omit<Premises, 'id'>) => {
+      const created = await withToken((token) => postPremises(token, accountId, premises));
+      mapPremises(accountId, (list) => [...list, created]);
       return created;
     },
-    [withToken, mapAddresses],
+    [withToken, mapPremises],
   );
 
-  const updateAddress = useCallback(
-    async (accountId: string, address: BusinessAddress) => {
-      const saved = await withToken((token) => putAddress(token, accountId, address));
-      mapAddresses(accountId, (list) => list.map((a) => (a.id === saved.id ? saved : a)));
+  const updatePremises = useCallback(
+    async (accountId: string, premises: Premises) => {
+      const saved = await withToken((token) => putPremises(token, accountId, premises));
+      mapPremises(accountId, (list) => list.map((p) => (p.id === saved.id ? saved : p)));
     },
-    [withToken, mapAddresses],
+    [withToken, mapPremises],
   );
 
-  const removeAddress = useCallback(
-    async (accountId: string, addressId: string) => {
-      await withToken((token) => deleteAddress(token, accountId, addressId));
-      mapAddresses(accountId, (list) => list.filter((a) => a.id !== addressId));
+  const removePremises = useCallback(
+    async (accountId: string, premisesId: string) => {
+      await withToken((token) => deletePremises(token, accountId, premisesId));
+      mapPremises(accountId, (list) => list.filter((p) => p.id !== premisesId));
     },
-    [withToken, mapAddresses],
+    [withToken, mapPremises],
   );
 
   const signIn = useCallback(async (intent: AuthIntent) => {
@@ -441,9 +459,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         withToken,
         sessionExpired,
         createBusiness,
-        addAddress,
-        updateAddress,
-        removeAddress,
+        addPremises,
+        updatePremises,
+        removePremises,
         accountType: selectedBusiness ? 'COMPANY' : 'INDIVIDUAL',
         connected: waslaConfigured,
         signIn,
