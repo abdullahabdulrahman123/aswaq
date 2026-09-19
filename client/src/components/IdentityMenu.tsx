@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -9,6 +9,50 @@ const itemClass =
   'flex w-full items-center gap-3 px-4 py-2.5 text-start text-sm transition hover:bg-stone-50 dark:hover:bg-white/5';
 const sectionClass = 'border-t border-stone-100 py-1 dark:border-white/5';
 const headingClass = 'px-4 pb-1 pt-2 text-[11px] font-medium text-stone-400';
+const currentClass = 'bg-brand-50/70 dark:bg-brand-500/10';
+
+const BUSINESSES_TITLE = 'أنشطتك التجارية';
+
+/** «نشاط واحد» · «نشاطين» · «3 أنشطة» · «11 نشاط» */
+function countBusinesses(n: number): string {
+  if (n === 1) return 'نشاط واحد';
+  if (n === 2) return 'نشاطين';
+  return n <= 10 ? `${n} أنشطة` : `${n} نشاط`;
+}
+
+/** الموقع RTL: «ادخل» سهم صغير بيشاور على الشمال، و«رجوع» سهم كامل → على اليمين */
+function Arrow({ direction }: { direction: 'in' | 'back' }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className={`h-4 w-4 shrink-0 ${direction === 'in' ? 'text-stone-400' : 'text-stone-500 dark:text-stone-300'}`}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d={direction === 'in' ? 'm15 6-6 6 6 6' : 'M5 12h14m-6-6 6 6-6 6'} />
+    </svg>
+  );
+}
+
+/** «الأنشطة» كمجموعة — مربع زي لوجو النشاط، بس هادي عشان ميتلخبطش مع نشاط بعينه */
+function BusinessesIcon() {
+  return (
+    <span
+      aria-hidden="true"
+      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[28%] bg-stone-100 text-stone-600 dark:bg-white/10 dark:text-stone-300"
+    >
+      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4.5 10.5V19h15v-8.5" />
+        <path d="M3 10.5 5 5h14l2 5.5Z" />
+        <path d="M10 19v-4.5h4V19" />
+      </svg>
+    </span>
+  );
+}
 
 /** واحد من الهويات اللي المستخدم يقدر يتعامل بيها — حسابه أو نشاط من أنشطته */
 function IdentityOption({
@@ -29,7 +73,7 @@ function IdentityOption({
       role="menuitemradio"
       aria-checked={checked}
       onClick={onSelect}
-      className={`${itemClass} ${checked ? 'bg-brand-50/70 dark:bg-brand-500/10' : ''}`}
+      className={`${itemClass} ${checked ? currentClass : ''}`}
     >
       {avatar}
       <span className="min-w-0 flex-1">
@@ -53,11 +97,37 @@ function IdentityOption({
  *
  * المنيو اللي بتفتح منها فيها كل حاجة: التبديل بين حسابه وأنشطته، التحكم في
  * النشاط، الحساب، والوضع الليلي لحد ما «التفضيلات» تتعمل. للزائر: الدخول.
+ *
+ * الأنشطة مش مفرودة في المنيو — جوه قائمة فرعية «أنشطتك التجارية»، بطلب
+ * العميل، عشان المنيو متطولش مع كل نشاط. القائمة الفرعية بتاخد مكان المنيو
+ * نفسها بزرار رجوع (مش جنبها) عشان تفضل واسعة على الموبايل.
  */
 export function IdentityMenu() {
   const { user, businesses, businessesLoading, selectedBusiness, selectBusiness, signIn, signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { open, setOpen, wrapRef, close } = useDropdown();
+  const [view, setView] = useState<'main' | 'businesses'>('main');
+  const menuRef = useRef<HTMLDivElement>(null);
+  // التركيز بيتنقل لما المستخدم يدخل القائمة الفرعية أو يرجع منها بس — مش أول ما المنيو تفتح
+  const focusAfterSwitch = useRef(false);
+  const showBusinesses = view === 'businesses' && businesses.length > 0;
+
+  function switchView(next: 'main' | 'businesses') {
+    focusAfterSwitch.current = true;
+    setView(next);
+  }
+
+  useEffect(() => {
+    if (!focusAfterSwitch.current) return;
+    focusAfterSwitch.current = false;
+    const menu = menuRef.current;
+    const target =
+      view === 'businesses'
+        ? (menu?.querySelector<HTMLElement>('[role=menuitemradio][aria-checked=true]') ??
+          menu?.querySelector<HTMLElement>('[role=menuitemradio]'))
+        : menu?.querySelector<HTMLElement>('[aria-haspopup=menu]');
+    target?.focus();
+  }, [view]);
 
   const userName = user?.name ?? user?.email ?? 'حسابي';
   const userAvatar = (size: number) => (
@@ -83,7 +153,10 @@ export function IdentityMenu() {
   return (
     <div ref={wrapRef} className="relative">
       <button
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          setView('main');
+          setOpen((v) => !v);
+        }}
         aria-expanded={open}
         aria-haspopup="menu"
         aria-label={
@@ -118,10 +191,46 @@ export function IdentityMenu() {
 
       {open && (
         <div
+          ref={menuRef}
           role="menu"
+          aria-label={showBusinesses ? BUSINESSES_TITLE : undefined}
+          onKeyDown={(e) => {
+            // Escape جوه القائمة الفرعية بيرجع خطوة، مش بيقفل المنيو كلها
+            if (e.key === 'Escape' && showBusinesses) {
+              e.stopPropagation();
+              switchView('main');
+            }
+          }}
           className="absolute start-0 top-full z-40 mt-1.5 max-h-[80vh] w-72 overflow-y-auto rounded-xl border border-stone-200 bg-white shadow-card dark:border-white/10 dark:bg-surface-card"
         >
-          {user ? (
+          {user && showBusinesses ? (
+            <>
+              <button
+                role="menuitem"
+                onClick={() => switchView('main')}
+                aria-label={`رجوع — ${BUSINESSES_TITLE}`}
+                className="flex w-full items-center gap-2 px-4 py-3 text-start text-sm font-semibold transition hover:bg-stone-50 dark:hover:bg-white/5"
+              >
+                <Arrow direction="back" />
+                {BUSINESSES_TITLE}
+              </button>
+              <div role="group" aria-label={BUSINESSES_TITLE} className={sectionClass}>
+                {businesses.map((b) => (
+                  <IdentityOption
+                    key={b.accountId}
+                    checked={selectedBusiness?.accountId === b.accountId}
+                    onSelect={() => {
+                      selectBusiness(b.accountId);
+                      close();
+                    }}
+                    avatar={<Avatar kind="business" picture={b.picture} fallback={b.abbreviation} size={28} />}
+                    title={b.name}
+                    subtitle={b.abbreviation}
+                  />
+                ))}
+              </div>
+            </>
+          ) : user ? (
             <>
               {/* أنا مين دلوقتي، وده معناه أسعار إيه */}
               <div className="flex items-center gap-3 px-4 py-3">
@@ -151,19 +260,21 @@ export function IdentityMenu() {
                     title={userName}
                     subtitle="حسابك الشخصي"
                   />
-                  {businesses.map((b) => (
-                    <IdentityOption
-                      key={b.accountId}
-                      checked={selectedBusiness?.accountId === b.accountId}
-                      onSelect={() => {
-                        selectBusiness(b.accountId);
-                        close();
-                      }}
-                      avatar={<Avatar kind="business" picture={b.picture} fallback={b.abbreviation} size={28} />}
-                      title={b.name}
-                      subtitle={b.abbreviation}
-                    />
-                  ))}
+                  {/* ملوّن لو المستخدم بيتعامل دلوقتي بنشاط منهم */}
+                  <button
+                    role="menuitem"
+                    aria-haspopup="menu"
+                    aria-expanded={false}
+                    onClick={() => switchView('businesses')}
+                    className={`${itemClass} ${selectedBusiness ? currentClass : ''}`}
+                  >
+                    <BusinessesIcon />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium">{BUSINESSES_TITLE}</span>
+                      <span className="block truncate text-xs text-stone-400">{countBusinesses(businesses.length)}</span>
+                    </span>
+                    <Arrow direction="in" />
+                  </button>
                 </div>
               ) : (
                 businessesLoading && <div className="px-4 pb-2.5 text-xs text-stone-400">بنجيب أنشطتك…</div>

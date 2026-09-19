@@ -2,9 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 
 /**
  * فتح وقفل قايمة منسدلة من الناڤبار: بتقفل لو المستخدم داس برّه أو داس Escape.
- *
- * القايمتين (☰ وصورة الحساب) بيستخدموها. فتح واحدة بيقفل التانية لوحده،
- * لأن الضغطة على زرارها بتتحسب "برّه" التانية.
+ * القايمة ممكن توقف Escape قبل ما يوصل هنا (القائمة الفرعية في IdentityMenu
+ * بترجع خطوة بيه بدل ما تقفل).
  */
 export function useDropdown() {
   const [open, setOpen] = useState(false);
