@@ -1,84 +1,58 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useId, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useDropdown } from '../lib/useDropdown';
 import { Avatar, personInitial } from './Avatar';
+import { Notch } from './OutlinedField';
 
 const itemClass =
   'flex w-full items-center gap-3 px-4 py-2.5 text-start text-sm transition hover:bg-stone-50 dark:hover:bg-white/5';
 const sectionClass = 'border-t border-stone-100 py-1 dark:border-white/5';
 const headingClass = 'px-4 pb-1 pt-2 text-[11px] font-medium text-stone-400';
-const currentClass = 'bg-brand-50/70 dark:bg-brand-500/10';
+/** سطر في ليستة «حساباتي» */
+const rowClass =
+  'flex w-full items-center gap-3 px-3 py-2.5 text-start text-sm transition hover:bg-stone-50 dark:hover:bg-white/5';
+/**
+ * الإيميل ltr عشان لو طويل يتقص من آخره (…@gmail.com) مش من أوله، ويفضل
+ * على اليمين زي باقي المنيو.
+ */
+const emailClass = 'block truncate text-right text-xs text-stone-400';
 
-const BUSINESSES_TITLE = 'أنشطتك التجارية';
-
-/** «نشاط واحد» · «نشاطين» · «3 أنشطة» · «11 نشاط» */
-function countBusinesses(n: number): string {
-  if (n === 1) return 'نشاط واحد';
-  if (n === 2) return 'نشاطين';
-  return n <= 10 ? `${n} أنشطة` : `${n} نشاط`;
-}
-
-/** الموقع RTL: «ادخل» سهم صغير بيشاور على الشمال، و«رجوع» سهم كامل → على اليمين */
-function Arrow({ direction }: { direction: 'in' | 'back' }) {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      className={`h-4 w-4 shrink-0 ${direction === 'in' ? 'text-stone-400' : 'text-stone-500 dark:text-stone-300'}`}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d={direction === 'in' ? 'm15 6-6 6 6 6' : 'M5 12h14m-6-6 6 6-6 6'} />
-    </svg>
-  );
-}
-
-/** «الأنشطة» كمجموعة — مربع زي لوجو النشاط، بس هادي عشان ميتلخبطش مع نشاط بعينه */
-function BusinessesIcon() {
-  return (
-    <span
-      aria-hidden="true"
-      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[28%] bg-stone-100 text-stone-600 dark:bg-white/10 dark:text-stone-300"
-    >
-      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M4.5 10.5V19h15v-8.5" />
-        <path d="M3 10.5 5 5h14l2 5.5Z" />
-        <path d="M10 19v-4.5h4V19" />
-      </svg>
-    </span>
-  );
-}
-
-/** واحد من الهويات اللي المستخدم يقدر يتعامل بيها — حسابه أو نشاط من أنشطته */
-function IdentityOption({
+/** حساب في ليستة «حساباتي» — حساب المستخدم نفسه أو نشاط من أنشطته */
+function AccountOption({
   checked,
   onSelect,
   avatar,
   title,
   subtitle,
+  subtitleIsEmail = false,
 }: {
   checked: boolean;
   onSelect: () => void;
   avatar: ReactNode;
   title: string;
-  subtitle: string;
+  subtitle?: string;
+  subtitleIsEmail?: boolean;
 }) {
   return (
     <button
       role="menuitemradio"
       aria-checked={checked}
       onClick={onSelect}
-      className={`${itemClass} ${checked ? currentClass : ''}`}
+      className={`${rowClass} ${checked ? 'bg-brand-50/70 dark:bg-brand-500/10' : ''}`}
     >
       {avatar}
       <span className="min-w-0 flex-1">
         <span className="block truncate font-medium">{title}</span>
-        <span className="block truncate text-xs text-stone-400">{subtitle}</span>
+        {subtitle &&
+          (subtitleIsEmail ? (
+            <span dir="ltr" className={emailClass}>
+              {subtitle}
+            </span>
+          ) : (
+            <span className="block truncate text-xs text-stone-400">{subtitle}</span>
+          ))}
       </span>
       {checked && (
         <span aria-hidden="true" className="text-brand-700 dark:text-brand-400">
@@ -95,41 +69,26 @@ function IdentityOption({
  * الأول أو الاختصار لو مفيش صورة). الشكل لوحده بيقول مين ده: الشخص دايرة
  * والنشاط مربع — من غير كلمة «شخصي»، بطلب العميل.
  *
- * المنيو اللي بتفتح منها فيها كل حاجة: التبديل بين حسابه وأنشطته، التحكم في
- * النشاط، الحساب، والوضع الليلي لحد ما «التفضيلات» تتعمل. للزائر: الدخول.
- *
- * الأنشطة مش مفرودة في المنيو — جوه قائمة فرعية «أنشطتك التجارية»، بطلب
- * العميل، عشان المنيو متطولش مع كل نشاط. القائمة الفرعية بتاخد مكان المنيو
- * نفسها بزرار رجوع (مش جنبها) عشان تفضل واسعة على الموبايل.
+ * المنيو اللي بتفتح منها، زي ما العميل وافق عليها (شبه ليستة الحسابات في جوجل):
+ *   ١) كارت المستخدم: صورته واسمه وتحته الإيميل — بيفتح «حسابي»
+ *   ٢) خانة «حساباتي» زي خانات الفورم (اسمها على الإطار)، فيها الحساب اللي
+ *      شغال بيه دلوقتي، وبتفتح ليستة: حسابه، وأنشطته، و«أنشئ نشاط تجاري»
+ *   ٣) التحكم في النشاط، والوضع الليلي لحد ما «التفضيلات» تتعمل، والخروج
+ * مفيش هنا أي كلمة جملة أو قطاعي: ده تصنيف داخلي، والمشتري بيشوف «السعر» وبس.
+ * للزائر: الدخول.
  */
 export function IdentityMenu() {
   const { user, businesses, businessesLoading, selectedBusiness, selectBusiness, signIn, signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { open, setOpen, wrapRef, close } = useDropdown();
-  const [view, setView] = useState<'main' | 'businesses'>('main');
-  const menuRef = useRef<HTMLDivElement>(null);
-  // التركيز بيتنقل لما المستخدم يدخل القائمة الفرعية أو يرجع منها بس — مش أول ما المنيو تفتح
-  const focusAfterSwitch = useRef(false);
-  const showBusinesses = view === 'businesses' && businesses.length > 0;
-
-  function switchView(next: 'main' | 'businesses') {
-    focusAfterSwitch.current = true;
-    setView(next);
-  }
-
-  useEffect(() => {
-    if (!focusAfterSwitch.current) return;
-    focusAfterSwitch.current = false;
-    const menu = menuRef.current;
-    const target =
-      view === 'businesses'
-        ? (menu?.querySelector<HTMLElement>('[role=menuitemradio][aria-checked=true]') ??
-          menu?.querySelector<HTMLElement>('[role=menuitemradio]'))
-        : menu?.querySelector<HTMLElement>('[aria-haspopup=menu]');
-    target?.focus();
-  }, [view]);
+  // ليستة «حساباتي» بتبدأ مقفولة كل ما المنيو تفتح
+  const [accountsOpen, setAccountsOpen] = useState(false);
+  const accountsButton = useRef<HTMLButtonElement>(null);
+  const accountsId = useId();
 
   const userName = user?.name ?? user?.email ?? 'حسابي';
+  // الإيميل تحت الاسم — إلا لو هو نفسه اللي ظاهر مكان الاسم
+  const userEmail = user?.name ? user.email : undefined;
   const userAvatar = (size: number) => (
     <Avatar kind="person" picture={user?.picture} fallback={personInitial(user?.name, user?.email)} size={size} />
   );
@@ -139,6 +98,11 @@ export function IdentityMenu() {
     ) : (
       userAvatar(size)
     );
+
+  function choose(accountId: string | null) {
+    selectBusiness(accountId);
+    close();
+  }
 
   // الوضع الليلي هنا مؤقتاً — العميل عنده موضوع «التفضيلات» لسه هيتكلم فيه
   const themeItem = (
@@ -154,7 +118,7 @@ export function IdentityMenu() {
     <div ref={wrapRef} className="relative">
       <button
         onClick={() => {
-          setView('main');
+          setAccountsOpen(false);
           setOpen((v) => !v);
         }}
         aria-expanded={open}
@@ -191,96 +155,118 @@ export function IdentityMenu() {
 
       {open && (
         <div
-          ref={menuRef}
           role="menu"
-          aria-label={showBusinesses ? BUSINESSES_TITLE : undefined}
           onKeyDown={(e) => {
-            // Escape جوه القائمة الفرعية بيرجع خطوة، مش بيقفل المنيو كلها
-            if (e.key === 'Escape' && showBusinesses) {
+            // Escape والليستة مفتوحة بيقفلها هي الأول، مش المنيو كلها
+            if (e.key === 'Escape' && accountsOpen) {
               e.stopPropagation();
-              switchView('main');
+              setAccountsOpen(false);
+              accountsButton.current?.focus();
             }
           }}
           className="absolute start-0 top-full z-40 mt-1.5 max-h-[80vh] w-72 overflow-y-auto rounded-xl border border-stone-200 bg-white shadow-card dark:border-white/10 dark:bg-surface-card"
         >
-          {user && showBusinesses ? (
+          {user ? (
             <>
-              <button
+              {/* ١) إنت: صورتك واسمك وتحته الإيميل */}
+              <Link
                 role="menuitem"
-                onClick={() => switchView('main')}
-                aria-label={`رجوع — ${BUSINESSES_TITLE}`}
-                className="flex w-full items-center gap-2 px-4 py-3 text-start text-sm font-semibold transition hover:bg-stone-50 dark:hover:bg-white/5"
+                to="/account"
+                onClick={close}
+                className="flex w-full items-center gap-3 px-4 py-3 text-start transition hover:bg-stone-50 dark:hover:bg-white/5"
               >
-                <Arrow direction="back" />
-                {BUSINESSES_TITLE}
-              </button>
-              <div role="group" aria-label={BUSINESSES_TITLE} className={sectionClass}>
-                {businesses.map((b) => (
-                  <IdentityOption
-                    key={b.accountId}
-                    checked={selectedBusiness?.accountId === b.accountId}
-                    onSelect={() => {
-                      selectBusiness(b.accountId);
-                      close();
-                    }}
-                    avatar={<Avatar kind="business" picture={b.picture} fallback={b.abbreviation} size={28} />}
-                    title={b.name}
-                    subtitle={b.abbreviation}
-                  />
-                ))}
-              </div>
-            </>
-          ) : user ? (
-            <>
-              {/* أنا مين دلوقتي، وده معناه أسعار إيه */}
-              <div className="flex items-center gap-3 px-4 py-3">
-                {current(40)}
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5 text-sm font-semibold">
-                    <span className="truncate">{selectedBusiness ? selectedBusiness.name : userName}</span>
+                {userAvatar(40)}
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-1.5">
+                    <span className="truncate text-base font-semibold">{userName}</span>
                     {user.demo && <span className="shrink-0 text-xs font-medium text-amber-600 dark:text-amber-400">(تجريبي)</span>}
-                  </div>
-                  <div className="truncate text-xs text-stone-400">
-                    {selectedBusiness ? 'نشاط تجاري · أسعار الجملة' : 'حسابك الشخصي · أسعار القطاعي'}
-                  </div>
+                  </span>
+                  {userEmail && (
+                    <span dir="ltr" className={emailClass}>
+                      {userEmail}
+                    </span>
+                  )}
+                </span>
+              </Link>
+
+              {/* ٢) «حساباتي»: الحساب اللي شغال بيه دلوقتي، وبتفتح ليستة حساباته */}
+              <div className="border-t border-stone-100 px-4 pb-3 pt-4 dark:border-white/5">
+                <div className="relative">
+                  <button
+                    ref={accountsButton}
+                    role="menuitem"
+                    aria-expanded={accountsOpen}
+                    aria-controls={accountsId}
+                    onClick={() => setAccountsOpen((v) => !v)}
+                    className={`flex w-full items-center gap-2.5 rounded-xl border px-3 py-2 text-start transition ${
+                      accountsOpen ? 'border-brand-500 ring-1 ring-inset ring-brand-500' : 'border-stone-300 dark:border-white/20'
+                    }`}
+                  >
+                    {current(30)}
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                      {selectedBusiness ? selectedBusiness.name : userName}
+                    </span>
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      className={`h-4 w-4 shrink-0 text-stone-500 transition-transform dark:text-stone-400 ${accountsOpen ? 'rotate-180' : ''}`}
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
+                  </button>
+                  <Notch active={accountsOpen}>حساباتي</Notch>
                 </div>
+
+                {accountsOpen && (
+                  <div
+                    id={accountsId}
+                    role="group"
+                    aria-label="حساباتي"
+                    className="mt-1.5 divide-y divide-stone-100 overflow-hidden rounded-xl border border-stone-200 dark:divide-white/5 dark:border-white/10"
+                  >
+                    <AccountOption
+                      checked={!selectedBusiness}
+                      onSelect={() => choose(null)}
+                      avatar={userAvatar(32)}
+                      title={userName}
+                      subtitle={userEmail}
+                      subtitleIsEmail
+                    />
+                    {businesses.map((b) => (
+                      <AccountOption
+                        key={b.accountId}
+                        checked={selectedBusiness?.accountId === b.accountId}
+                        onSelect={() => choose(b.accountId)}
+                        avatar={<Avatar kind="business" picture={b.picture} fallback={b.abbreviation} size={32} />}
+                        title={b.name}
+                        subtitle={b.abbreviation}
+                      />
+                    ))}
+                    {businessesLoading && businesses.length === 0 && (
+                      <div className="px-3 py-2.5 text-xs text-stone-400">بنجيب أنشطتك…</div>
+                    )}
+                    {/* زي «إضافة حساب آخر» في ليستة حسابات جوجل */}
+                    <Link role="menuitem" to="/business/new" onClick={close} className={rowClass}>
+                      <span
+                        aria-hidden="true"
+                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-300"
+                      >
+                        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                          <path d="M12 5v14M5 12h14" />
+                        </svg>
+                      </span>
+                      <span className="font-medium">أنشئ نشاط تجاري</span>
+                    </Link>
+                  </div>
+                )}
               </div>
 
-              {/* التبديل — بس لو فيه أنشطة يتبدّل بينها وبين حسابه */}
-              {businesses.length > 0 ? (
-                <div role="group" aria-label="اتعامل كـ" className={sectionClass}>
-                  <div className={headingClass}>اتعامل كـ</div>
-                  <IdentityOption
-                    checked={!selectedBusiness}
-                    onSelect={() => {
-                      selectBusiness(null);
-                      close();
-                    }}
-                    avatar={userAvatar(28)}
-                    title={userName}
-                    subtitle="حسابك الشخصي"
-                  />
-                  {/* ملوّن لو المستخدم بيتعامل دلوقتي بنشاط منهم */}
-                  <button
-                    role="menuitem"
-                    aria-haspopup="menu"
-                    aria-expanded={false}
-                    onClick={() => switchView('businesses')}
-                    className={`${itemClass} ${selectedBusiness ? currentClass : ''}`}
-                  >
-                    <BusinessesIcon />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-medium">{BUSINESSES_TITLE}</span>
-                      <span className="block truncate text-xs text-stone-400">{countBusinesses(businesses.length)}</span>
-                    </span>
-                    <Arrow direction="in" />
-                  </button>
-                </div>
-              ) : (
-                businessesLoading && <div className="px-4 pb-2.5 text-xs text-stone-400">بنجيب أنشطتك…</div>
-              )}
-
-              {/* تحكم في النشاط اللي بيتعامل بيه — الأصناف والعناوين */}
+              {/* ٣) تحكم في النشاط اللي بيتعامل بيه — الأصناف والعناوين */}
               {selectedBusiness && (
                 <div className={sectionClass}>
                   <div className={headingClass}>تحكم في النشاط</div>
@@ -296,15 +282,7 @@ export function IdentityMenu() {
                 </div>
               )}
 
-              <div className={sectionClass}>
-                <Link role="menuitem" to="/business/new" onClick={close} className={itemClass}>
-                  أنشئ نشاط تجاري
-                </Link>
-                <Link role="menuitem" to="/account" onClick={close} className={itemClass}>
-                  حسابي
-                </Link>
-                {themeItem}
-              </div>
+              <div className={sectionClass}>{themeItem}</div>
 
               <div className={sectionClass}>
                 <button

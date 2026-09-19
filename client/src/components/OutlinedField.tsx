@@ -36,13 +36,23 @@ export const compactFieldClass = `${fieldBase} px-2 py-2.5 text-sm`;
  * الفتحة في الإطار مش فتحة حقيقية — خلفية الاسم هي نفس خلفية الكارت اللي
  * الخانة قاعدة عليه، فبتغطّي الخط تحتها. يعني لو خلفية الكارت اتغيّرت لازم
  * تتغيّر هنا كمان.
+ *
+ * active: لون التركيز من غير focus — لخانة مفتوحة مش input (زي «حساباتي» في المنيو).
  */
-export function Notch({ children, compact = false }: { children: ReactNode; compact?: boolean }) {
+export function Notch({
+  children,
+  compact = false,
+  active = false,
+}: {
+  children: ReactNode;
+  compact?: boolean;
+  active?: boolean;
+}) {
   return (
     <span
-      className={`pointer-events-none absolute -top-2 whitespace-nowrap bg-white font-medium text-stone-500 transition-colors peer-focus:text-brand-600 peer-disabled:text-stone-400 dark:bg-surface-card dark:text-stone-400 dark:peer-focus:text-brand-400 ${
-        compact ? 'start-1.5 px-0.5 text-[11px]' : 'start-3 px-1 text-xs'
-      }`}
+      className={`pointer-events-none absolute -top-2 whitespace-nowrap bg-white font-medium transition-colors peer-focus:text-brand-600 peer-disabled:text-stone-400 dark:bg-surface-card dark:peer-focus:text-brand-400 ${
+        active ? 'text-brand-600 dark:text-brand-400' : 'text-stone-500 dark:text-stone-400'
+      } ${compact ? 'start-1.5 px-0.5 text-[11px]' : 'start-3 px-1 text-xs'}`}
     >
       {children}
     </span>

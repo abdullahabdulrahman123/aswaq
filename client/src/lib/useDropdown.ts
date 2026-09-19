@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 
 /**
  * فتح وقفل قايمة منسدلة من الناڤبار: بتقفل لو المستخدم داس برّه أو داس Escape.
- * القايمة ممكن توقف Escape قبل ما يوصل هنا (القائمة الفرعية في IdentityMenu
- * بترجع خطوة بيه بدل ما تقفل).
+ * القايمة ممكن توقف Escape قبل ما يوصل هنا (ليستة «حساباتي» في IdentityMenu
+ * بتتقفل بيه هي الأول بدل المنيو كلها).
  */
 export function useDropdown() {
   const [open, setOpen] = useState(false);
