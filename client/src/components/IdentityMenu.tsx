@@ -1,10 +1,14 @@
 import { useId, useRef, useState, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { createPortal } from 'react-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { pathAfterSwitch } from '../lib/businessRoutes';
+import { hasUnsavedWork } from '../lib/unsavedWork';
 import { useDropdown } from '../lib/useDropdown';
 import { Avatar, personInitial } from './Avatar';
 import { Notch } from './OutlinedField';
+import { UnsavedSwitchDialog } from './UnsavedSwitchDialog';
 
 const itemClass =
   'flex w-full items-center gap-3 px-4 py-2.5 text-start text-sm transition hover:bg-stone-50 dark:hover:bg-white/5';
@@ -76,6 +80,9 @@ function AccountOption({
  *   ٣) التحكم في النشاط، والوضع الليلي لحد ما «التفضيلات» تتعمل، والخروج
  * مفيش هنا أي كلمة جملة أو قطاعي: ده تصنيف داخلي، والمشتري بيشوف «السعر» وبس.
  * للزائر: الدخول.
+ *
+ * تغيير الحساب وإنت في صفحة نشاط بيودّيك لنفس الصفحة للحساب الجديد
+ * (lib/businessRoutes)، وبيسأل الأول لو فيه صنف لسه متحفظش.
  */
 export function IdentityMenu() {
   const { user, businesses, businessesLoading, selectedBusiness, selectBusiness, signIn, signOut } = useAuth();
@@ -85,6 +92,10 @@ export function IdentityMenu() {
   const [accountsOpen, setAccountsOpen] = useState(false);
   const accountsButton = useRef<HTMLButtonElement>(null);
   const accountsId = useId();
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  /** تغيير حساب مستني رد المستخدم، لأن فيه صنف لسه متحفظش */
+  const [pendingSwitch, setPendingSwitch] = useState<{ accountId: string | null; name: string } | null>(null);
 
   const userName = user?.name ?? user?.email ?? 'حسابي';
   // الإيميل تحت الاسم — إلا لو هو نفسه اللي ظاهر مكان الاسم
@@ -99,9 +110,21 @@ export function IdentityMenu() {
       userAvatar(size)
     );
 
-  function choose(accountId: string | null) {
+  function switchTo(accountId: string | null) {
     selectBusiness(accountId);
+    const next = pathAfterSwitch(pathname, accountId);
+    // replace: زرار الرجوع ميرجّعش لصفحة النشاط القديم
+    if (next) navigate(next, { replace: true });
+  }
+
+  function choose(accountId: string | null, name: string) {
     close();
+    if (accountId === (selectedBusiness?.accountId ?? null)) return;
+    if (pathAfterSwitch(pathname, accountId) && hasUnsavedWork()) {
+      setPendingSwitch({ accountId, name });
+      return;
+    }
+    switchTo(accountId);
   }
 
   // الوضع الليلي هنا مؤقتاً — العميل عنده موضوع «التفضيلات» لسه هيتكلم فيه
@@ -231,7 +254,7 @@ export function IdentityMenu() {
                   >
                     <AccountOption
                       checked={!selectedBusiness}
-                      onSelect={() => choose(null)}
+                      onSelect={() => choose(null, userName)}
                       avatar={userAvatar(32)}
                       title={userName}
                       subtitle={userEmail}
@@ -241,7 +264,7 @@ export function IdentityMenu() {
                       <AccountOption
                         key={b.accountId}
                         checked={selectedBusiness?.accountId === b.accountId}
-                        onSelect={() => choose(b.accountId)}
+                        onSelect={() => choose(b.accountId, b.name)}
                         avatar={<Avatar kind="business" picture={b.picture} fallback={b.abbreviation} size={32} />}
                         title={b.name}
                         subtitle={b.abbreviation}
@@ -326,6 +349,20 @@ export function IdentityMenu() {
           )}
         </div>
       )}
+
+      {/* على body: الهيدر فيه backdrop-blur، وده بيحبس أي fixed جواه في مساحة الهيدر */}
+      {pendingSwitch &&
+        createPortal(
+          <UnsavedSwitchDialog
+            accountName={pendingSwitch.name}
+            onCancel={() => setPendingSwitch(null)}
+            onConfirm={() => {
+              setPendingSwitch(null);
+              switchTo(pendingSwitch.accountId);
+            }}
+          />,
+          document.body,
+        )}
     </div>
   );
 }

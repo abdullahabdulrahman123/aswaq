@@ -7,6 +7,7 @@ import { ApiError, SessionExpiredError } from '../lib/waslaApi';
 import { aswaqApiConfigured, fetchItem, postItem, putItem, type Item, type ItemUnit } from '../lib/aswaqApi';
 import { uploadImage, uploadsConfigured, UploadError } from '../lib/cloudinary';
 import { PRICE_FIELDS, PRICE_GROUPS, PRICE_LABELS, type PriceField } from '../lib/itemUnits';
+import { useUnsavedWork } from '../lib/unsavedWork';
 
 /**
  * إضافة صنف أو تعديله — نفس الفورم، والفرق إن فيه itemId في الرابط ولا لأ.
@@ -46,6 +47,9 @@ const emptyUnit = (unitContent: string): UnitDraft => ({
   onLWP: '',
   onLRP: '',
 });
+
+/** الفورم كله في نص واحد — عشان نعرف اتغيّر عن اللي اتفتح بيه ولا لأ */
+const formSnapshot = (name: string, picture: string, units: UnitDraft[]) => JSON.stringify([name, picture, units]);
 
 /** جنيه (نص) → قرش. فاضي = null · مش رقم = undefined */
 function toPiastres(value: string): number | null | undefined {
@@ -101,6 +105,11 @@ export function ItemFormPage() {
   const [saved, setSaved] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
+  /** الفورم زي ما اتفتح: فاضي، أو الصنف زي ما جه من السيرفر */
+  const [baseline, setBaseline] = useState(() => formSnapshot('', '', [emptyUnit('1')]));
+
+  // أي فرق عن اللي اتفتح بيه = صنف لسه متحفظش، وتغيير الحساب من المنيو بيسأل قبل ما يضيّعه
+  useUnsavedWork(formSnapshot(name, picture, units) !== baseline);
 
   const business = businesses.find((b) => b.accountId === accountId);
 
@@ -113,10 +122,12 @@ export function ItemFormPage() {
     withToken((token) => fetchItem(token, accountId, itemId))
       .then((item) => {
         if (cancelled) return;
+        const drafts = item.units.map(toDraft);
         setSource(item);
         setName(item.name);
         setPicture(item.picture ?? '');
-        setUnits(item.units.map(toDraft));
+        setUnits(drafts);
+        setBaseline(formSnapshot(item.name, item.picture ?? '', drafts));
       })
       .catch((err: unknown) => {
         if (cancelled || err instanceof SessionExpiredError) return;
