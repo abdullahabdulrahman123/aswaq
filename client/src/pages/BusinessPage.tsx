@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { useAuth, type Premises } from '../context/AuthContext';
+import { ContactsField } from '../components/ContactsField';
 import { EMPTY_PREMISES, PremisesDialog } from '../components/PremisesDialog';
 import { PremisesCard } from '../components/PremisesCard';
 import { PicturePicker } from '../components/PicturePicker';
@@ -8,7 +9,7 @@ import { SessionExpiredNotice } from '../components/SessionExpiredNotice';
 
 /**
  * صفحة النشاط التجاري — «بروفايل النشاط»، بطلب العميل: اسمه واختصاره
- * ولوجوه، وتحتهم ليستة مقراته.
+ * ولوجوه، وأرقامه العامة، وتحتهم ليستة مقراته (وأرقام كل مقر جواه).
  *
  * التسجيل بياخد اسم واختصار وبس، والمقرات بتتضاف من هنا — نشاط ممكن يكون
  * له فرع ومخزن ومتجر، وممكن يفضل من غير مقرات لحد ما صاحبه يجهّز مكانه.
@@ -24,6 +25,9 @@ export function BusinessPage() {
     addPremises,
     updatePremises,
     removePremises,
+    addBusinessContact,
+    updateBusinessContact,
+    removeBusinessContact,
     setBusinessPicture,
     signIn,
   } = useAuth();
@@ -131,7 +135,29 @@ export function BusinessPage() {
         <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">نشاط تجاري على أسواق · {business.abbreviation}</p>
       </PicturePicker>
 
+      {/* نفس أرقام التسجيل — هنا بتتضاف وتتعدل بعده، وبتتحفظ في وصلة على طول */}
       <section className="mt-7 rounded-2xl border border-stone-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
+        <h2 className="font-display text-lg font-bold">
+          جهات الاتصال
+          {business.contacts.length > 0 && (
+            <span className="ms-2 rounded-md bg-stone-100 px-1.5 py-0.5 text-xs tabular-nums font-normal text-stone-500 dark:bg-white/10 dark:text-stone-400">
+              {business.contacts.length}
+            </span>
+          )}
+        </h2>
+        <p className="mt-1 text-xs text-stone-400">أرقام النشاط العامة. أرقام كل فرع بتتضاف من المقر بتاعه.</p>
+        <div className="mt-4">
+          <ContactsField
+            contacts={business.contacts}
+            ownerName={business.name}
+            onAdd={(input) => addBusinessContact(business.accountId, input)}
+            onUpdate={(contactId, input) => updateBusinessContact(business.accountId, contactId, input)}
+            onRemove={(contactId) => removeBusinessContact(business.accountId, contactId)}
+          />
+        </div>
+      </section>
+
+      <section className="mt-5 rounded-2xl border border-stone-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-display text-lg font-bold">
             المقرات

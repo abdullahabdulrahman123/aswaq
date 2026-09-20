@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Premises } from '../context/AuthContext';
 import { oneLine } from '../lib/address';
+import { draftId } from '../lib/contacts';
 import { AddressDialog, EMPTY_ADDRESS } from './AddressDialog';
+import { ContactsField } from './ContactsField';
 import { MapPreview } from './MapPreview';
 import { Notch, fieldClass } from './OutlinedField';
 import { PinIcon } from './PinIcon';
 
 /** المسودة اللي بتبدأ بيها أي إضافة — النوع من غير اختيار عشان يختاره بنفسه، والعنوان لسه متحددش */
-export const EMPTY_PREMISES: Premises = { id: '', name: '', isStore: false, isWarehouse: false, address: null };
+export const EMPTY_PREMISES: Premises = { id: '', name: '', isStore: false, isWarehouse: false, address: null, contacts: [] };
 
 /** بترتيب كلام العميل: «مخزن أو متجر أو الاتنين» */
 const KINDS = [
@@ -31,10 +33,11 @@ interface Props {
 }
 
 /**
- * فورم المقر — صفحة واحدة، بطلب العميل: اسمه، ونوعه، وعنوانه. النوع هنا مش في
- * العنوان عشان بيتغيّر مع الوقت (مخزن يبقى مخزن ومتجر). العنوان خاصية من
- * خواص المقر وإجباري: «حدد العنوان» بيفتح الخريطة وتفاصيله، و«تم» بيرجّعه هنا،
- * والمقر وعنوانه بيتحفظوا مع بعض.
+ * فورم المقر — صفحة واحدة، بطلب العميل: اسمه، ونوعه، وعنوانه، وأرقامه. النوع
+ * هنا مش في العنوان عشان بيتغيّر مع الوقت (مخزن يبقى مخزن ومتجر). العنوان
+ * خاصية من خواص المقر وإجباري: «حدد العنوان» بيفتح الخريطة وتفاصيله، و«تم»
+ * بيرجّعه هنا. الأرقام تحت العنوان واختيارية («إضافة جهة اتصال»)، والمقر
+ * وعنوانه وأرقامه بيتحفظوا مع بعض.
  *
  * نافذة «حدد العنوان» جنب النافذة دي مش جواها: الاتنين <dialog>، والتانية
  * بتطلع فوق الأولى لوحدها، وEsc بيقفل اللي فوق بس.
@@ -206,6 +209,19 @@ export function PremisesDialog({ open, value, mode, onSave, onDelete, onClose }:
                     </span>
                   </>
                 )}
+              </div>
+
+              {/* مع العنوان بطلب العميل: رقم المقر في وصلة شايل المقر وعنوانه */}
+              <div role="group" aria-label="جهات الاتصال">
+                <span className={legendClass}>جهات الاتصال</span>
+                <ContactsField
+                  contacts={draft.contacts}
+                  ownerName={draft.name.trim()}
+                  hint="أرقام المقر ده — اختياري. بتتحفظ مع المقر."
+                  onAdd={(input) => setField('contacts', [...draft.contacts, { id: draftId(), ...input }])}
+                  onUpdate={(id, input) => setField('contacts', draft.contacts.map((c) => (c.id === id ? { id, ...input } : c)))}
+                  onRemove={(id) => setField('contacts', draft.contacts.filter((c) => c.id !== id))}
+                />
               </div>
             </div>
 

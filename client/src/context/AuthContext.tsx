@@ -2,17 +2,24 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { redirectToWasla, waslaConfigured, type WaslaSession, type WaslaUser } from '../lib/waslaAuth';
 import {
   ApiError,
+  deleteBusinessContact,
+  deleteMyContact,
   deletePremises,
   fetchBusinesses,
   fetchProfile,
   patchBusinessPicture,
   patchProfilePicture,
   postBusiness,
+  postBusinessContact,
+  postMyContact,
   postPremises,
+  putBusinessContact,
+  putMyContact,
   putPremises,
   SessionExpiredError,
   type WaslaProfile,
 } from '../lib/waslaApi';
+import type { Contact, ContactInput } from '../lib/contacts';
 import { accessToken, endSession, saveSession, SESSION_KEY, sessionUsable } from '../lib/waslaSession';
 import type { AccountType } from '../lib/pricing';
 
@@ -20,8 +27,9 @@ import type { AccountType } from '../lib/pricing';
  * الزبون يتصفح كزائر عادي، وتسجيل الدخول مطلوب عند إتمام الطلب فقط.
  * التسجيل كله عبر وصلة — أسواق مش بيخزّن كلمات سر.
  *
- * النشاط التجاري نفسه (اسمه واختصاره وصورته ومقراته) متسجّل في وصلة بطلب
- * العميل: البيانات الأساسية في مكان واحد لكل التطبيقات.
+ * النشاط التجاري نفسه (اسمه واختصاره وصورته وأرقامه ومقراته) متسجّل في وصلة
+ * بطلب العميل: البيانات الأساسية في مكان واحد لكل التطبيقات. وأرقام المستخدم
+ * نفسه كمان.
  *
  * صاحب الأنشطة بيختار يتعامل بإيه من المنيو اللي في صورته فوق: بحسابه الشخصي
  * (أسعار القطاعي) أو بنشاط من أنشطته (أسعار الجملة) — selectedBusiness.
@@ -63,6 +71,8 @@ export interface Premises {
   isWarehouse: boolean;
   /** null = لسه متحددش (مقر جديد في الفورم) — وصلة مبتحفظش مقر من غير عنوان */
   address: BusinessAddress | null;
+  /** أرقام الفرع ده — بتتحفظ مع المقر، وفي وصلة كل رقم شايل عنوان المقر كمان */
+  contacts: Contact[];
 }
 
 /**
@@ -80,6 +90,8 @@ export interface Business {
   abbreviation: string;
   /** لوجو النشاط (رابط Cloudinary). null = لسه مترفعش */
   picture: string | null;
+  /** أرقام النشاط العامة (الكول سنتر مثلاً) — أرقام كل مقر جوه المقر نفسه */
+  contacts: Contact[];
   /**
    * النشاط ممكن يكون له أكتر من مقر (فرع، مخزن، متجر)، وممكن يتسجّل من
    * غير مقرات خالص وتتضاف بعدين من صفحة النشاط.
@@ -114,10 +126,21 @@ interface AuthContextValue {
   withToken: <T>(call: (token: string) => Promise<T>) => Promise<T>;
   /** الجلسة خلصت ومتجدّدتش: المعروض لسه صحيح، بس الحفظ محتاج تسجيل دخول تاني */
   sessionExpired: boolean;
-  createBusiness: (input: Pick<Business, 'name' | 'abbreviation'>) => Promise<Business>;
+  createBusiness: (input: Pick<Business, 'name' | 'abbreviation'> & { contacts: ContactInput[] }) => Promise<Business>;
   addPremises: (accountId: string, premises: Omit<Premises, 'id'>) => Promise<Premises>;
   updatePremises: (accountId: string, premises: Premises) => Promise<void>;
   removePremises: (accountId: string, premisesId: string) => Promise<void>;
+  /** أرقام النشاط العامة من صفحته — بتتحفظ في وصلة على طول، وبترمي لو الحفظ فشل */
+  addBusinessContact: (accountId: string, input: ContactInput) => Promise<void>;
+  updateBusinessContact: (accountId: string, contactId: string, input: ContactInput) => Promise<void>;
+  removeBusinessContact: (accountId: string, contactId: string) => Promise<void>;
+  /** أرقام المستخدم نفسه (من «حسابي»). null = لسه جاية من وصلة */
+  userContacts: Contact[] | null;
+  /** جلب الأرقام فشل */
+  userContactsError: string;
+  addUserContact: (input: ContactInput) => Promise<void>;
+  updateUserContact: (contactId: string, input: ContactInput) => Promise<void>;
+  removeUserContact: (contactId: string) => Promise<void>;
   /**
    * الأسعار بتتبني عليه: الزائر والحساب الشخصي قطاعي، واللي بيتعامل بنشاط
    * بيشوف أسعار الكميات.
@@ -176,10 +199,15 @@ function save(key: string, value: unknown) {
 
 /**
  * الأنشطة المحفوظة على الجهاز. النسخة اللي اتحفظت قبل المقرات مفيهاش premises
- * (كان فيها addresses) — بتتعرض من غير مقرات لحد ما وصلة ترد، بدل ما الصفحة تقع.
+ * (كان فيها addresses)، واللي قبل جهات الاتصال مفيهاش contacts — بتتعرض
+ * بليستات فاضية لحد ما وصلة ترد، بدل ما الصفحة تقع.
  */
 function loadBusinesses(sub: string): Business[] {
-  return (load<Business[]>(cacheKey(sub)) ?? []).map((b) => ({ ...b, premises: b.premises ?? [] }));
+  return (load<Business[]>(cacheKey(sub)) ?? []).map((b) => ({
+    ...b,
+    contacts: b.contacts ?? [],
+    premises: (b.premises ?? []).map((p) => ({ ...p, contacts: p.contacts ?? [] })),
+  }));
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -194,6 +222,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
   const [businessesLoading, setBusinessesLoading] = useState(false);
   const [businessesError, setBusinessesError] = useState('');
+  const [userContacts, setUserContacts] = useState<Contact[] | null>(null);
+  const [userContactsError, setUserContactsError] = useState('');
   const [sessionExpired, setSessionExpired] = useState(false);
 
   // التحميل مربوط بالمستخدم نفسه مش بالكائن: تغيير صورته مبيعيدش تحميل أنشطته
@@ -311,15 +341,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /*
    * الاسم والصورة ممكن يتغيّروا بعد الدخول (صورة اترفعت من جهاز تاني مثلاً)،
    * فبنسأل وصلة عنهم مع كل فتحة. لو مردتش، اللي من وقت الدخول يفضل معروض.
+   * أرقام المستخدم جاية في نفس الرد — ومش متخزّنة على الجهاز، فلحد ما ترد
+   * «حسابي» بيقول إنها جاية.
    */
+  useEffect(() => {
+    // أرقام مستخدم تاني متفضلش معروضة، بس انتهاء الجلسة مبيمسحهاش
+    setUserContacts(null);
+    setUserContactsError('');
+  }, [sub]);
+
   useEffect(() => {
     if (!sub || demo || sessionExpired) return;
     let cancelled = false;
     withToken(fetchProfile)
       .then((profile) => {
-        if (!cancelled) setUser((prev) => mergeProfile(prev, profile));
+        if (cancelled) return;
+        setUser((prev) => mergeProfile(prev, profile));
+        setUserContacts(profile.contacts ?? []);
       })
-      .catch(() => {});
+      .catch((err: unknown) => {
+        if (cancelled || err instanceof SessionExpiredError) return;
+        setUserContactsError(err instanceof Error ? err.message : 'مقدرناش نجيب أرقامك من وصلة.');
+      });
     return () => {
       cancelled = true;
     };
@@ -363,7 +406,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const createBusiness = useCallback(
-    async (input: Pick<Business, 'name' | 'abbreviation'>) => {
+    async (input: Pick<Business, 'name' | 'abbreviation'> & { contacts: ContactInput[] }) => {
       const created = await withToken((token) => postBusiness(token, input));
       commit((prev) => [...prev, created]);
       // اللي لسه عامل نشاط غالباً عايز يشتغل بيه
@@ -405,6 +448,63 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       mapPremises(accountId, (list) => list.filter((p) => p.id !== premisesId));
     },
     [withToken, mapPremises],
+  );
+
+  /** تعديل أرقام نشاط واحد العامة من غير ما نلمس الباقي */
+  const mapBusinessContacts = useCallback(
+    (accountId: string, update: (list: Contact[]) => Contact[]) =>
+      commit((prev) =>
+        prev.map((b) => (b.accountId === accountId ? { ...b, contacts: update(b.contacts) } : b)),
+      ),
+    [commit],
+  );
+
+  const addBusinessContact = useCallback(
+    async (accountId: string, input: ContactInput) => {
+      const created = await withToken((token) => postBusinessContact(token, accountId, input));
+      mapBusinessContacts(accountId, (list) => [...list, created]);
+    },
+    [withToken, mapBusinessContacts],
+  );
+
+  const updateBusinessContact = useCallback(
+    async (accountId: string, contactId: string, input: ContactInput) => {
+      const saved = await withToken((token) => putBusinessContact(token, accountId, contactId, input));
+      mapBusinessContacts(accountId, (list) => list.map((c) => (c.id === saved.id ? saved : c)));
+    },
+    [withToken, mapBusinessContacts],
+  );
+
+  const removeBusinessContact = useCallback(
+    async (accountId: string, contactId: string) => {
+      await withToken((token) => deleteBusinessContact(token, accountId, contactId));
+      mapBusinessContacts(accountId, (list) => list.filter((c) => c.id !== contactId));
+    },
+    [withToken, mapBusinessContacts],
+  );
+
+  const addUserContact = useCallback(
+    async (input: ContactInput) => {
+      const created = await withToken((token) => postMyContact(token, input));
+      setUserContacts((list) => [...(list ?? []), created]);
+    },
+    [withToken],
+  );
+
+  const updateUserContact = useCallback(
+    async (contactId: string, input: ContactInput) => {
+      const saved = await withToken((token) => putMyContact(token, contactId, input));
+      setUserContacts((list) => (list ?? []).map((c) => (c.id === saved.id ? saved : c)));
+    },
+    [withToken],
+  );
+
+  const removeUserContact = useCallback(
+    async (contactId: string) => {
+      await withToken((token) => deleteMyContact(token, contactId));
+      setUserContacts((list) => (list ?? []).filter((c) => c.id !== contactId));
+    },
+    [withToken],
   );
 
   const signIn = useCallback(async (intent: AuthIntent) => {
@@ -462,6 +562,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         addPremises,
         updatePremises,
         removePremises,
+        addBusinessContact,
+        updateBusinessContact,
+        removeBusinessContact,
+        userContacts,
+        userContactsError,
+        addUserContact,
+        updateUserContact,
+        removeUserContact,
         accountType: selectedBusiness ? 'COMPANY' : 'INDIVIDUAL',
         connected: waslaConfigured,
         signIn,

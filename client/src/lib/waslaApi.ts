@@ -1,8 +1,9 @@
 import type { Business, Premises } from '../context/AuthContext';
+import { contactInputs, type Contact, type ContactInput } from './contacts';
 import { waslaApiOrigin } from './waslaAuth';
 
 /**
- * بيانات النشاط التجاري الأساسية (الاسم، الاختصار، المقرات وعناوينها) عايشة في وصلة.
+ * بيانات النشاط التجاري الأساسية (الاسم، الاختصار، الأرقام، المقرات وعناوينها) عايشة في وصلة.
  *
  * كل طلب بيتبعت بتوكن الوصول اللي أسواق خده وقت تسجيل الدخول، ووصلة
  * بتتحقق منه من ناحيتها — مفيش حاجة بتتحقق هنا في المتصفح.
@@ -59,17 +60,25 @@ async function request<T>(path: string, token: string, init: RequestInit = {}): 
 const businessPath = (accountId: string) => `/api/businesses/${encodeURIComponent(accountId)}`;
 
 /**
- * وصلة قبل المقرات كانت بترجّع addresses بدل premises. لحد ما النسختين يتنشروا
- * الاتنين، الصفحات تشوف ليستة مقرات فاضية بدل ما تقع.
+ * وصلة القديمة: قبل المقرات كانت بترجّع addresses بدل premises، وقبل جهات
+ * الاتصال مكانش فيه contacts. لحد ما النسختين يتنشروا الاتنين، الصفحات تشوف
+ * ليستات فاضية بدل ما تقع.
  */
-const withPremises = (business: Business): Business => ({ ...business, premises: business.premises ?? [] });
+const normalizePremises = (premises: Premises): Premises => ({ ...premises, contacts: premises.contacts ?? [] });
+const normalizeBusiness = (business: Business): Business => ({
+  ...business,
+  contacts: business.contacts ?? [],
+  premises: (business.premises ?? []).map(normalizePremises),
+});
 
-/** المستخدم زي ما وصلة بتعرضه — نفس أسماء الـclaims اللي في id_token */
+/** المستخدم زي ما وصلة بتعرضه — نفس أسماء الـclaims اللي في id_token، وأرقامه */
 export interface WaslaProfile {
   sub: string;
   name: string;
   email: string;
   picture: string | null;
+  /** مش موجودة في وصلة اللي قبل جهات الاتصال */
+  contacts?: Contact[];
 }
 
 /** الاسم والصورة ممكن يتغيّروا من جهاز تاني بعد الدخول */
@@ -93,40 +102,43 @@ export async function patchBusinessPicture(token: string, accountId: string, pic
     method: 'PATCH',
     body: JSON.stringify({ picture }),
   });
-  return withPremises(business);
+  return normalizeBusiness(business);
 }
 
 export async function fetchBusinesses(token: string): Promise<Business[]> {
   const { businesses } = await request<{ businesses: Business[] }>('/api/businesses', token);
-  return businesses.map(withPremises);
+  return businesses.map(normalizeBusiness);
 }
 
-/** 409 = الاختصار مستخدم في نشاط تاني عند نفس المستخدم */
+/** 409 = الاختصار مستخدم في نشاط تاني عند نفس المستخدم. الأرقام اختيارية: أرقام النشاط العامة */
 export async function postBusiness(
   token: string,
-  input: Pick<Business, 'name' | 'abbreviation'>,
+  input: Pick<Business, 'name' | 'abbreviation'> & { contacts: ContactInput[] },
 ): Promise<Business> {
   const { business } = await request<{ business: Business }>('/api/businesses', token, {
     method: 'POST',
     body: JSON.stringify(input),
   });
-  return withPremises(business);
+  return normalizeBusiness(business);
 }
 
-/** المقر زي ما وصلة بتستلمه: اسمه ونوعه وعنوانه، من غير الـids */
-function premisesBody({ name, isStore, isWarehouse, address }: Omit<Premises, 'id'>): string {
+/**
+ * المقر زي ما وصلة بتستلمه: اسمه ونوعه وعنوانه وأرقامه، من غير الـids. الأرقام
+ * ليستة كاملة بتحل محل القديمة.
+ */
+function premisesBody({ name, isStore, isWarehouse, address, contacts }: Omit<Premises, 'id'>): string {
   if (!address) throw new Error('المقر محتاج عنوان');
   const { id: _addressId, ...fields } = address;
-  return JSON.stringify({ name, isStore, isWarehouse, address: fields });
+  return JSON.stringify({ name, isStore, isWarehouse, address: fields, contacts: contactInputs(contacts) });
 }
 
-/** المقر وعنوانه بيتحفظوا مع بعض — مفيش مقر من غير عنوان */
+/** المقر وعنوانه وأرقامه بيتحفظوا مع بعض — مفيش مقر من غير عنوان */
 export async function postPremises(token: string, accountId: string, premises: Omit<Premises, 'id'>): Promise<Premises> {
   const { premises: saved } = await request<{ premises: Premises }>(`${businessPath(accountId)}/premises`, token, {
     method: 'POST',
     body: premisesBody(premises),
   });
-  return saved;
+  return normalizePremises(saved);
 }
 
 export async function putPremises(token: string, accountId: string, { id, ...premises }: Premises): Promise<Premises> {
@@ -135,7 +147,7 @@ export async function putPremises(token: string, accountId: string, { id, ...pre
     token,
     { method: 'PUT', body: premisesBody(premises) },
   );
-  return saved;
+  return normalizePremises(saved);
 }
 
 /** المقر وعنوانه بيتمسحوا مع بعض */
@@ -144,3 +156,44 @@ export async function deletePremises(token: string, accountId: string, premisesI
     method: 'DELETE',
   });
 }
+
+/*
+ * أرقام الحساب العامة (مش تبع مقر): أرقام النشاط من صفحته، وأرقام المستخدم من
+ * «حسابي». نفس الشكل للاتنين — الفرق في الرابط بس. 409 = نفس النوع والرقم موجودين.
+ */
+
+function contactBody({ type, value }: ContactInput): string {
+  return JSON.stringify({ type, value });
+}
+
+async function postContact(token: string, basePath: string, input: ContactInput): Promise<Contact> {
+  const { contact } = await request<{ contact: Contact }>(`${basePath}/contacts`, token, {
+    method: 'POST',
+    body: contactBody(input),
+  });
+  return contact;
+}
+
+async function putContact(token: string, basePath: string, contactId: string, input: ContactInput): Promise<Contact> {
+  const { contact } = await request<{ contact: Contact }>(`${basePath}/contacts/${encodeURIComponent(contactId)}`, token, {
+    method: 'PUT',
+    body: contactBody(input),
+  });
+  return contact;
+}
+
+async function deleteContact(token: string, basePath: string, contactId: string): Promise<void> {
+  await request<void>(`${basePath}/contacts/${encodeURIComponent(contactId)}`, token, { method: 'DELETE' });
+}
+
+export const postBusinessContact = (token: string, accountId: string, input: ContactInput) =>
+  postContact(token, businessPath(accountId), input);
+export const putBusinessContact = (token: string, accountId: string, contactId: string, input: ContactInput) =>
+  putContact(token, businessPath(accountId), contactId, input);
+export const deleteBusinessContact = (token: string, accountId: string, contactId: string) =>
+  deleteContact(token, businessPath(accountId), contactId);
+
+export const postMyContact = (token: string, input: ContactInput) => postContact(token, '/api/me', input);
+export const putMyContact = (token: string, contactId: string, input: ContactInput) =>
+  putContact(token, '/api/me', contactId, input);
+export const deleteMyContact = (token: string, contactId: string) => deleteContact(token, '/api/me', contactId);

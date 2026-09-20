@@ -1,17 +1,30 @@
 import { useAuth } from '../context/AuthContext';
 import { personInitial } from '../components/Avatar';
+import { ContactsField } from '../components/ContactsField';
 import { PicturePicker } from '../components/PicturePicker';
 import { SessionExpiredNotice } from '../components/SessionExpiredNotice';
 
 /**
- * صفحة الحساب في أسواق — ومنها صورة الحساب اللي بتظهر في الناڤبار.
+ * صفحة الحساب في أسواق — ومنها صورة الحساب اللي بتظهر في الناڤبار، وأرقامه
+ * (بطلب العميل: من هنا، مش وقت التسجيل في وصلة).
  *
  * أغلب المستخدمين مشترين مش بائعين، فأي كلام عن البيع والنشاط التجاري
  * مبيظهرش غير بعد ما يكون فيه نشاط فعلاً. إنشاء النشاط وإدارته في المنيو
  * اللي بتفتح من الصورة فوق.
  */
 export function AccountPage() {
-  const { user, businesses, signIn, setUserPicture } = useAuth();
+  const {
+    user,
+    businesses,
+    signIn,
+    setUserPicture,
+    sessionExpired,
+    userContacts,
+    userContactsError,
+    addUserContact,
+    updateUserContact,
+    removeUserContact,
+  } = useAuth();
 
   if (!user) {
     return (
@@ -62,6 +75,36 @@ export function AccountPage() {
         <p className="mt-4 border-t border-stone-200 pt-3 text-xs leading-relaxed text-stone-400 dark:border-white/10">
           تعديل بياناتك الشخصية وكلمة السر هيتضاف في مرحلة جاية.
         </p>
+      </section>
+
+      {/* الأرقام في وصلة مع الحساب — بتتحفظ على طول، زي الصورة */}
+      <section className="mt-5 rounded-2xl border border-stone-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
+        <h2 className="font-display text-lg font-bold">
+          جهات الاتصال
+          {userContacts && userContacts.length > 0 && (
+            <span className="ms-2 rounded-md bg-stone-100 px-1.5 py-0.5 text-xs tabular-nums font-normal text-stone-500 dark:bg-white/10 dark:text-stone-400">
+              {userContacts.length}
+            </span>
+          )}
+        </h2>
+        <p className="mt-1 text-xs text-stone-400">أرقامك وطرق التواصل معاك.</p>
+        <div className="mt-4">
+          {userContacts ? (
+            <ContactsField
+              contacts={userContacts}
+              ownerName={user.name}
+              onAdd={addUserContact}
+              onUpdate={updateUserContact}
+              onRemove={removeUserContact}
+            />
+          ) : (
+            <p className="rounded-xl border border-dashed border-stone-300 px-4 py-5 text-center text-sm text-stone-400 dark:border-white/15">
+              {user.demo
+                ? 'الأرقام بتتحفظ في وصلة — محتاجة تسجيل دخول حقيقي.'
+                : userContactsError || (sessionExpired ? 'سجّل دخول تاني عشان تشوف أرقامك.' : 'بنجيب أرقامك من وصلة…')}
+            </p>
+          )}
+        </div>
       </section>
 
       {businesses.length > 0 && (

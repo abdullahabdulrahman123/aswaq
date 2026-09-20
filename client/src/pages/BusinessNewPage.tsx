@@ -1,15 +1,18 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { ContactsField } from '../components/ContactsField';
 import { Notch, fieldClass } from '../components/OutlinedField';
 import { SessionExpiredNotice } from '../components/SessionExpiredNotice';
+import { contactInputs, draftId, type Contact } from '../lib/contacts';
 import { ApiError, SessionExpiredError } from '../lib/waslaApi';
 
 /** أقصى طول للاختصار — بيظهر كشارة صغيرة فمينفعش يكون طويل */
 const ABBR_MAX = 8;
 
 /**
- * تسجيل نشاط تجاري جديد — اسم واختصار وبس.
+ * تسجيل نشاط تجاري جديد — اسم واختصار، وأرقامه العامة لو حب (الكول سنتر
+ * مثلاً، بطلب العميل: من غير مقر ولا عنوان).
  *
  * المقرات مش جزء من التسجيل: النشاط ممكن يكون لسه مالوش مكان، وممكن يكون
  * له كذا فرع. بيتضافوا من صفحة النشاط نفسها بعد ما يتسجّل.
@@ -20,6 +23,8 @@ export function BusinessNewPage() {
 
   const [name, setName] = useState('');
   const [abbreviation, setAbbreviation] = useState('');
+  /** بتتبعت مع التسجيل — لحد كده مسودة */
+  const [contacts, setContacts] = useState<Contact[]>([]);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -42,7 +47,7 @@ export function BusinessNewPage() {
 
     setSubmitting(true);
     try {
-      const created = await createBusiness({ name: cleanName, abbreviation: cleanAbbr });
+      const created = await createBusiness({ name: cleanName, abbreviation: cleanAbbr, contacts: contactInputs(contacts) });
       // على طول لصفحة النشاط — منها بيضيف المقرات
       navigate(`/business/${created.accountId}`, { state: { created: true } });
     } catch (err) {
@@ -116,6 +121,18 @@ export function BusinessNewPage() {
             اسم قصير بيظهر كشارة جنب نشاطك — {ABBR_MAX} حروف كحد أقصى.
           </span>
         </label>
+
+        <div role="group" aria-label="جهات الاتصال" className="mt-6">
+          <span className="mb-2 block text-xs font-medium text-stone-500 dark:text-stone-400">جهات الاتصال</span>
+          <ContactsField
+            contacts={contacts}
+            ownerName={name.trim()}
+            hint="أرقام النشاط العامة أو الكول سنتر — اختياري، وتقدر تضيفها بعدين من صفحة النشاط."
+            onAdd={(input) => setContacts((list) => [...list, { id: draftId(), ...input }])}
+            onUpdate={(id, input) => setContacts((list) => list.map((c) => (c.id === id ? { id, ...input } : c)))}
+            onRemove={(id) => setContacts((list) => list.filter((c) => c.id !== id))}
+          />
+        </div>
 
         {error && (
           <p role="alert" className="mt-5 rounded-lg bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-300">
