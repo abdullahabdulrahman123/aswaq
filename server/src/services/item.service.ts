@@ -2,21 +2,12 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../config/db.js';
 import { isObjectId } from '../schemas/common.js';
 import type { CreateItemInput, UpdateItemInput } from '../schemas/item.schema.js';
-import { findShop } from './shop.service.js';
 
-/** فيه صنف بنفس الاسم في نفس المستوى (النشاط أو نفس المحل) — بيتترجم لـ409 */
+/** فيه صنف بنفس الاسم في نفس المستوى (النشاط أو نفس المتجر) — بيتترجم لـ409 */
 export class ItemNameTakenError extends Error {
   constructor() {
     super('Item name already used');
     this.name = 'ItemNameTakenError';
-  }
-}
-
-/** الـshopId في الطلب مش محل تبع النشاط ده */
-export class ShopNotFoundError extends Error {
-  constructor() {
-    super('Shop not found');
-    this.name = 'ShopNotFoundError';
   }
 }
 
@@ -31,9 +22,24 @@ function rethrowNameTaken(err: unknown): never {
   throw err;
 }
 
-/** shopId = null → أصناف النشاط نفسه · shopId = id → نسخ المحل ده */
+/** shopId = null → أصناف النشاط نفسه · shopId = id → نسخ المتجر ده */
 export function listItems(accountId: string, shopId: string | null) {
   return prisma.item.findMany({ where: { accountId, shopId }, orderBy: { name: 'asc' } });
+}
+
+/**
+ * أصناف النشاط اللي لسه مضافتش للمتجر ده — دي اللي بتظهر في كومبو الإضافة،
+ * بطلب العميل: «أجيب أصناف الشركة اللي مدخلتش المتجر».
+ *
+ * النسخة بتاخد اسم الأصل زي ما هو، فالاسم هو اللي بيقول ده اتضاف قبل كده.
+ */
+export async function listItemsNotInStore(accountId: string, shopId: string) {
+  const [items, inStore] = await Promise.all([
+    listItems(accountId, null),
+    prisma.item.findMany({ where: { accountId, shopId }, select: { name: true } }),
+  ]);
+  const taken = new Set(inStore.map((item) => item.name));
+  return items.filter((item) => !taken.has(item.name));
 }
 
 export function findItem(accountId: string, itemId: string) {
@@ -41,9 +47,23 @@ export function findItem(accountId: string, itemId: string) {
   return prisma.item.findFirst({ where: { id: itemId, accountId } });
 }
 
-export async function createItem(accountId: string, input: CreateItemInput) {
-  if (input.shopId && !(await findShop(accountId, input.shopId))) throw new ShopNotFoundError();
-  return prisma.item.create({ data: { accountId, ...input } }).catch(rethrowNameTaken);
+export function createItem(accountId: string, input: CreateItemInput) {
+  return prisma.item.create({ data: { accountId, shopId: null, ...input } }).catch(rethrowNameTaken);
+}
+
+/**
+ * إضافة صنف من أصناف النشاط لمتجر: نسخة كاملة منه بنفس البيانات، والفرق إنها
+ * تبع المتجر ده. العميل طلبها نسخة مستقلة مش إشارة للأصل، عشان سعر الصنف
+ * ومعدل بيعه (rate) بيختلفوا من فرع لفرع.
+ *
+ * بيرجّع null لو الصنف مش موجود أو مش صنف نشاط (يعني نسخة متجر تانية).
+ */
+export async function copyItemToStore(accountId: string, itemId: string, shopId: string) {
+  const item = await findItem(accountId, itemId);
+  if (!item || item.shopId !== null) return null;
+
+  const { id: _id, accountId: _accountId, shopId: _shopId, ...fields } = item;
+  return prisma.item.create({ data: { ...fields, accountId, shopId } }).catch(rethrowNameTaken);
 }
 
 export async function updateItem(accountId: string, itemId: string, input: UpdateItemInput) {

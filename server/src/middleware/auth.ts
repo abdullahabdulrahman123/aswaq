@@ -7,10 +7,11 @@ export interface WaslaBusiness {
   name: string;
   abbreviation: string;
   /**
-   * مقرات النشاط، وعنوان كل مقر جواه. اختياري: نسخة محفوظة من قبل المقرات
-   * كانت بتيجي بـaddresses بدلها — ساعتها بنسأل وصلة من جديد.
+   * مقرات النشاط. المتجر هو مقر معلّم عليه isStore — وده اللي الأصناف بتتربط
+   * بيه (شوف prisma/schema.prisma). اختياري: نسخة محفوظة من قبل المقرات كانت
+   * بتيجي بـaddresses بدلها — ساعتها بنسأل وصلة من جديد.
    */
-  premises?: { address: { id: string } | null }[];
+  premises?: { id: string; isStore: boolean }[];
 }
 
 declare global {

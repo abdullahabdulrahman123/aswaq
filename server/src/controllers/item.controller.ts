@@ -1,14 +1,16 @@
 import type { Request, Response } from 'express';
 import type { Item } from '@prisma/client';
+import { findManagedBusiness } from '../middleware/auth.js';
 import { isObjectId } from '../schemas/common.js';
-import { createItemSchema, updateItemSchema } from '../schemas/item.schema.js';
+import { createItemSchema, storeItemSchema, updateItemSchema } from '../schemas/item.schema.js';
 import {
+  copyItemToStore,
   createItem,
   deleteItem,
   findItem,
   ItemNameTakenError,
   listItems,
-  ShopNotFoundError,
+  listItemsNotInStore,
   updateItem,
 } from '../services/item.service.js';
 
@@ -31,27 +33,39 @@ function toItemView(item: Item) {
   };
 }
 
-/** نفس الرد لخطأين الـservice المتوقعين في الإنشاء والتعديل */
+/** الاسم اتكرر في نفس المستوى — نفس الرد في الإنشاء والتعديل والإضافة لمتجر */
 function handleItemError(err: unknown, res: Response): void {
   if (err instanceof ItemNameTakenError) {
     res.status(409).json({ message: 'An item with this name already exists here' });
     return;
   }
-  if (err instanceof ShopNotFoundError) {
-    res.status(400).json({ message: 'Shop not found in this business' });
-    return;
-  }
   throw err;
 }
 
-/** ?shopId=<id> → أصناف المحل ده · من غيره → أصناف النشاط نفسه */
-export async function list(req: Request, res: Response) {
-  const { shopId } = req.query;
-  if (shopId !== undefined && (typeof shopId !== 'string' || !isObjectId(shopId))) {
-    res.status(400).json({ message: 'Invalid shopId' });
-    return;
+/**
+ * المتاجر عايشة في وصلة مش هنا، فبنتأكد إن الـid ده مقر من مقرات النشاط ده
+ * ومعلّم عليه «متجر». بيرجّع false بعد ما يرد بـ404.
+ *
+ * 404 مش 400: الرد ميقولش لحد إن المقر ده موجود عند نشاط تاني.
+ */
+async function ensureStore(req: Request, res: Response): Promise<string | null> {
+  const shopId = String(req.params.shopId);
+  const business = isObjectId(shopId)
+    ? await findManagedBusiness(req, req.business!.accountId, (b) =>
+        (b.premises ?? []).some((premises) => premises.id === shopId && premises.isStore),
+      )
+    : undefined;
+
+  if (!business) {
+    res.status(404).json({ message: 'Store not found in this business' });
+    return null;
   }
-  const items = await listItems(req.business!.accountId, shopId ?? null);
+  return shopId;
+}
+
+/** أصناف النشاط نفسه (مستوى الشركة) */
+export async function list(req: Request, res: Response) {
+  const items = await listItems(req.business!.accountId, null);
   res.json({ items: items.map(toItemView) });
 }
 
@@ -104,4 +118,45 @@ export async function remove(req: Request, res: Response) {
     return;
   }
   res.status(204).send();
+}
+
+/** أصناف المتجر ده — نسخه هو */
+export async function listInStore(req: Request, res: Response) {
+  const shopId = await ensureStore(req, res);
+  if (!shopId) return;
+
+  const items = await listItems(req.business!.accountId, shopId);
+  res.json({ items: items.map(toItemView) });
+}
+
+/** أصناف النشاط اللي لسه مضافتش للمتجر ده — اللي بتتحط في كومبو الإضافة */
+export async function listAvailableForStore(req: Request, res: Response) {
+  const shopId = await ensureStore(req, res);
+  if (!shopId) return;
+
+  const items = await listItemsNotInStore(req.business!.accountId, shopId);
+  res.json({ items: items.map(toItemView) });
+}
+
+/** إضافة صنف من أصناف النشاط للمتجر — نسخة منه بنفس بياناته */
+export async function addToStore(req: Request, res: Response) {
+  const shopId = await ensureStore(req, res);
+  if (!shopId) return;
+
+  const parsed = storeItemSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ message: 'Invalid input', issues: parsed.error.issues });
+    return;
+  }
+
+  try {
+    const item = await copyItemToStore(req.business!.accountId, parsed.data.itemId, shopId);
+    if (!item) {
+      res.status(404).json({ message: 'Item not found' });
+      return;
+    }
+    res.status(201).json({ item: toItemView(item) });
+  } catch (err) {
+    handleItemError(err, res);
+  }
 }

@@ -15,6 +15,7 @@ import { BusinessNewPage } from './pages/BusinessNewPage';
 import { BusinessPage } from './pages/BusinessPage';
 import { ItemFormPage } from './pages/ItemFormPage';
 import { ItemsPage } from './pages/ItemsPage';
+import { StoreItemsPage } from './pages/StoreItemsPage';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 
 /** نرجع لأعلى الصفحة عند تغيير المسار — من غير الفلاتر عشان متقفزش مع كل فلتر */
@@ -80,6 +81,7 @@ export function App() {
           <Route path="/business/:accountId/items" element={<PerBusiness page={ItemsPage} />} />
           <Route path="/business/:accountId/items/new" element={<PerBusiness page={ItemFormPage} />} />
           <Route path="/business/:accountId/items/:itemId/edit" element={<PerBusiness page={ItemFormPage} />} />
+          <Route path="/business/:accountId/store-items" element={<PerBusiness page={StoreItemsPage} />} />
           <Route path="/auth/wasla/callback" element={<AuthCallbackPage />} />
           <Route path="*" element={<HomePage />} />
         </Routes>

@@ -18,31 +18,20 @@ datasource db {
   url      = env("MONGODB_URL")
 }
 
-/** محل تابع لنشاط تجاري */
-model Shop {
-  id        String  @id @default(auto()) @map("_id") @db.ObjectId
-  accountId String  @db.ObjectId
-  name      String
-  /** واحد من عناوين النشاط في وصلة */
-  addressId String? @db.ObjectId
-
-  items Item[]
-
-  @@index([accountId])
-  @@map("shops")
-}
-
 /**
- * صنف. نفس الصنف بيتسجّل على مستويين:
- *   shopId = null → الصنف على مستوى النشاط
- *   shopId = id   → نسخة المحل ده بأسعاره
- * ومسح المحل بيمسح نسخه معاه.
+ * صنف. نفس الصنف بيتسجّل على مستويين — بطلب العميل:
+ *   shopId = null → الصنف على مستوى النشاط، وده منبع البيانات
+ *   shopId = id   → نسخة المتجر ده، بأسعاره ومعدلاته هو
+ *
+ * المتجر مش جدول هنا: هو مقر من مقرات النشاط في وصلة معلّم عليه «متجر»
+ * (isStore)، والسيرفر بيتأكد منه من رد وصلة زي ما بيعمل مع النشاط نفسه.
+ * يعني نشاط عنده ١٠ متاجر بيبقى عنده ١١ صف للصنف: واحد للشركة و١٠ للمتاجر.
  */
 model Item {
   id        String     @id @default(auto()) @map("_id") @db.ObjectId
   accountId String     @db.ObjectId
+  /** id المقر (المتجر) في وصلة */
   shopId    String?    @db.ObjectId
-  shop      Shop?      @relation(fields: [shopId], references: [id], onDelete: Cascade)
   name      String
   picture   String?
   /** بالقرش. بيتحسب من المشتريات (متوسط مرجّح) — مش بيتكتب بإيد */
@@ -56,6 +45,8 @@ model Item {
    * هنا ده بالظبط المطلوب: صنف واحد بس بالاسم ده على مستوى النشاط.
    */
   @@unique([accountId, shopId, name])
+  /** صفحة «إدارة أصناف المتاجر» بتسأل بالمتجر */
+  @@index([shopId])
   @@map("items")
 }
 

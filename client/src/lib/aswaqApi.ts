@@ -124,3 +124,36 @@ export async function putItem(
 export async function deleteItem(token: string, accountId: string, itemId: string): Promise<void> {
   await request<void>(`${itemsPath(accountId)}/${encodeURIComponent(itemId)}`, token, { method: 'DELETE' });
 }
+
+/**
+ * أصناف المتاجر. المتجر هو مقر من مقرات النشاط معلّم عليه «متجر» في وصلة،
+ * وصنف المتجر نسخة مستقلة من صنف النشاط — بطلب العميل، عشان السعر ومعدل
+ * البيع بيختلفوا من فرع لفرع.
+ */
+const storePath = (accountId: string, shopId: string) =>
+  `/api/businesses/${encodeURIComponent(accountId)}/shops/${encodeURIComponent(shopId)}/items`;
+
+export async function fetchStoreItems(token: string, accountId: string, shopId: string): Promise<Item[]> {
+  const { items } = await request<{ items: Item[] }>(storePath(accountId, shopId), token);
+  return items;
+}
+
+/** أصناف النشاط اللي لسه مضافتش للمتجر ده — دي اللي بتتحط في كومبو الإضافة */
+export async function fetchItemsForStore(token: string, accountId: string, shopId: string): Promise<Item[]> {
+  const { items } = await request<{ items: Item[] }>(`${storePath(accountId, shopId)}/available`, token);
+  return items;
+}
+
+/** 409 = الصنف ده متضاف للمتجر ده قبل كده */
+export async function postStoreItem(
+  token: string,
+  accountId: string,
+  shopId: string,
+  itemId: string,
+): Promise<Item> {
+  const { item } = await request<{ item: Item }>(storePath(accountId, shopId), token, {
+    method: 'POST',
+    body: JSON.stringify({ itemId }),
+  });
+  return item;
+}

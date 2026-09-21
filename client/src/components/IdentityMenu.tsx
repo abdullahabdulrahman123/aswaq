@@ -299,8 +299,12 @@ export function IdentityMenu() {
                   <Link role="menuitem" to={`/business/${selectedBusiness.accountId}/items/new`} onClick={close} className={itemClass}>
                     إضافة صنف
                   </Link>
+                  <Link role="menuitem" to={`/business/${selectedBusiness.accountId}/store-items`} onClick={close} className={itemClass}>
+                    إدارة أصناف المتاجر
+                  </Link>
+                  {/* Business Profile — الاسم اللي العميل اختاره بالعربي */}
                   <Link role="menuitem" to={`/business/${selectedBusiness.accountId}`} onClick={close} className={itemClass}>
-                    صفحة النشاط واللوجو والمقرات
+                    بيانات الشركة
                   </Link>
                 </div>
               )}

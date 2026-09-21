@@ -50,13 +50,16 @@ const itemFields = {
   units: unitsSchema,
 };
 
-/** shopId بيتحدد مرة وقت الإنشاء: نسخة المحل صف مستقل، مش صنف بيتنقل */
-export const createItemSchema = z.object({
-  ...itemFields,
-  shopId: objectIdSchema.nullable().default(null),
-});
+/**
+ * الصنف بيتعمل على مستوى النشاط بس. نسخة المتجر مبتتعملش من هنا: بتتاخد من
+ * صنف موجود بـ`POST /shops/:shopId/items` (شوف copyItemToStore).
+ */
+export const createItemSchema = z.object(itemFields);
 
 export const updateItemSchema = z.object(itemFields);
+
+/** إضافة صنف من أصناف النشاط لمتجر */
+export const storeItemSchema = z.object({ itemId: objectIdSchema });
 
 export type CreateItemInput = z.infer<typeof createItemSchema>;
 export type UpdateItemInput = z.infer<typeof updateItemSchema>;
