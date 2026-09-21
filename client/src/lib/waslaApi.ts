@@ -6,7 +6,8 @@ import { waslaApiOrigin } from './waslaAuth';
  * بيانات النشاط التجاري الأساسية (الاسم، الاختصار، الأرقام، المقرات وعناوينها) عايشة في وصلة.
  *
  * كل طلب بيتبعت بتوكن الوصول اللي أسواق خده وقت تسجيل الدخول، ووصلة
- * بتتحقق منه من ناحيتها — مفيش حاجة بتتحقق هنا في المتصفح.
+ * بتتحقق منه من ناحيتها — مفيش حاجة بتتحقق هنا في المتصفح. ما عدا متاجر
+ * المعرض: دي لأي زائر.
  */
 
 /** طلب رجع بخطأ. status = 0 لو الطلب موصلش أصلاً */
@@ -36,13 +37,14 @@ const MESSAGES: Record<number, string> = {
   404: 'مش لاقيين ده — يمكن يكون اتحذف.',
 };
 
-async function request<T>(path: string, token: string, init: RequestInit = {}): Promise<T> {
+/** token = null للطلبات اللي مش محتاجة تسجيل دخول (متاجر المعرض) */
+async function request<T>(path: string, token: string | null, init: RequestInit = {}): Promise<T> {
   let res: Response;
   try {
     res = await fetch(`${waslaApiOrigin()}${path}`, {
       ...init,
       headers: {
-        Authorization: `Bearer ${token}`,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(init.body ? { 'Content-Type': 'application/json' } : {}),
       },
     });
@@ -103,6 +105,20 @@ export async function patchBusinessPicture(token: string, accountId: string, pic
     body: JSON.stringify({ picture }),
   });
   return normalizeBusiness(business);
+}
+
+/** متجر في المعرض — وصلة مبتبعتش للزائر غير اسمه والنشاط اللي تبعه */
+export interface ShowroomStore {
+  /** id المقر في وصلة — نفس الـshopId بتاع أصناف المتجر في أسواق */
+  id: string;
+  name: string;
+  business: Pick<Business, 'accountId' | 'name' | 'abbreviation' | 'picture'>;
+}
+
+/** كل المتاجر من كل الأنشطة، الأحدث الأول — من غير تسجيل دخول */
+export async function fetchStores(): Promise<ShowroomStore[]> {
+  const { stores } = await request<{ stores: ShowroomStore[] }>('/api/stores', null);
+  return stores;
 }
 
 export async function fetchBusinesses(token: string): Promise<Business[]> {
