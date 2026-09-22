@@ -2,10 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import type { Premises } from '../context/AuthContext';
 import { oneLine } from '../lib/address';
 import { draftId } from '../lib/contacts';
+import type { Minimums } from '../lib/aswaqApi';
+import { PRICE_FIELDS, PRICE_LABELS, type PriceField } from '../lib/itemUnits';
 import { AddressDialog, EMPTY_ADDRESS } from './AddressDialog';
 import { ContactsField } from './ContactsField';
 import { MapPreview } from './MapPreview';
-import { Notch, fieldClass } from './OutlinedField';
+import { Notch, compactFieldClass, fieldClass } from './OutlinedField';
 import { PinIcon } from './PinIcon';
 
 /** المسودة اللي بتبدأ بيها أي إضافة — النوع من غير اختيار عشان يختاره بنفسه، والعنوان لسه متحددش */
@@ -14,6 +16,25 @@ export const EMPTY_PREMISES: Premises = { id: '', name: '', isStore: false, isWa
 /** الكيبورد العربي بيكتب ٠-٩ و«٫» — بتتقري زي 0-9 و«.» */
 const normalizeNumber = (text: string) =>
   text.trim().replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))).replace(/[٫,]/g, '.');
+
+/** إعدادات المتجر اللي بتتحفظ في أسواق مع المقر */
+export interface StoreSettingsDraft {
+  /** بالكيلو. null = المتجر مبيوصّلش */
+  deliveryRadiusKm: number | null;
+  /** الحد الأدنى للأوردر بالقرش لكل شريحة سعر. null = مفيش حد أدنى */
+  minimums: Minimums;
+}
+
+const EMPTY_MINIMUMS: Minimums = { onSWP: null, onSRP: null, onLWP: null, onLRP: null };
+
+/** متجر لسه صاحبه محددش له حاجة */
+export const EMPTY_STORE_SETTINGS: StoreSettingsDraft = { deliveryRadiusKm: null, minimums: EMPTY_MINIMUMS };
+
+/** الخانات بالجنيه، والمحفوظ بالقرش */
+const minimumsToText = (minimums: Minimums | undefined) =>
+  Object.fromEntries(
+    PRICE_FIELDS.map((f) => [f, minimums?.[f] != null ? String(minimums[f]! / 100) : '']),
+  ) as Record<PriceField, string>;
 
 /** بترتيب كلام العميل: «مخزن أو متجر أو الاتنين» */
 const KINDS = [
@@ -30,17 +51,18 @@ interface Props {
   /** بيغيّر العنوان والزرار، وبيظهر المسح في التعديل بس */
   mode: 'add' | 'edit';
   /**
-   * نطاق التوصيل الحالي من أسواق — بيظهر لما المقر يبقى «متجر». null = مبيوصّلش،
-   * وundefined = مش عارفينه (أسواق مردّش)، فالخانة الفاضية ساعتها مبتمسحوش.
+   * إعدادات المتجر الحالية من أسواق — بتظهر لما المقر يبقى «متجر».
+   * undefined = مش عارفينها (أسواق مردّش)، فالخانات الفاضية ساعتها مبتمسحش
+   * المحفوظ.
    */
-  deliveryRadiusKm?: number | null;
-  /** أسواق متوصّل؟ من غيره مفيش مكان يتحفظ فيه النطاق */
-  withDeliveryRadius: boolean;
+  settings?: StoreSettingsDraft;
+  /** أسواق متوصّل؟ من غيره مفيش مكان تتحفظ فيه إعدادات المتجر */
+  withStoreSettings: boolean;
   /**
    * بيخلص لما الحفظ يخلص، وبيرمي لو فشل — النافذة بتعرض الخطأ وتفضل مفتوحة.
-   * deliveryRadiusKm بيتبعت بس لو اتغيّر: undefined = سيبه زي ما هو.
+   * settings بتتبعت بس لو اتغيّرت: undefined = سيبها زي ما هي.
    */
-  onSave: (premises: Premises, deliveryRadiusKm?: number | null) => Promise<void>;
+  onSave: (premises: Premises, settings?: StoreSettingsDraft) => Promise<void>;
   /** التعديل بس. بيرمي لو المسح فشل */
   onDelete?: () => Promise<void>;
   onClose: () => void;
@@ -57,12 +79,14 @@ interface Props {
  * نافذة «حدد العنوان» جنب النافذة دي مش جواها: الاتنين <dialog>، والتانية
  * بتطلع فوق الأولى لوحدها، وEsc بيقفل اللي فوق بس.
  */
-export function PremisesDialog({ open, value, mode, deliveryRadiusKm, withDeliveryRadius, onSave, onDelete, onClose }: Props) {
+export function PremisesDialog({ open, value, mode, settings, withStoreSettings, onSave, onDelete, onClose }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   const [draft, setDraft] = useState<Premises>(value);
   /** نص مش رقم: الخانة ممكن تبقى فاضية، أو فيها «٢٫٥» وهو بيكتب */
   const [radiusText, setRadiusText] = useState('');
+  /** الحد الأدنى للأوردر بالجنيه، خانة لكل شريحة سعر */
+  const [minText, setMinText] = useState<Record<PriceField, string>>(minimumsToText(undefined));
   const [pickingAddress, setPickingAddress] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -81,7 +105,8 @@ export function PremisesDialog({ open, value, mode, deliveryRadiusKm, withDelive
   useEffect(() => {
     if (!open) return;
     setDraft(value);
-    setRadiusText(deliveryRadiusKm != null ? String(deliveryRadiusKm) : '');
+    setRadiusText(settings?.deliveryRadiusKm != null ? String(settings.deliveryRadiusKm) : '');
+    setMinText(minimumsToText(settings?.minimums));
     setPickingAddress(false);
     setError('');
     setSaving(false);
@@ -111,22 +136,37 @@ export function PremisesDialog({ open, value, mode, deliveryRadiusKm, withDelive
       return;
     }
 
-    let radius: number | null | undefined;
-    if (draft.isStore && withDeliveryRadius) {
-      const text = normalizeNumber(radiusText);
-      radius = text ? Number(text) : null;
+    let storeSettings: StoreSettingsDraft | undefined;
+    if (draft.isStore && withStoreSettings) {
+      const radiusValue = normalizeNumber(radiusText);
+      const radius = radiusValue ? Number(radiusValue) : null;
       if (radius !== null && !(Number.isFinite(radius) && radius > 0 && radius <= 1000)) {
         setError('نطاق التوصيل بالكيلو: رقم أكبر من صفر ولحد ١٠٠٠، أو سيبه فاضي لو المتجر مبيوصّلش.');
         return;
       }
-      // مبعتش غير اللي اتغيّر — ولو مش عارفين القديم، الخانة الفاضية مبتمسحوش
-      if (radius === (deliveryRadiusKm ?? null) || (deliveryRadiusKm === undefined && radius === null)) radius = undefined;
+
+      const minimums = { ...EMPTY_MINIMUMS };
+      for (const field of PRICE_FIELDS) {
+        const text = normalizeNumber(minText[field]);
+        if (!text) continue;
+        const pounds = Number(text);
+        if (!Number.isFinite(pounds) || pounds <= 0 || pounds > 1_000_000) {
+          setError('الحد الأدنى «' + PRICE_LABELS[field] + '» بالجنيه: رقم أكبر من صفر، أو سيبه فاضي لو مفيش حد أدنى.');
+          return;
+        }
+        minimums[field] = Math.round(pounds * 100);
+      }
+
+      // مبعتش غير اللي اتغيّر — ولو مش عارفين القديم، الخانات الفاضية مبتمسحش
+      const next: StoreSettingsDraft = { deliveryRadiusKm: radius, minimums };
+      const current = settings ?? { deliveryRadiusKm: null, minimums: EMPTY_MINIMUMS };
+      storeSettings = JSON.stringify(next) === JSON.stringify(current) ? undefined : next;
     }
 
     setSaving(true);
     setError('');
     try {
-      await onSave({ ...draft, name }, radius);
+      await onSave({ ...draft, name }, storeSettings);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'مقدرناش نحفظ المقر. جرّب تاني.');
     } finally {
@@ -205,25 +245,52 @@ export function PremisesDialog({ open, value, mode, deliveryRadiusKm, withDelive
                 </span>
               </fieldset>
 
-              {/* بطلب العميل: نطاق التوصيل بالكيلو — بيتحفظ في أسواق مع إعدادات المتجر */}
-              {draft.isStore && withDeliveryRadius && (
-                <label className="relative block">
-                  <input
-                    value={radiusText}
-                    onChange={(e) => {
-                      setRadiusText(e.target.value);
-                      setError('');
-                    }}
-                    inputMode="decimal"
-                    maxLength={7}
-                    placeholder="مثال: 10"
-                    className={fieldClass}
-                  />
-                  <Notch>نطاق التوصيل (كم)</Notch>
-                  <span className="mt-1.5 block text-xs text-stone-400">
-                    المتجر بيوصّل لحد المسافة دي من مكانه. سيبها فاضية لو مبيوصّلش.
-                  </span>
-                </label>
+              {/* بطلب العميل: نطاق التوصيل والحد الأدنى للأوردر — بيتحفظوا في أسواق مش وصلة */}
+              {draft.isStore && withStoreSettings && (
+                <>
+                  <label className="relative block">
+                    <input
+                      value={radiusText}
+                      onChange={(e) => {
+                        setRadiusText(e.target.value);
+                        setError('');
+                      }}
+                      inputMode="decimal"
+                      maxLength={7}
+                      placeholder="مثال: 10"
+                      className={fieldClass}
+                    />
+                    <Notch>نطاق التوصيل (كم)</Notch>
+                    <span className="mt-1.5 block text-xs text-stone-400">
+                      المتجر بيوصّل لحد المسافة دي من مكانه. سيبها فاضية لو مبيوصّلش.
+                    </span>
+                  </label>
+
+                  {/* أربع خانات: كل شريحة سعر وحدها الأدنى — بطلب العميل «كل مؤسسة ولها السياسة بتاعتها» */}
+                  <fieldset>
+                    <legend className={legendClass}>الحد الأدنى للأوردر (ج.م)</legend>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-5">
+                      {PRICE_FIELDS.map((field) => (
+                        <label key={field} className="relative block">
+                          <input
+                            value={minText[field]}
+                            onChange={(e) => {
+                              setMinText((prev) => ({ ...prev, [field]: e.target.value }));
+                              setError('');
+                            }}
+                            inputMode="decimal"
+                            maxLength={9}
+                            className={compactFieldClass}
+                          />
+                          <Notch compact>{PRICE_LABELS[field]}</Notch>
+                        </label>
+                      ))}
+                    </div>
+                    <span className="mt-1.5 block text-xs text-stone-400">
+                      أقل قيمة أوردر المتجر يقبلها، لكل نوع سعر. سيب الخانة فاضية لو مفيش حد أدنى.
+                    </span>
+                  </fieldset>
+                </>
               )}
 
               <div role="group" aria-label="العنوان">

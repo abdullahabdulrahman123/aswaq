@@ -6,7 +6,8 @@ import { StoreItemCard } from '../components/StoreItemCard';
 import { useAuth } from '../context/AuthContext';
 import { useBuyerLocation } from '../context/LocationContext';
 import { useCurrentSeller } from '../context/SellerContext';
-import { fetchShowroomStore, type ShowroomItem } from '../lib/aswaqApi';
+import { useCartFocus, useStoreCart } from '../context/StoreCartContext';
+import { fetchShowroomStore, type ShowroomStoreDetails } from '../lib/aswaqApi';
 import { deliversTo, distanceKm, formatDistance } from '../lib/buyerLocation';
 import { buyerPriceField, type ReceivingMethod } from '../lib/itemUnits';
 import { ApiError, fetchStore, type ShowroomStore } from '../lib/waslaApi';
@@ -28,8 +29,9 @@ export function StorePage() {
   const { accountType } = useAuth();
   const { location } = useBuyerLocation();
 
+  const { repriceStore } = useStoreCart();
   const [store, setStore] = useState<ShowroomStore | null>(null);
-  const [details, setDetails] = useState<{ deliveryRadiusKm: number | null; items: ShowroomItem[] } | null>(null);
+  const [details, setDetails] = useState<ShowroomStoreDetails | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState('');
   /** بيزيد مع «جرّب تاني» عشان الطلب يتعاد */
@@ -81,6 +83,32 @@ export function StorePage() {
     },
   );
 
+  const radius = details?.deliveryRadiusKm ?? null;
+  const km = location && store?.location ? distanceKm(location, store.location) : null;
+  const canDeliver = deliversTo(store?.location ?? null, radius, location);
+  const method: ReceivingMethod = chosen === 'delivery' && !canDeliver ? 'pickup' : (chosen ?? (canDeliver ? 'delivery' : 'pickup'));
+  const priceField = buyerPriceField(method, accountType);
+  /** الحد الأدنى للأوردر في الشريحة اللي المشتري شايفها — السلة بتلوّن بيه */
+  const minimum = details?.minimums[priceField] ?? null;
+  /**
+   * المتجر بيوصّل بس مكان المشتري مش متحدد: «توصيل» مش مقفول، والدوسة عليه
+   * بتقول «حدد موقعك الأول» — بطلب المستخدم. ولما يحدده والمتجر بيوصّله،
+   * التوصيل بيتختار لوحده (chosen = توصيل).
+   */
+  const needsLocation = radius !== null && !location;
+
+  // السلة اللي في الناڤبار تخص المتجر ده، بلون حسب حده الأدنى
+  useCartFocus(store?.id ?? null, minimum);
+
+  // الأسعار بتتغيّر مع طريقة الاستلام ونوع الحساب — سطور السلة بتمشي معاها
+  useEffect(() => {
+    if (!details) return;
+    const prices = new Map(
+      details.items.flatMap((item) => item.units.map((u) => [`${item.id}|${u.name}`, u[priceField] ?? null] as const)),
+    );
+    repriceStore(storeId, (itemId, unitName) => prices.get(`${itemId}|${unitName}`));
+  }, [details, priceField, storeId, repriceStore]);
+
   if (notFound) {
     return (
       <div className="mx-auto max-w-md px-4 py-20 text-center">
@@ -121,17 +149,6 @@ export function StorePage() {
   if (!store || !details) {
     return <p className="mx-auto max-w-6xl px-4 py-8 text-sm text-stone-500 dark:text-stone-400">بنجيب المتجر…</p>;
   }
-
-  const radius = details.deliveryRadiusKm;
-  const km = location && store.location ? distanceKm(location, store.location) : null;
-  const canDeliver = deliversTo(store.location, radius, location);
-  const method: ReceivingMethod = chosen === 'delivery' && !canDeliver ? 'pickup' : (chosen ?? (canDeliver ? 'delivery' : 'pickup'));
-  /**
-   * المتجر بيوصّل بس مكان المشتري مش متحدد: «توصيل» مش مقفول، والدوسة عليه
-   * بتقول «حدد موقعك الأول» — بطلب المستخدم. ولما يحدده والمتجر بيوصّله،
-   * التوصيل بيتختار لوحده (chosen = توصيل).
-   */
-  const needsLocation = radius !== null && !location;
 
   /** ليه التوصيل مقفول — بيظهر تحت الاختيار */
   const noDeliveryReason =
@@ -207,9 +224,9 @@ export function StorePage() {
             لسه مفيش أصناف في المتجر ده.
           </p>
         ) : (
-          <ul aria-label="أصناف المتجر" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          <ul aria-label="أصناف المتجر" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {details.items.map((item) => (
-              <StoreItemCard key={item.id} item={item} priceField={buyerPriceField(method, accountType)} />
+              <StoreItemCard key={item.id} item={item} priceField={priceField} shopId={store.id} storeName={store.name} />
             ))}
           </ul>
         )}

@@ -3,7 +3,7 @@ import { Link, useLocation, useParams } from 'react-router-dom';
 import { useAuth, type Premises } from '../context/AuthContext';
 import { aswaqApiConfigured, fetchStoreSettings, putStoreSettings } from '../lib/aswaqApi';
 import { ContactsField } from '../components/ContactsField';
-import { EMPTY_PREMISES, PremisesDialog } from '../components/PremisesDialog';
+import { EMPTY_PREMISES, EMPTY_STORE_SETTINGS, PremisesDialog, type StoreSettingsDraft } from '../components/PremisesDialog';
 import { PremisesCard } from '../components/PremisesCard';
 import { PicturePicker } from '../components/PicturePicker';
 import { SessionExpiredNotice } from '../components/SessionExpiredNotice';
@@ -40,16 +40,18 @@ export function BusinessPage() {
   /** null = مقفول، مقر بـid فاضي = إضافة، مقر بـid = تعديل */
   const [editing, setEditing] = useState<Premises | null>(null);
   /** نطاق توصيل كل متجر من أسواق. null = لسه بنجيب، أو أسواق مردّش */
-  const [radii, setRadii] = useState<Map<string, number | null> | null>(null);
+  const [storeSettings, setStoreSettings] = useState<Map<string, StoreSettingsDraft> | null>(null);
 
   // النطاق عايش في أسواق مش وصلة، فبييجي في طلب لوحده
   useEffect(() => {
-    setRadii(null);
+    setStoreSettings(null);
     if (!id || !user || sessionExpired || !aswaqApiConfigured) return;
     let cancelled = false;
     withToken((token) => fetchStoreSettings(token, id))
       .then((list) => {
-        if (!cancelled) setRadii(new Map(list.map((s) => [s.shopId, s.deliveryRadiusKm])));
+        if (!cancelled) {
+          setStoreSettings(new Map(list.map((s) => [s.shopId, { deliveryRadiusKm: s.deliveryRadiusKm, minimums: s.minimums }])));
+        }
       })
       .catch(() => {
         // الفورم بيعرض الخانة فاضية ومبيمسحش النطاق القديم (شوف PremisesDialog)
@@ -120,10 +122,11 @@ export function BusinessPage() {
   }
 
   /**
-   * المقر في وصلة، وبعده نطاق التوصيل في أسواق لو اتغيّر. بترمي لو الحفظ فشل —
-   * النافذة بتمسك الخطأ وتعرضه وتفضل مفتوحة.
+   * المقر في وصلة، وبعده إعدادات المتجر في أسواق (نطاق التوصيل والحد الأدنى
+   * للأوردر) لو اتغيّرت. بترمي لو الحفظ فشل — النافذة بتمسك الخطأ وتعرضه
+   * وتفضل مفتوحة.
    */
-  async function handleSave(premises: Premises, deliveryRadiusKm?: number | null) {
+  async function handleSave(premises: Premises, settings?: StoreSettingsDraft) {
     if (!business) return;
     // لو المقر الجديد اتحفظ والنطاق وقع، «حفظ» تاني بيعدّل نفس المقر بدل ما يعمل واحد تاني
     const { id: draftId, ...fields } = premises;
@@ -137,12 +140,14 @@ export function BusinessPage() {
       setEditing(saved);
     }
 
-    if (saved.isStore && deliveryRadiusKm !== undefined) {
+    if (saved.isStore && settings !== undefined) {
       try {
-        const settings = await withToken((token) => putStoreSettings(token, business.accountId, saved.id, deliveryRadiusKm));
-        setRadii((prev) => new Map(prev ?? []).set(settings.shopId, settings.deliveryRadiusKm));
+        const next = await withToken((token) => putStoreSettings(token, business.accountId, saved.id, settings));
+        setStoreSettings((prev) =>
+          new Map(prev ?? []).set(next.shopId, { deliveryRadiusKm: next.deliveryRadiusKm, minimums: next.minimums }),
+        );
       } catch {
-        throw new Error('المقر اتحفظ، بس نطاق التوصيل متحفظش. دوس «حفظ التعديل» تاني.');
+        throw new Error('المقر اتحفظ، بس إعدادات المتجر متحفظتش. دوس «حفظ التعديل» تاني.');
       }
     }
     setEditing(null);
@@ -222,7 +227,12 @@ export function BusinessPage() {
           <>
             <ul className="mt-4 grid gap-2.5">
               {business.premises.map((p) => (
-                <PremisesCard key={p.id} premises={p} deliveryRadiusKm={radii?.get(p.id)} onOpen={() => setEditing(p)} />
+                <PremisesCard
+                  key={p.id}
+                  premises={p}
+                  deliveryRadiusKm={storeSettings?.get(p.id)?.deliveryRadiusKm}
+                  onOpen={() => setEditing(p)}
+                />
               ))}
             </ul>
             <p className="mt-3 text-xs text-stone-400">دوس على أي مقر تفتحه وتعدّله.</p>
@@ -239,8 +249,14 @@ export function BusinessPage() {
         value={editing ?? EMPTY_PREMISES}
         mode={editing?.id ? 'edit' : 'add'}
         // مقر جديد مبيوصّلش لحد ما يتكتب نطاق. undefined = أسواق مردّش
-        deliveryRadiusKm={editing?.id ? (radii ? (radii.get(editing.id) ?? null) : undefined) : null}
-        withDeliveryRadius={aswaqApiConfigured}
+        settings={
+          editing?.id
+            ? storeSettings
+              ? (storeSettings.get(editing.id) ?? EMPTY_STORE_SETTINGS)
+              : undefined
+            : EMPTY_STORE_SETTINGS
+        }
+        withStoreSettings={aswaqApiConfigured}
         onSave={handleSave}
         onDelete={editing?.id ? () => handleDelete(editing.id) : undefined}
         onClose={() => setEditing(null)}

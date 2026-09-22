@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { CartIcon } from './CartIcon';
+import { CartButton } from './CartButton';
 import { IdentityMenu } from './IdentityMenu';
 import { SellerBadge } from './SellerBadge';
 
@@ -22,15 +22,8 @@ export function Navbar() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* العربة — صفحتها لسه «قريباً»، وهيبقى فيها طلباتي */}
-          <Link
-            to="/orders"
-            aria-label="طلباتي"
-            title="طلباتي"
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-stone-700 transition hover:bg-stone-100 dark:text-stone-200 dark:hover:bg-white/10"
-          >
-            <CartIcon className="h-6 w-6" />
-          </Link>
+          {/* السلة وتحتها عدد الأصناف والإجمالي — صفحتها لسه «قريباً» */}
+          <CartButton />
 
           <SellerBadge />
         </div>

@@ -1,3 +1,4 @@
+import type { PriceField } from './itemUnits';
 import { ApiError, SessionExpiredError } from './waslaApi';
 
 /**
@@ -159,13 +160,25 @@ export async function postStoreItem(
   return item;
 }
 
-/**
- * إعدادات المتجر في أسواق — بطلب العميل «إعدادات خاصة بالمتاجر». دلوقتي نطاق
- * التوصيل بالكيلو، وnull = المتجر مبيوصّلش. المتجر اللي ملوش إعدادات زيه.
- */
-export interface StoreSettings {
+/** نطاق توصيل متجر — المعرض بياخد ده بس عن كل المتاجر */
+export interface DeliveryRadius {
   shopId: string;
   deliveryRadiusKm: number | null;
+}
+
+/**
+ * الحد الأدنى للأوردر بالقرش لكل شريحة سعر — المفتاح هو نفسه مفتاح السعر،
+ * فالواجهة بتاخد الحد بنفس المفتاح اللي بتعرض بيه السعر. null = مفيش حد أدنى.
+ */
+export type Minimums = Record<PriceField, number | null>;
+
+/**
+ * إعدادات المتجر في أسواق — بطلب العميل «إعدادات خاصة بالمتاجر»: نطاق التوصيل
+ * بالكيلو (null = مبيوصّلش)، والحد الأدنى للأوردر بشرايحه. المتجر اللي ملوش
+ * إعدادات لسه صاحبه محددش حاجة.
+ */
+export interface StoreSettings extends DeliveryRadius {
+  minimums: Minimums;
 }
 
 const settingsPath = (accountId: string) => `/api/businesses/${encodeURIComponent(accountId)}/shops`;
@@ -179,12 +192,12 @@ export async function putStoreSettings(
   token: string,
   accountId: string,
   shopId: string,
-  deliveryRadiusKm: number | null,
+  input: { deliveryRadiusKm: number | null; minimums?: Minimums },
 ): Promise<StoreSettings> {
   const { settings } = await request<{ settings: StoreSettings }>(
     `${settingsPath(accountId)}/${encodeURIComponent(shopId)}/settings`,
     token,
-    { method: 'PUT', body: JSON.stringify({ deliveryRadiusKm }) },
+    { method: 'PUT', body: JSON.stringify(input) },
   );
   return settings;
 }
@@ -205,14 +218,20 @@ export interface ShowroomItem {
 }
 
 /** نطاق توصيل كل المتاجر اللي بتوصّل — المتجر اللي مش في الليستة مبيوصّلش */
-export async function fetchDeliveryRadii(): Promise<StoreSettings[]> {
-  const { stores } = await request<{ stores: StoreSettings[] }>('/api/showroom/stores', null);
+export async function fetchDeliveryRadii(): Promise<DeliveryRadius[]> {
+  const { stores } = await request<{ stores: DeliveryRadius[] }>('/api/showroom/stores', null);
   return stores;
 }
 
-/** نطاق توصيل المتجر وأصنافه */
-export async function fetchShowroomStore(shopId: string): Promise<{ deliveryRadiusKm: number | null; items: ShowroomItem[] }> {
-  const { store } = await request<{ store: { deliveryRadiusKm: number | null; items: ShowroomItem[] } }>(
+/** صفحة المتجر في المعرض: نطاقه وحدوده الدنيا وأصنافه */
+export interface ShowroomStoreDetails {
+  deliveryRadiusKm: number | null;
+  minimums: Minimums;
+  items: ShowroomItem[];
+}
+
+export async function fetchShowroomStore(shopId: string): Promise<ShowroomStoreDetails> {
+  const { store } = await request<{ store: ShowroomStoreDetails }>(
     `/api/showroom/stores/${encodeURIComponent(shopId)}`,
     null,
   );
