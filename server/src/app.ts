@@ -5,6 +5,7 @@ import { env } from './config/env.js';
 import { requireWaslaUser } from './middleware/auth.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import businessRoutes from './routes/business.routes.js';
+import showroomRoutes from './routes/showroom.routes.js';
 
 export function createApp() {
   const app = express();
@@ -18,6 +19,8 @@ export function createApp() {
 
   app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
   app.use('/api/businesses', requireWaslaUser, businessRoutes);
+  // من غير توكن: الزائر بيشوف المعرض كمان
+  app.use('/api/showroom', showroomRoutes);
 
   app.use(errorHandler);
 

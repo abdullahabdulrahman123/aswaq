@@ -50,6 +50,25 @@ model Item {
   @@map("items")
 }
 
+/**
+ * إعدادات البيع لمتجر — بطلب العميل «إعدادات خاصة بالمتاجر». المتجر نفسه مقر
+ * في وصلة (shopId)، والإعدادات دي بتاعة البيع في أسواق بس، فمكانها هنا مش
+ * هناك. صف واحد لكل متجر، بيتعمل أول ما صاحبه يحفظ حاجة فيه.
+ *
+ * دلوقتي نطاق التوصيل. الحد الأدنى لفاتورة الجملة هيتضاف هنا بعدين.
+ */
+model StoreSettings {
+  id               String @id @default(auto()) @map("_id") @db.ObjectId
+  accountId        String @db.ObjectId
+  /** id المقر (المتجر) في وصلة */
+  shopId           String @unique @db.ObjectId
+  /** المتجر بيوصّل لحد المسافة دي بالكيلو من مكانه، بخط مستقيم. فاضي = مبيوصّلش */
+  deliveryRadiusKm Float?
+
+  @@index([accountId])
+  @@map("store_settings")
+}
+
 /** وحدة بيع. كل الأسعار بالقرش، والفاضي = لسه متحددش */
 type ItemUnit {
   name        String

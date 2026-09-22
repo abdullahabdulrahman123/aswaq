@@ -61,5 +61,10 @@ export const updateItemSchema = z.object(itemFields);
 /** إضافة صنف من أصناف النشاط لمتجر */
 export const storeItemSchema = z.object({ itemId: objectIdSchema });
 
+/** إعدادات المتجر. نطاق التوصيل بالكيلو، وnull = مبيوصّلش */
+export const storeSettingsSchema = z.object({
+  deliveryRadiusKm: z.number().positive().max(1000).nullable(),
+});
+
 export type CreateItemInput = z.infer<typeof createItemSchema>;
 export type UpdateItemInput = z.infer<typeof updateItemSchema>;
