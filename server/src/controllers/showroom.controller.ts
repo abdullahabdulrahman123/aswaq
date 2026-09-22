@@ -28,12 +28,17 @@ export async function listDelivery(_req: Request, res: Response) {
   res.json({ stores: await listDeliveryRadii() });
 }
 
-/** صفحة متجر: نطاقه وأصنافه. المتجر نفسه (اسمه ونشاطه) من وصلة */
+/**
+ * صفحة متجر: نطاقه، والحد الأدنى للأوردر لكل شريحة سعر، وأصنافه. المتجر نفسه
+ * (اسمه ونشاطه) من وصلة.
+ */
 export async function getStore(req: Request, res: Response) {
   const store = await findShowroomStore(String(req.params.shopId));
   if (!store) {
     res.status(404).json({ message: 'Store not found' });
     return;
   }
-  res.json({ store: { deliveryRadiusKm: store.deliveryRadiusKm, items: store.items.map(toShowroomItem) } });
+  res.json({
+    store: { deliveryRadiusKm: store.deliveryRadiusKm, minimums: store.minimums, items: store.items.map(toShowroomItem) },
+  });
 }

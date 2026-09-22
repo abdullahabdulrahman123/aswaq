@@ -1,5 +1,17 @@
 import { prisma } from '../config/db.js';
 import { isObjectId } from '../schemas/common.js';
+import type { StoreSettingsInput } from '../schemas/item.schema.js';
+
+/**
+ * الحدود الدنيا في قاعدة البيانات أسماؤها minSWP…، وبرّه بتتبعت بأسماء الأسعار
+ * نفسها (onSWP…) عشان الواجهة تاخد الحد بنفس مفتاح السعر اللي بتعرضه.
+ */
+export const toMinimums = (s: { minSWP: number | null; minSRP: number | null; minLWP: number | null; minLRP: number | null }) => ({
+  onSWP: s.minSWP,
+  onSRP: s.minSRP,
+  onLWP: s.minLWP,
+  onLRP: s.minLRP,
+});
 
 /** إعدادات متاجر النشاط ده — لفورم المقر في «بيانات الشركة» */
 export function listStoreSettings(accountId: string) {
@@ -7,14 +19,22 @@ export function listStoreSettings(accountId: string) {
 }
 
 /**
- * نطاق توصيل المتجر. null = مبيوصّلش. الصف بيتعمل مع أول حفظ — المتجر اللي
- * ملوش صف لسه صاحبه محددش حاجة، يعني مبيوصّلش برضه.
+ * إعدادات المتجر: نطاق التوصيل (null = مبيوصّلش) والحدود الدنيا للأوردر. الصف
+ * بيتعمل مع أول حفظ — المتجر اللي ملوش صف لسه صاحبه محددش حاجة. الحدود اللي
+ * مبتتبعتش بتفضل زي ما هي.
  */
-export function setDeliveryRadius(accountId: string, shopId: string, deliveryRadiusKm: number | null) {
+export function saveStoreSettings(accountId: string, shopId: string, input: StoreSettingsInput) {
+  const { deliveryRadiusKm, minimums } = input;
+  const mins = minimums && {
+    minSWP: minimums.onSWP,
+    minSRP: minimums.onSRP,
+    minLWP: minimums.onLWP,
+    minLRP: minimums.onLRP,
+  };
   return prisma.storeSettings.upsert({
     where: { shopId },
-    create: { accountId, shopId, deliveryRadiusKm },
-    update: { deliveryRadiusKm },
+    create: { accountId, shopId, deliveryRadiusKm, ...mins },
+    update: { deliveryRadiusKm, ...mins },
   });
 }
 
@@ -26,12 +46,16 @@ export function listDeliveryRadii() {
   });
 }
 
-/** صفحة المتجر في المعرض: نطاقه وأصنافه */
+/** صفحة المتجر في المعرض: نطاقه وحدوده الدنيا وأصنافه */
 export async function findShowroomStore(shopId: string) {
   if (!isObjectId(shopId)) return null;
   const [settings, items] = await Promise.all([
     prisma.storeSettings.findUnique({ where: { shopId } }),
     prisma.item.findMany({ where: { shopId }, orderBy: { name: 'asc' } }),
   ]);
-  return { deliveryRadiusKm: settings?.deliveryRadiusKm ?? null, items };
+  return {
+    deliveryRadiusKm: settings?.deliveryRadiusKm ?? null,
+    minimums: settings ? toMinimums(settings) : { onSWP: null, onSRP: null, onLWP: null, onLRP: null },
+    items,
+  };
 }

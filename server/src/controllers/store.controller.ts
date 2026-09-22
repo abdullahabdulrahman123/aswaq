@@ -1,12 +1,12 @@
 import type { Request, Response } from 'express';
 import type { StoreSettings } from '@prisma/client';
 import { storeSettingsSchema } from '../schemas/item.schema.js';
-import { listStoreSettings, setDeliveryRadius } from '../services/store.service.js';
+import { listStoreSettings, saveStoreSettings, toMinimums } from '../services/store.service.js';
 import { ensureStore } from './store.helpers.js';
 
 /** إعدادات المتجر زي ما فورم المقر بيشوفها */
 function toSettingsView(settings: StoreSettings) {
-  return { shopId: settings.shopId, deliveryRadiusKm: settings.deliveryRadiusKm };
+  return { shopId: settings.shopId, deliveryRadiusKm: settings.deliveryRadiusKm, minimums: toMinimums(settings) };
 }
 
 /** إعدادات كل متاجر النشاط — المتجر اللي ملوش صف لسه صاحبه محددش حاجة */
@@ -26,6 +26,6 @@ export async function updateSettings(req: Request, res: Response) {
     return;
   }
 
-  const settings = await setDeliveryRadius(req.business!.accountId, shopId, parsed.data.deliveryRadiusKm);
+  const settings = await saveStoreSettings(req.business!.accountId, shopId, parsed.data);
   res.json({ settings: toSettingsView(settings) });
 }

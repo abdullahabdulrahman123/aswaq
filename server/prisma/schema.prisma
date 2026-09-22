@@ -64,6 +64,11 @@ model StoreSettings {
   shopId           String @unique @db.ObjectId
   /** المتجر بيوصّل لحد المسافة دي بالكيلو من مكانه، بخط مستقيم. فاضي = مبيوصّلش */
   deliveryRadiusKm Float?
+  /** الحد الأدنى للأوردر بالقرش لكل شريحة من الأسعار الأربعة. فاضي = مفيش حد أدنى */
+  minSWP           Int?
+  minSRP           Int?
+  minLWP           Int?
+  minLRP           Int?
 
   @@index([accountId])
   @@map("store_settings")

@@ -61,10 +61,22 @@ export const updateItemSchema = z.object(itemFields);
 /** إضافة صنف من أصناف النشاط لمتجر */
 export const storeItemSchema = z.object({ itemId: objectIdSchema });
 
-/** إعدادات المتجر. نطاق التوصيل بالكيلو، وnull = مبيوصّلش */
+/** حد أدنى للأوردر بالقرش — عدد صحيح موجب، وnull = مفيش حد أدنى */
+const minimumSchema = z.number().int().positive().max(100_000_000).nullable();
+
+/**
+ * إعدادات المتجر. نطاق التوصيل بالكيلو وnull = مبيوصّلش، والحد الأدنى للأوردر
+ * لكل شريحة من الأسعار الأربعة — بطلب العميل: «كل مؤسسة ولها السياسة بتاعتها».
+ * minimums اختيارية: اللي مبيبعتهاش مبيغيّرش الحدود المحفوظة.
+ */
 export const storeSettingsSchema = z.object({
   deliveryRadiusKm: z.number().positive().max(1000).nullable(),
+  minimums: z
+    .object({ onSWP: minimumSchema, onSRP: minimumSchema, onLWP: minimumSchema, onLRP: minimumSchema })
+    .optional(),
 });
+
+export type StoreSettingsInput = z.infer<typeof storeSettingsSchema>;
 
 export type CreateItemInput = z.infer<typeof createItemSchema>;
 export type UpdateItemInput = z.infer<typeof updateItemSchema>;
