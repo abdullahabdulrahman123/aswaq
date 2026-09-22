@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { useAuth, type Premises } from '../context/AuthContext';
+import { aswaqApiConfigured, fetchStoreSettings, putStoreSettings } from '../lib/aswaqApi';
 import { ContactsField } from '../components/ContactsField';
 import { EMPTY_PREMISES, PremisesDialog } from '../components/PremisesDialog';
 import { PremisesCard } from '../components/PremisesCard';
@@ -30,12 +31,33 @@ export function BusinessPage() {
     removeBusinessContact,
     setBusinessPicture,
     signIn,
+    withToken,
+    sessionExpired,
   } = useAuth();
   // بنيجي هنا على طول بعد التسجيل — بنقول للمستخدم إنه تم قبل ما يسأل
   const justCreated = Boolean((useLocation().state as { created?: boolean } | null)?.created);
 
   /** null = مقفول، مقر بـid فاضي = إضافة، مقر بـid = تعديل */
   const [editing, setEditing] = useState<Premises | null>(null);
+  /** نطاق توصيل كل متجر من أسواق. null = لسه بنجيب، أو أسواق مردّش */
+  const [radii, setRadii] = useState<Map<string, number | null> | null>(null);
+
+  // النطاق عايش في أسواق مش وصلة، فبييجي في طلب لوحده
+  useEffect(() => {
+    setRadii(null);
+    if (!id || !user || sessionExpired || !aswaqApiConfigured) return;
+    let cancelled = false;
+    withToken((token) => fetchStoreSettings(token, id))
+      .then((list) => {
+        if (!cancelled) setRadii(new Map(list.map((s) => [s.shopId, s.deliveryRadiusKm])));
+      })
+      .catch(() => {
+        // الفورم بيعرض الخانة فاضية ومبيمسحش النطاق القديم (شوف PremisesDialog)
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id, user, sessionExpired, withToken]);
 
   if (!user) {
     return (
@@ -97,12 +119,32 @@ export function BusinessPage() {
     );
   }
 
-  /** بترمي لو الحفظ فشل — النافذة بتمسك الخطأ وتعرضه وتفضل مفتوحة */
-  async function handleSave(premises: Premises) {
+  /**
+   * المقر في وصلة، وبعده نطاق التوصيل في أسواق لو اتغيّر. بترمي لو الحفظ فشل —
+   * النافذة بتمسك الخطأ وتعرضه وتفضل مفتوحة.
+   */
+  async function handleSave(premises: Premises, deliveryRadiusKm?: number | null) {
     if (!business) return;
-    const { id: premisesId, ...fields } = premises;
-    if (premisesId) await updatePremises(business.accountId, premises);
-    else await addPremises(business.accountId, fields);
+    // لو المقر الجديد اتحفظ والنطاق وقع، «حفظ» تاني بيعدّل نفس المقر بدل ما يعمل واحد تاني
+    const { id: draftId, ...fields } = premises;
+    const premisesId = draftId || editing?.id || '';
+    let saved: Premises;
+    if (premisesId) {
+      saved = { ...premises, id: premisesId };
+      await updatePremises(business.accountId, saved);
+    } else {
+      saved = await addPremises(business.accountId, fields);
+      setEditing(saved);
+    }
+
+    if (saved.isStore && deliveryRadiusKm !== undefined) {
+      try {
+        const settings = await withToken((token) => putStoreSettings(token, business.accountId, saved.id, deliveryRadiusKm));
+        setRadii((prev) => new Map(prev ?? []).set(settings.shopId, settings.deliveryRadiusKm));
+      } catch {
+        throw new Error('المقر اتحفظ، بس نطاق التوصيل متحفظش. دوس «حفظ التعديل» تاني.');
+      }
+    }
     setEditing(null);
   }
 
@@ -180,7 +222,7 @@ export function BusinessPage() {
           <>
             <ul className="mt-4 grid gap-2.5">
               {business.premises.map((p) => (
-                <PremisesCard key={p.id} premises={p} onOpen={() => setEditing(p)} />
+                <PremisesCard key={p.id} premises={p} deliveryRadiusKm={radii?.get(p.id)} onOpen={() => setEditing(p)} />
               ))}
             </ul>
             <p className="mt-3 text-xs text-stone-400">دوس على أي مقر تفتحه وتعدّله.</p>
@@ -196,6 +238,9 @@ export function BusinessPage() {
         open={editing !== null}
         value={editing ?? EMPTY_PREMISES}
         mode={editing?.id ? 'edit' : 'add'}
+        // مقر جديد مبيوصّلش لحد ما يتكتب نطاق. undefined = أسواق مردّش
+        deliveryRadiusKm={editing?.id ? (radii ? (radii.get(editing.id) ?? null) : undefined) : null}
+        withDeliveryRadius={aswaqApiConfigured}
         onSave={handleSave}
         onDelete={editing?.id ? () => handleDelete(editing.id) : undefined}
         onClose={() => setEditing(null)}

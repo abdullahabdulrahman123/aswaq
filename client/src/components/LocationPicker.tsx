@@ -48,9 +48,11 @@ interface Props {
   onLocate: () => void;
   /** بنعطّل الزرار وهو شغّال عشان مفيش طلبين مع بعض */
   locating: boolean;
+  /** اسم الخريطة لقارئ الشاشة */
+  label?: string;
 }
 
-export function LocationPicker({ value, onChange, hint, onLocate, locating }: Props) {
+export function LocationPicker({ value, onChange, hint, onLocate, locating, label = 'خريطة لاختيار موقع النشاط' }: Props) {
   const holderRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
@@ -183,7 +185,7 @@ export function LocationPicker({ value, onChange, hint, onLocate, locating }: Pr
       <div
         ref={holderRef}
         role="application"
-        aria-label="خريطة لاختيار موقع النشاط"
+        aria-label={label}
         /*
          * isolate مهم: Leaflet بيدي طبقاته z-index من 400 لفوق، والناڤبار
          * عنده 30 — فالخريطة كانت بتعدّي فوقه وقت التمرير. isolation:isolate

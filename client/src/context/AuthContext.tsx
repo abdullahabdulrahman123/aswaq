@@ -3,17 +3,21 @@ import { redirectToWasla, waslaConfigured, type WaslaSession, type WaslaUser } f
 import {
   ApiError,
   deleteBusinessContact,
+  deleteMyAddress,
   deleteMyContact,
   deletePremises,
   fetchBusinesses,
+  fetchMyAddresses,
   fetchProfile,
   patchBusinessPicture,
   patchProfilePicture,
   postBusiness,
   postBusinessContact,
+  postMyAddress,
   postMyContact,
   postPremises,
   putBusinessContact,
+  putMyAddress,
   putMyContact,
   putPremises,
   SessionExpiredError,
@@ -142,6 +146,17 @@ interface AuthContextValue {
   updateUserContact: (contactId: string, input: ContactInput) => Promise<void>;
   removeUserContact: (contactId: string) => Promise<void>;
   /**
+   * «عناويني» — عناوين المستخدم نفسه في وصلة (من غير مقر)، والمشتري بيختار
+   * منها مكانه في المعرض. null = لسه جاية من وصلة
+   */
+  userAddresses: BusinessAddress[] | null;
+  /** جلب العناوين فشل */
+  userAddressesError: string;
+  /** بيرجّع العنوان بالـid اللي وصلة ادته. بيرمي لو الحفظ فشل */
+  addUserAddress: (address: BusinessAddress) => Promise<BusinessAddress>;
+  updateUserAddress: (address: BusinessAddress) => Promise<void>;
+  removeUserAddress: (addressId: string) => Promise<void>;
+  /**
    * الأسعار بتتبني عليه: الزائر والحساب الشخصي قطاعي، واللي بيتعامل بنشاط
    * بيشوف أسعار الكميات.
    */
@@ -224,6 +239,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [businessesError, setBusinessesError] = useState('');
   const [userContacts, setUserContacts] = useState<Contact[] | null>(null);
   const [userContactsError, setUserContactsError] = useState('');
+  const [userAddresses, setUserAddresses] = useState<BusinessAddress[] | null>(null);
+  const [userAddressesError, setUserAddressesError] = useState('');
   const [sessionExpired, setSessionExpired] = useState(false);
 
   // التحميل مربوط بالمستخدم نفسه مش بالكائن: تغيير صورته مبيعيدش تحميل أنشطته
@@ -345,10 +362,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * «حسابي» بيقول إنها جاية.
    */
   useEffect(() => {
-    // أرقام مستخدم تاني متفضلش معروضة، بس انتهاء الجلسة مبيمسحهاش
+    // أرقام وعناوين مستخدم تاني متفضلش معروضة، بس انتهاء الجلسة مبيمسحهاش
     setUserContacts(null);
     setUserContactsError('');
+    setUserAddresses(null);
+    setUserAddressesError('');
   }, [sub]);
+
+  // العناوين في طلب لوحدها — مش جاية مع الاسم والصورة
+  useEffect(() => {
+    if (!sub || demo || sessionExpired) return;
+    let cancelled = false;
+    withToken(fetchMyAddresses)
+      .then((list) => {
+        if (!cancelled) setUserAddresses(list);
+      })
+      .catch((err: unknown) => {
+        if (cancelled || err instanceof SessionExpiredError) return;
+        setUserAddressesError(err instanceof Error ? err.message : 'مقدرناش نجيب عناوينك من وصلة.');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sub, demo, sessionExpired, withToken]);
 
   useEffect(() => {
     if (!sub || demo || sessionExpired) return;
@@ -507,6 +543,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [withToken],
   );
 
+  const addUserAddress = useCallback(
+    async (address: BusinessAddress) => {
+      const created = await withToken((token) => postMyAddress(token, address));
+      setUserAddresses((list) => [...(list ?? []), created]);
+      return created;
+    },
+    [withToken],
+  );
+
+  const updateUserAddress = useCallback(
+    async (address: BusinessAddress) => {
+      const saved = await withToken((token) => putMyAddress(token, address));
+      setUserAddresses((list) => (list ?? []).map((a) => (a.id === saved.id ? saved : a)));
+    },
+    [withToken],
+  );
+
+  const removeUserAddress = useCallback(
+    async (addressId: string) => {
+      await withToken((token) => deleteMyAddress(token, addressId));
+      setUserAddresses((list) => (list ?? []).filter((a) => a.id !== addressId));
+    },
+    [withToken],
+  );
+
   const signIn = useCallback(async (intent: AuthIntent) => {
     if (waslaConfigured) {
       await redirectToWasla(window.location.pathname + window.location.search, intent);
@@ -570,6 +631,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         addUserContact,
         updateUserContact,
         removeUserContact,
+        userAddresses,
+        userAddressesError,
+        addUserAddress,
+        updateUserAddress,
+        removeUserAddress,
         accountType: selectedBusiness ? 'COMPANY' : 'INDIVIDUAL',
         connected: waslaConfigured,
         signIn,

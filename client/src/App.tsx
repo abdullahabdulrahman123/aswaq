@@ -16,6 +16,7 @@ import { BusinessPage } from './pages/BusinessPage';
 import { ItemFormPage } from './pages/ItemFormPage';
 import { ItemsPage } from './pages/ItemsPage';
 import { StoreItemsPage } from './pages/StoreItemsPage';
+import { StorePage } from './pages/StorePage';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 
 /** نرجع لأعلى الصفحة عند تغيير المسار — من غير الفلاتر عشان متقفزش مع كل فلتر */
@@ -70,6 +71,7 @@ export function App() {
       <main className="flex-1">
         <Routes>
           <Route path="/" element={<HomePage />} />
+          <Route path="/store/:storeId" element={<StorePage />} />
           <Route path="/product/:id" element={<ProductPage />} />
           <Route path="/vendor/:id" element={<VendorPage />} />
           <Route path="/cart" element={<CartPage />} />

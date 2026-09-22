@@ -1,5 +1,6 @@
-import type { Business, Premises } from '../context/AuthContext';
+import type { Business, BusinessAddress, Premises } from '../context/AuthContext';
 import { contactInputs, type Contact, type ContactInput } from './contacts';
+import type { Coords } from './geolocate';
 import { waslaApiOrigin } from './waslaAuth';
 
 /**
@@ -107,18 +108,68 @@ export async function patchBusinessPicture(token: string, accountId: string, pic
   return normalizeBusiness(business);
 }
 
-/** متجر في المعرض — وصلة مبتبعتش للزائر غير اسمه والنشاط اللي تبعه */
+/**
+ * متجر في المعرض — وصلة مبتبعتش للزائر غير اسمه ومكانه على الخريطة والنشاط
+ * اللي تبعه. نطاق التوصيل مش هنا: ده في أسواق (fetchDeliveryRadii).
+ */
 export interface ShowroomStore {
   /** id المقر في وصلة — نفس الـshopId بتاع أصناف المتجر في أسواق */
   id: string;
   name: string;
+  /** null = المقر من غير عنوان (بيانات قديمة بس) — ساعتها مفيش مسافة ولا توصيل */
+  location: Coords | null;
   business: Pick<Business, 'accountId' | 'name' | 'abbreviation' | 'picture'>;
 }
+
+/** وصلة اللي قبل المكان كانت مبترجّعش location */
+const normalizeStore = (store: ShowroomStore): ShowroomStore => ({ ...store, location: store.location ?? null });
 
 /** كل المتاجر من كل الأنشطة، الأحدث الأول — من غير تسجيل دخول */
 export async function fetchStores(): Promise<ShowroomStore[]> {
   const { stores } = await request<{ stores: ShowroomStore[] }>('/api/stores', null);
-  return stores;
+  return stores.map(normalizeStore);
+}
+
+/** متجر واحد لصفحته. 404 = مش موجود، أو بقى مخزن بس */
+export async function fetchStore(storeId: string): Promise<ShowroomStore> {
+  const { store } = await request<{ store: ShowroomStore }>(`/api/stores/${encodeURIComponent(storeId)}`, null);
+  return normalizeStore(store);
+}
+
+/*
+ * «عناويني»: عناوين المستخدم نفسه في وصلة، من غير مقر — البيت أو الشغل.
+ * المشتري بيختار منها مكانه في المعرض.
+ */
+
+function addressBody({ id: _id, ...fields }: BusinessAddress): string {
+  return JSON.stringify(fields);
+}
+
+export async function fetchMyAddresses(token: string): Promise<BusinessAddress[]> {
+  const { addresses } = await request<{ addresses: BusinessAddress[] }>('/api/me/addresses', token);
+  return addresses;
+}
+
+/** 400 = وصل لأقصى عدد عناوين */
+export async function postMyAddress(token: string, address: BusinessAddress): Promise<BusinessAddress> {
+  const { address: saved } = await request<{ address: BusinessAddress }>('/api/me/addresses', token, {
+    method: 'POST',
+    body: addressBody(address),
+  });
+  return saved;
+}
+
+export async function putMyAddress(token: string, address: BusinessAddress): Promise<BusinessAddress> {
+  const { address: saved } = await request<{ address: BusinessAddress }>(
+    `/api/me/addresses/${encodeURIComponent(address.id)}`,
+    token,
+    { method: 'PUT', body: addressBody(address) },
+  );
+  return saved;
+}
+
+export async function deleteMyAddress(token: string, addressId: string): Promise<void> {
+  await request<void>(`/api/me/addresses/${encodeURIComponent(addressId)}`, token, { method: 'DELETE' });
 }
 
 export async function fetchBusinesses(token: string): Promise<Business[]> {

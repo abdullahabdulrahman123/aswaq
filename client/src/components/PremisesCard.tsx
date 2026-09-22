@@ -1,5 +1,6 @@
 import type { Premises } from '../context/AuthContext';
 import { oneLine } from '../lib/address';
+import { formatDistance } from '../lib/buyerLocation';
 import { PinIcon } from './PinIcon';
 
 /** نوع المقر كشارات — المقر اللي اتعمل من عنوان قديم بيبان إن نوعه ناقص */
@@ -31,7 +32,16 @@ function KindBadges({ premises }: { premises: Premises }) {
  * العميل). سطر واحد مقصوص عشان النشاط ممكن يكون له عشر فروع. الدوسة بتفتح
  * المقر في فورمه للتعديل.
  */
-export function PremisesCard({ premises, onOpen }: { premises: Premises; onOpen: () => void }) {
+export function PremisesCard({
+  premises,
+  deliveryRadiusKm,
+  onOpen,
+}: {
+  premises: Premises;
+  /** نطاق توصيل المتجر من أسواق — بيظهر تحت العنوان */
+  deliveryRadiusKm?: number | null;
+  onOpen: () => void;
+}) {
   const summary = (premises.address && oneLine(premises.address)) || 'من غير عنوان';
 
   return (
@@ -51,6 +61,12 @@ export function PremisesCard({ premises, onOpen }: { premises: Premises; onOpen:
             <PinIcon className="h-3.5 w-3.5 shrink-0 text-stone-400" />
             <span className="truncate">{summary}</span>
           </span>
+          {/* سطر لوحده مش شارة جنب الاسم: الشارة كانت بتقص اسم المتجر على الموبايل */}
+          {premises.isStore && deliveryRadiusKm != null && (
+            <span className="mt-0.5 block text-xs font-medium text-accent-700 dark:text-accent-300">
+              بيوصّل لحد {formatDistance(deliveryRadiusKm)}
+            </span>
+          )}
         </span>
         {/* RTL: «افتح» بيشاور على الشمال */}
         <svg

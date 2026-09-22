@@ -11,6 +11,10 @@ import { PinIcon } from './PinIcon';
 /** المسودة اللي بتبدأ بيها أي إضافة — النوع من غير اختيار عشان يختاره بنفسه، والعنوان لسه متحددش */
 export const EMPTY_PREMISES: Premises = { id: '', name: '', isStore: false, isWarehouse: false, address: null, contacts: [] };
 
+/** الكيبورد العربي بيكتب ٠-٩ و«٫» — بتتقري زي 0-9 و«.» */
+const normalizeNumber = (text: string) =>
+  text.trim().replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))).replace(/[٫,]/g, '.');
+
 /** بترتيب كلام العميل: «مخزن أو متجر أو الاتنين» */
 const KINDS = [
   { key: 'isWarehouse', label: 'مخزن' },
@@ -25,8 +29,18 @@ interface Props {
   value: Premises;
   /** بيغيّر العنوان والزرار، وبيظهر المسح في التعديل بس */
   mode: 'add' | 'edit';
-  /** بيخلص لما وصلة ترد، وبيرمي لو الحفظ فشل — النافذة بتعرض الخطأ وتفضل مفتوحة */
-  onSave: (premises: Premises) => Promise<void>;
+  /**
+   * نطاق التوصيل الحالي من أسواق — بيظهر لما المقر يبقى «متجر». null = مبيوصّلش،
+   * وundefined = مش عارفينه (أسواق مردّش)، فالخانة الفاضية ساعتها مبتمسحوش.
+   */
+  deliveryRadiusKm?: number | null;
+  /** أسواق متوصّل؟ من غيره مفيش مكان يتحفظ فيه النطاق */
+  withDeliveryRadius: boolean;
+  /**
+   * بيخلص لما الحفظ يخلص، وبيرمي لو فشل — النافذة بتعرض الخطأ وتفضل مفتوحة.
+   * deliveryRadiusKm بيتبعت بس لو اتغيّر: undefined = سيبه زي ما هو.
+   */
+  onSave: (premises: Premises, deliveryRadiusKm?: number | null) => Promise<void>;
   /** التعديل بس. بيرمي لو المسح فشل */
   onDelete?: () => Promise<void>;
   onClose: () => void;
@@ -34,7 +48,8 @@ interface Props {
 
 /**
  * فورم المقر — صفحة واحدة، بطلب العميل: اسمه، ونوعه، وعنوانه، وأرقامه. النوع
- * هنا مش في العنوان عشان بيتغيّر مع الوقت (مخزن يبقى مخزن ومتجر). العنوان
+ * هنا مش في العنوان عشان بيتغيّر مع الوقت (مخزن يبقى مخزن ومتجر). والمتجر
+ * ليه كمان نطاق توصيل بالكيلو — ده بس اللي بيتحفظ في أسواق مش وصلة. العنوان
  * خاصية من خواص المقر وإجباري: «حدد العنوان» بيفتح الخريطة وتفاصيله، و«تم»
  * بيرجّعه هنا. الأرقام تحت العنوان واختيارية («إضافة جهة اتصال»)، والمقر
  * وعنوانه وأرقامه بيتحفظوا مع بعض.
@@ -42,10 +57,12 @@ interface Props {
  * نافذة «حدد العنوان» جنب النافذة دي مش جواها: الاتنين <dialog>، والتانية
  * بتطلع فوق الأولى لوحدها، وEsc بيقفل اللي فوق بس.
  */
-export function PremisesDialog({ open, value, mode, onSave, onDelete, onClose }: Props) {
+export function PremisesDialog({ open, value, mode, deliveryRadiusKm, withDeliveryRadius, onSave, onDelete, onClose }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   const [draft, setDraft] = useState<Premises>(value);
+  /** نص مش رقم: الخانة ممكن تبقى فاضية، أو فيها «٢٫٥» وهو بيكتب */
+  const [radiusText, setRadiusText] = useState('');
   const [pickingAddress, setPickingAddress] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -64,6 +81,7 @@ export function PremisesDialog({ open, value, mode, onSave, onDelete, onClose }:
   useEffect(() => {
     if (!open) return;
     setDraft(value);
+    setRadiusText(deliveryRadiusKm != null ? String(deliveryRadiusKm) : '');
     setPickingAddress(false);
     setError('');
     setSaving(false);
@@ -93,10 +111,22 @@ export function PremisesDialog({ open, value, mode, onSave, onDelete, onClose }:
       return;
     }
 
+    let radius: number | null | undefined;
+    if (draft.isStore && withDeliveryRadius) {
+      const text = normalizeNumber(radiusText);
+      radius = text ? Number(text) : null;
+      if (radius !== null && !(Number.isFinite(radius) && radius > 0 && radius <= 1000)) {
+        setError('نطاق التوصيل بالكيلو: رقم أكبر من صفر ولحد ١٠٠٠، أو سيبه فاضي لو المتجر مبيوصّلش.');
+        return;
+      }
+      // مبعتش غير اللي اتغيّر — ولو مش عارفين القديم، الخانة الفاضية مبتمسحوش
+      if (radius === (deliveryRadiusKm ?? null) || (deliveryRadiusKm === undefined && radius === null)) radius = undefined;
+    }
+
     setSaving(true);
     setError('');
     try {
-      await onSave({ ...draft, name });
+      await onSave({ ...draft, name }, radius);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'مقدرناش نحفظ المقر. جرّب تاني.');
     } finally {
@@ -174,6 +204,27 @@ export function PremisesDialog({ open, value, mode, onSave, onDelete, onClose }:
                   تقدر تختار الاتنين لو نفس المكان مخزن ومتجر مع بعض.
                 </span>
               </fieldset>
+
+              {/* بطلب العميل: نطاق التوصيل بالكيلو — بيتحفظ في أسواق مع إعدادات المتجر */}
+              {draft.isStore && withDeliveryRadius && (
+                <label className="relative block">
+                  <input
+                    value={radiusText}
+                    onChange={(e) => {
+                      setRadiusText(e.target.value);
+                      setError('');
+                    }}
+                    inputMode="decimal"
+                    maxLength={7}
+                    placeholder="مثال: 10"
+                    className={fieldClass}
+                  />
+                  <Notch>نطاق التوصيل (كم)</Notch>
+                  <span className="mt-1.5 block text-xs text-stone-400">
+                    المتجر بيوصّل لحد المسافة دي من مكانه. سيبها فاضية لو مبيوصّلش.
+                  </span>
+                </label>
+              )}
 
               <div role="group" aria-label="العنوان">
                 <span className={legendClass}>العنوان</span>

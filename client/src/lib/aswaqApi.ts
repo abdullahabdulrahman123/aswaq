@@ -64,7 +64,8 @@ const MESSAGES: Record<number, string> = {
   503: 'وصلة مش رادّة دلوقتي. جرّب كمان شوية.',
 };
 
-async function request<T>(path: string, token: string, init: RequestInit = {}): Promise<T> {
+/** token = null للمعرض — الزائر بيشوف المتاجر وأصنافها من غير تسجيل دخول */
+async function request<T>(path: string, token: string | null, init: RequestInit = {}): Promise<T> {
   if (!ORIGIN) throw new ApiError(0, 'سيرفر الأصناف مش متوصّل بالنسخة دي.');
 
   let res: Response;
@@ -72,7 +73,7 @@ async function request<T>(path: string, token: string, init: RequestInit = {}): 
     res = await fetch(`${ORIGIN}${path}`, {
       ...init,
       headers: {
-        Authorization: `Bearer ${token}`,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(init.body ? { 'Content-Type': 'application/json' } : {}),
       },
     });
@@ -156,4 +157,64 @@ export async function postStoreItem(
     body: JSON.stringify({ itemId }),
   });
   return item;
+}
+
+/**
+ * إعدادات المتجر في أسواق — بطلب العميل «إعدادات خاصة بالمتاجر». دلوقتي نطاق
+ * التوصيل بالكيلو، وnull = المتجر مبيوصّلش. المتجر اللي ملوش إعدادات زيه.
+ */
+export interface StoreSettings {
+  shopId: string;
+  deliveryRadiusKm: number | null;
+}
+
+const settingsPath = (accountId: string) => `/api/businesses/${encodeURIComponent(accountId)}/shops`;
+
+export async function fetchStoreSettings(token: string, accountId: string): Promise<StoreSettings[]> {
+  const { settings } = await request<{ settings: StoreSettings[] }>(`${settingsPath(accountId)}/settings`, token);
+  return settings;
+}
+
+export async function putStoreSettings(
+  token: string,
+  accountId: string,
+  shopId: string,
+  deliveryRadiusKm: number | null,
+): Promise<StoreSettings> {
+  const { settings } = await request<{ settings: StoreSettings }>(
+    `${settingsPath(accountId)}/${encodeURIComponent(shopId)}/settings`,
+    token,
+    { method: 'PUT', body: JSON.stringify({ deliveryRadiusKm }) },
+  );
+  return settings;
+}
+
+/*
+ * المعرض — من غير تسجيل دخول. المتاجر نفسها (أساميها وأنشطتها ومكانها) من
+ * وصلة، وأسواق بيضيف عليها نطاق التوصيل والأصناف.
+ */
+
+/** وحدة الصنف زي ما المشتري بيشوفها — الأسعار الأربعة من غير التكلفة والريت */
+export type ShowroomUnit = Pick<ItemUnit, 'name' | 'unitContent' | 'onSWP' | 'onSRP' | 'onLWP' | 'onLRP'>;
+
+export interface ShowroomItem {
+  id: string;
+  name: string;
+  picture: string | null;
+  units: ShowroomUnit[];
+}
+
+/** نطاق توصيل كل المتاجر اللي بتوصّل — المتجر اللي مش في الليستة مبيوصّلش */
+export async function fetchDeliveryRadii(): Promise<StoreSettings[]> {
+  const { stores } = await request<{ stores: StoreSettings[] }>('/api/showroom/stores', null);
+  return stores;
+}
+
+/** نطاق توصيل المتجر وأصنافه */
+export async function fetchShowroomStore(shopId: string): Promise<{ deliveryRadiusKm: number | null; items: ShowroomItem[] }> {
+  const { store } = await request<{ store: { deliveryRadiusKm: number | null; items: ShowroomItem[] } }>(
+    `/api/showroom/stores/${encodeURIComponent(shopId)}`,
+    null,
+  );
+  return store;
 }

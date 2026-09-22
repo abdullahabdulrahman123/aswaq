@@ -35,14 +35,21 @@ interface Props {
   value: BusinessAddress;
   /** اسم المقر اللي العنوان ده بتاعه — بيظهر تحت العنوان لو مكتوب */
   premisesName: string;
-  /** «تم»: العنوان بيرجع لفورم المقر، والحفظ الفعلي بيحصل مع المقر نفسه */
-  onDone: (address: BusinessAddress) => void;
+  /**
+   * «تم»: في فورم المقر العنوان بيرجع للفورم والحفظ بيحصل مع المقر. في
+   * «عناويني» الحفظ بيحصل هنا: بترجع Promise، ولو رمت النافذة بتعرض الخطأ
+   * وتفضل مفتوحة.
+   */
+  onDone: (address: BusinessAddress) => void | Promise<void>;
   onClose: () => void;
+  /** «مكان {المقر} بالظبط» في شرح الخريطة — عنوان المستخدم مش مقر */
+  placeNoun?: string;
 }
 
 /**
- * «حدد العنوان» — عنوان المقر على الخريطة وتفاصيله. بتتفتح من فورم المقر
- * (PremisesDialog)، و«تم» بيرجّع العنوان للفورم؛ الحفظ بيحصل مع المقر.
+ * «حدد العنوان» — العنوان على الخريطة وتفاصيله. بتتفتح من فورم المقر
+ * (PremisesDialog)، و«تم» بيرجّع العنوان للفورم؛ الحفظ بيحصل مع المقر. وبتتفتح
+ * كمان لعنوان من «عناويني»، وساعتها «تم» بيحفظ على طول.
  *
  * الشغل كله على *مسودة* جوه الدايالوج: التعديل مبيوصلش للفورم اللي بره غير
  * لما المستخدم يدوس «تم». فالرجوع بيسيب كل حاجة زي ما كانت.
@@ -50,11 +57,12 @@ interface Props {
  * بنستخدم عنصر <dialog> الأصلي مش div عادي: بيدينا حبس التركيز جوه النافذة،
  * وقفل بزرار Esc، وخلفية معتمة — كل ده من غير كود ولا مكتبة.
  */
-export function AddressDialog({ open, value, premisesName, onDone, onClose }: Props) {
+export function AddressDialog({ open, value, premisesName, onDone, onClose, placeNoun = 'المقر' }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   const [draft, setDraft] = useState<BusinessAddress>(value);
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
   const [locating, setLocating] = useState(false);
   const [locateError, setLocateError] = useState('');
   const [located, setLocated] = useState(false);
@@ -72,6 +80,7 @@ export function AddressDialog({ open, value, premisesName, onDone, onClose }: Pr
     if (!open) return;
     setDraft(value);
     setError('');
+    setSaving(false);
     setLocateError('');
     setLocated(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -128,12 +137,13 @@ export function AddressDialog({ open, value, premisesName, onDone, onClose }: Pr
     }
   }
 
-  function handleDone() {
+  async function handleDone() {
+    if (saving) return;
     if (!draft.governorate || !draft.city.trim()) {
       setError('اختار المحافظة والمدينة.');
       return;
     }
-    onDone({
+    const pending = onDone({
       ...draft,
       description: draft.description.trim(),
       country: draft.country.trim(),
@@ -142,6 +152,16 @@ export function AddressDialog({ open, value, premisesName, onDone, onClose }: Pr
       street: draft.street.trim(),
       landmark: draft.landmark.trim(),
     });
+    if (!pending) return;
+
+    setSaving(true);
+    try {
+      await pending;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'مقدرناش نحفظ العنوان. جرّب تاني.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   const cities = citiesOf(draft.governorate);
@@ -199,8 +219,8 @@ export function AddressDialog({ open, value, premisesName, onDone, onClose }: Pr
               locating={locating}
               hint={
                 canLookupAnyPoint
-                  ? 'اسحب الدبوس أو دوس على الخريطة لتحديد مكان المقر بالظبط — الأسماء هتتحدّث لوحدها.'
-                  : 'اسحب الدبوس أو دوس على الخريطة لتحديد مكان المقر بالظبط. الأسماء تحت مش هتتغيّر لوحدها — عدّلها بإيدك لو محتاج.'
+                  ? `اسحب الدبوس أو دوس على الخريطة لتحديد مكان ${placeNoun} بالظبط — الأسماء هتتحدّث لوحدها.`
+                  : `اسحب الدبوس أو دوس على الخريطة لتحديد مكان ${placeNoun} بالظبط. الأسماء تحت مش هتتغيّر لوحدها — عدّلها بإيدك لو محتاج.`
               }
             />
           </div>
@@ -317,9 +337,10 @@ export function AddressDialog({ open, value, premisesName, onDone, onClose }: Pr
             <button
               type="button"
               onClick={handleDone}
-              className="rounded-xl bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-600"
+              disabled={saving}
+              className="rounded-xl bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:cursor-progress disabled:opacity-70"
             >
-              تم
+              {saving ? 'بنحفظ…' : 'تم'}
             </button>
             <button
               type="button"

@@ -5,6 +5,7 @@ import { App } from './App';
 import { ThemeProvider } from './context/ThemeContext';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
+import { LocationProvider } from './context/LocationContext';
 import { SellerProvider } from './context/SellerContext';
 import './index.css';
 
@@ -13,11 +14,13 @@ createRoot(document.getElementById('root')!).render(
     <BrowserRouter basename={import.meta.env.BASE_URL}>
       <ThemeProvider>
         <AuthProvider>
-          <CartProvider>
-            <SellerProvider>
-              <App />
-            </SellerProvider>
-          </CartProvider>
+          <LocationProvider>
+            <CartProvider>
+              <SellerProvider>
+                <App />
+              </SellerProvider>
+            </CartProvider>
+          </LocationProvider>
         </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>
