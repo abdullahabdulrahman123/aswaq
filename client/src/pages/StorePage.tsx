@@ -36,6 +36,8 @@ export function StorePage() {
   const [attempt, setAttempt] = useState(0);
   /** اللي المشتري اختاره. null = لسه مختارش: توصيل لو المتجر بيوصّله، وإلا استلام */
   const [chosen, setChosen] = useState<ReceivingMethod | null>(null);
+  /** داس «توصيل» ومكانه مش متحدد — بنقوله يحدده الأول */
+  const [askedForLocation, setAskedForLocation] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -44,6 +46,7 @@ export function StorePage() {
     setNotFound(false);
     setError('');
     setChosen(null);
+    setAskedForLocation(false);
 
     Promise.allSettled([fetchStore(storeId), fetchShowroomStore(storeId)]).then(([fromWasla, fromAswaq]) => {
       if (cancelled) return;
@@ -123,16 +126,20 @@ export function StorePage() {
   const km = location && store.location ? distanceKm(location, store.location) : null;
   const canDeliver = deliversTo(store.location, radius, location);
   const method: ReceivingMethod = chosen === 'delivery' && !canDeliver ? 'pickup' : (chosen ?? (canDeliver ? 'delivery' : 'pickup'));
+  /**
+   * المتجر بيوصّل بس مكان المشتري مش متحدد: «توصيل» مش مقفول، والدوسة عليه
+   * بتقول «حدد موقعك الأول» — بطلب المستخدم. ولما يحدده والمتجر بيوصّله،
+   * التوصيل بيتختار لوحده (chosen = توصيل).
+   */
+  const needsLocation = radius !== null && !location;
 
-  /** ليه التوصيل مش متاح — بيظهر تحت الاختيار */
+  /** ليه التوصيل مقفول — بيظهر تحت الاختيار */
   const noDeliveryReason =
     radius === null
       ? 'المتجر ده مبيوصّلش — الاستلام منه بس.'
-      : !location
-        ? 'حدد مكانك عشان نعرف المتجر بيوصّلك ولا لأ.'
-        : km === null
-          ? 'مكان المتجر مش متحدد، فمش هنقدر نعرف بيوصّلك ولا لأ.'
-          : `المتجر بيوصّل لحد ${formatDistance(radius)}، ومكانك على بعد ${formatDistance(km)}.`;
+      : km === null
+        ? 'مكان المتجر مش متحدد، فمش هنقدر نعرف بيوصّلك ولا لأ.'
+        : `المتجر بيوصّل لحد ${formatDistance(radius)}، ومكانك على بعد ${formatDistance(km)}.`;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
@@ -159,7 +166,7 @@ export function StorePage() {
           >
             {METHODS.map(({ key, label }) => {
               const picked = method === key;
-              const unavailable = key === 'delivery' && !canDeliver;
+              const unavailable = key === 'delivery' && !canDeliver && !needsLocation;
               return (
                 <button
                   key={key}
@@ -167,7 +174,10 @@ export function StorePage() {
                   role="radio"
                   aria-checked={picked}
                   disabled={unavailable}
-                  onClick={() => setChosen(key)}
+                  onClick={() => {
+                    if (key === 'delivery' && needsLocation) setAskedForLocation(true);
+                    setChosen(key);
+                  }}
                   className={`rounded-lg px-3 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
                     picked
                       ? 'bg-white text-brand-800 shadow-sm dark:bg-surface-card dark:text-brand-200'
@@ -179,7 +189,15 @@ export function StorePage() {
               );
             })}
           </div>
-          {!canDeliver && <p className="mt-1.5 text-xs leading-relaxed text-stone-500 dark:text-stone-400">{noDeliveryReason}</p>}
+          {needsLocation ? (
+            askedForLocation && (
+              <p role="alert" className="mt-1.5 text-xs font-semibold leading-relaxed text-brand-700 dark:text-brand-300">
+                حدد موقعك الأول
+              </p>
+            )
+          ) : (
+            !canDeliver && <p className="mt-1.5 text-xs leading-relaxed text-stone-500 dark:text-stone-400">{noDeliveryReason}</p>
+          )}
         </div>
       </div>
 
