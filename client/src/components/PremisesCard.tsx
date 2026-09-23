@@ -3,15 +3,8 @@ import { oneLine } from '../lib/address';
 import { formatDistance } from '../lib/buyerLocation';
 import { PinIcon } from './PinIcon';
 
-/** نوع المقر كشارات — المقر اللي اتعمل من عنوان قديم بيبان إن نوعه ناقص */
+/** نوع المقر كشارات — والمقر اللي مش متجر ولا مخزن ملوش شارة */
 function KindBadges({ premises }: { premises: Premises }) {
-  if (!premises.isStore && !premises.isWarehouse) {
-    return (
-      <span className="shrink-0 rounded-md bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
-        من غير نوع
-      </span>
-    );
-  }
   const kinds = [premises.isWarehouse && 'مخزن', premises.isStore && 'متجر'].filter((k): k is string => Boolean(k));
   return (
     <>

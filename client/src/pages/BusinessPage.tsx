@@ -25,7 +25,6 @@ export function BusinessPage() {
     businessesError,
     addPremises,
     updatePremises,
-    removePremises,
     addBusinessContact,
     updateBusinessContact,
     removeBusinessContact,
@@ -153,13 +152,6 @@ export function BusinessPage() {
     setEditing(null);
   }
 
-  /** بترمي لو المسح فشل — زي الحفظ، الخطأ بيتعرض جوه النافذة */
-  async function handleDelete(premisesId: string) {
-    if (!business) return;
-    await removePremises(business.accountId, premisesId);
-    setEditing(null);
-  }
-
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
       {justCreated && (
@@ -184,24 +176,26 @@ export function BusinessPage() {
 
       {/* نفس أرقام التسجيل — هنا بتتضاف وتتعدل بعده، وبتتحفظ في وصلة على طول */}
       <section className="mt-7 rounded-2xl border border-stone-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
-        <h2 className="font-display text-lg font-bold">
-          جهات الاتصال
-          {business.contacts.length > 0 && (
-            <span className="ms-2 rounded-md bg-stone-100 px-1.5 py-0.5 text-xs tabular-nums font-normal text-stone-500 dark:bg-white/10 dark:text-stone-400">
-              {business.contacts.length}
-            </span>
-          )}
-        </h2>
-        <p className="mt-1 text-xs text-stone-400">أرقام النشاط العامة. أرقام كل فرع بتتضاف من المقر بتاعه.</p>
-        <div className="mt-4">
-          <ContactsField
-            contacts={business.contacts}
-            ownerName={business.name}
-            onAdd={(input) => addBusinessContact(business.accountId, input)}
-            onUpdate={(contactId, input) => updateBusinessContact(business.accountId, contactId, input)}
-            onRemove={(contactId) => removeBusinessContact(business.accountId, contactId)}
-          />
-        </div>
+        <ContactsField
+          heading={
+            <>
+              <h2 className="font-display text-lg font-bold">
+                جهات الاتصال
+                {business.contacts.length > 0 && (
+                  <span className="ms-2 rounded-md bg-stone-100 px-1.5 py-0.5 text-xs tabular-nums font-normal text-stone-500 dark:bg-white/10 dark:text-stone-400">
+                    {business.contacts.length}
+                  </span>
+                )}
+              </h2>
+              <p className="mt-1 text-xs text-stone-400">أرقام النشاط العامة. أرقام كل فرع بتتضاف من المقر بتاعه.</p>
+            </>
+          }
+          contacts={business.contacts}
+          ownerName={business.name}
+          onAdd={(input) => addBusinessContact(business.accountId, input)}
+          onUpdate={(contactId, input) => updateBusinessContact(business.accountId, contactId, input)}
+          onRemove={(contactId) => removeBusinessContact(business.accountId, contactId)}
+        />
       </section>
 
       <section className="mt-5 rounded-2xl border border-stone-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
@@ -258,7 +252,6 @@ export function BusinessPage() {
         }
         withStoreSettings={aswaqApiConfigured}
         onSave={handleSave}
-        onDelete={editing?.id ? () => handleDelete(editing.id) : undefined}
         onClose={() => setEditing(null)}
       />
     </div>

@@ -1,6 +1,7 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { HelpHint } from '../components/HelpHint';
 import { Notch, compactFieldClass, fieldClass } from '../components/OutlinedField';
 import { SessionExpiredNotice } from '../components/SessionExpiredNotice';
 import { ApiError, SessionExpiredError } from '../lib/waslaApi';
@@ -294,9 +295,6 @@ export function ItemFormPage() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
       <h1 className="font-display text-2xl font-bold sm:text-3xl">{editing ? 'تعديل صنف' : 'إضافة صنف'}</h1>
-      <p className="mt-2 text-sm text-stone-500 dark:text-stone-400">
-        لنشاط <span className="font-semibold text-stone-700 dark:text-stone-200">{business.name}</span>
-      </p>
 
       <div className="mt-6">
         <SessionExpiredNotice />
@@ -401,12 +399,14 @@ export function ItemFormPage() {
           </div>
 
           <div className="mt-8 border-t border-stone-200 pt-5 dark:border-white/10">
-            <h2 className="font-display text-lg font-bold">الوحدات</h2>
-            <p className="mt-1 text-xs leading-relaxed text-stone-400">
-              محتوى كل وحدة = كام من أصغر وحدة: الكرتونة فيها 12 قطعة، والدستة ممكن تكون هي أصغر
-              وحدة بمحتوى ١. لازم تكون فيه وحدة محتواها ١. خانة weight بالجرام وخانة volume
-              بالسنتيمتر المكعب للوحدة الواحدة. الأسعار وavg بالجنيه، وسيب اللي لسه متحددش فاضي.
-            </p>
+            <div className="flex items-center gap-2">
+              <h2 className="font-display text-lg font-bold">الوحدات</h2>
+              <HelpHint label="شرح الوحدات">
+                محتوى كل وحدة = كام من أصغر وحدة: الكرتونة فيها 12 قطعة، والدستة ممكن تكون هي أصغر
+                وحدة بمحتوى ١. لازم تكون فيه وحدة محتواها ١. خانة weight بالجرام وخانة volume
+                بالسنتيمتر المكعب للوحدة الواحدة. الأسعار وavg بالجنيه، وسيب اللي لسه متحددش فاضي.
+              </HelpHint>
+            </div>
 
             {units.map((unit, index) => (
               /* على الموبايل خط فاصل بس بين الوحدات بدل بوكس — عشان الهوامش */
@@ -462,7 +462,6 @@ export function ItemFormPage() {
                       value={unit.avgCost}
                       onChange={(e) => setUnitField(index, 'avgCost', e.target.value)}
                       inputMode="decimal"
-                      placeholder="0.00"
                       className={compactFieldClass}
                     />
                     <Notch compact>avg</Notch>
@@ -473,7 +472,6 @@ export function ItemFormPage() {
                       value={unit.rate}
                       onChange={(e) => setUnitField(index, 'rate', e.target.value)}
                       inputMode="decimal"
-                      placeholder="0"
                       className={compactFieldClass}
                     />
                     <Notch compact>rate</Notch>
@@ -484,7 +482,6 @@ export function ItemFormPage() {
                       value={unit.weight}
                       onChange={(e) => setUnitField(index, 'weight', e.target.value)}
                       inputMode="decimal"
-                      placeholder="0"
                       className={compactFieldClass}
                     />
                     <Notch compact>weight</Notch>
@@ -496,7 +493,6 @@ export function ItemFormPage() {
                       value={unit.volume}
                       onChange={(e) => setUnitField(index, 'volume', e.target.value)}
                       inputMode="decimal"
-                      placeholder="0"
                       className={compactFieldClass}
                     />
                     <Notch compact>volume</Notch>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { contactTypeInfo, displayContactValue, MAX_CONTACTS, type Contact, type ContactInput } from '../lib/contacts';
 import { ContactDialog } from './ContactDialog';
 import { ContactIcon } from './ContactIcon';
@@ -13,6 +13,8 @@ interface Props {
   onAdd: (input: ContactInput) => Promise<void> | void;
   onUpdate: (id: string, input: ContactInput) => Promise<void> | void;
   onRemove: (id: string) => Promise<void> | void;
+  /** عنوان الجزء — زرار الإضافة بيتحط جنبه، زي «إضافة مقر» */
+  heading: ReactNode;
   /** مين الأرقام دي — بيظهر في النافذة */
   ownerName?: string;
   /** سطر شرح تحت الزرار */
@@ -21,10 +23,11 @@ interface Props {
 
 /**
  * جهات الاتصال — واجهة واحدة بطلب العميل، بتتحط في ٤ أماكن: تسجيل النشاط،
- * وصفحة النشاط، وفورم المقر مع العنوان، و«حسابي». ليستة بالأرقام، وزرار
- * «إضافة جهة اتصال» بيفتح ContactDialog، والدوسة على أي رقم بتفتحه للتعديل.
+ * وصفحة النشاط، وفورم المقر مع العنوان، و«حسابي». العنوان وجنبه زرار
+ * «إضافة جهة اتصال» بيفتح ContactDialog، وتحتهم ليستة بالأرقام، والدوسة على
+ * أي رقم بتفتحه للتعديل.
  */
-export function ContactsField({ contacts, onAdd, onUpdate, onRemove, ownerName, hint }: Props) {
+export function ContactsField({ contacts, onAdd, onUpdate, onRemove, heading, ownerName, hint }: Props) {
   /** null = مقفولة، 'new' = إضافة، جهة اتصال = تعديلها */
   const [editing, setEditing] = useState<Contact | 'new' | null>(null);
   const current = editing === 'new' ? null : editing;
@@ -32,8 +35,21 @@ export function ContactsField({ contacts, onAdd, onUpdate, onRemove, ownerName, 
 
   return (
     <div>
-      {contacts.length > 0 && (
-        <ul className="mb-2.5 grid gap-2">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">{heading}</div>
+        {!full && (
+          <button
+            type="button"
+            onClick={() => setEditing('new')}
+            className="shrink-0 rounded-lg border border-stone-300 px-3 py-2 text-xs font-medium transition hover:border-brand-400 hover:text-brand-700 dark:border-white/15 dark:hover:text-brand-400"
+          >
+            ＋ إضافة جهة اتصال
+          </button>
+        )}
+      </div>
+
+      {contacts.length > 0 ? (
+        <ul className="mt-3 grid gap-2">
           {contacts.map((contact) => (
             <li key={contact.id}>
               <button
@@ -66,21 +82,16 @@ export function ContactsField({ contacts, onAdd, onUpdate, onRemove, ownerName, 
             </li>
           ))}
         </ul>
+      ) : (
+        <p className="mt-3 rounded-xl border border-dashed border-stone-300 px-4 py-4 text-center text-sm text-stone-400 dark:border-white/15">
+          مفيش جهات اتصال لسه.
+        </p>
       )}
 
-      {full ? (
-        <p className="rounded-xl bg-stone-50 px-3 py-2.5 text-xs text-stone-500 dark:bg-white/5 dark:text-stone-400">
+      {full && (
+        <p className="mt-2.5 rounded-xl bg-stone-50 px-3 py-2.5 text-xs text-stone-500 dark:bg-white/5 dark:text-stone-400">
           وصلت لأقصى عدد: {MAX_CONTACTS} جهة اتصال. امسح واحدة عشان تضيف غيرها.
         </p>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setEditing('new')}
-          className="flex w-full items-center justify-center gap-2 rounded-xl border-[1.5px] border-dashed border-brand-400 bg-brand-50/70 px-4 py-3.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 dark:border-brand-500/60 dark:bg-brand-500/10 dark:text-brand-300"
-        >
-          <ContactIcon type="landline" className="h-[18px] w-[18px]" />
-          إضافة جهة اتصال
-        </button>
       )}
       {hint && <span className="mt-1.5 block text-xs text-stone-400">{hint}</span>}
 

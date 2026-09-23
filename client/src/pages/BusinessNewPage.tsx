@@ -123,8 +123,8 @@ export function BusinessNewPage() {
         </label>
 
         <div role="group" aria-label="جهات الاتصال" className="mt-6">
-          <span className="mb-2 block text-xs font-medium text-stone-500 dark:text-stone-400">جهات الاتصال</span>
           <ContactsField
+            heading={<span className="block text-xs font-medium text-stone-500 dark:text-stone-400">جهات الاتصال</span>}
             contacts={contacts}
             ownerName={name.trim()}
             hint="أرقام النشاط العامة أو الكول سنتر — اختياري، وتقدر تضيفها بعدين من صفحة النشاط."

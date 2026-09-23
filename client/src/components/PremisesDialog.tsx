@@ -36,7 +36,7 @@ const minimumsToText = (minimums: Minimums | undefined) =>
     PRICE_FIELDS.map((f) => [f, minimums?.[f] != null ? String(minimums[f]! / 100) : '']),
   ) as Record<PriceField, string>;
 
-/** بترتيب كلام العميل: «مخزن أو متجر أو الاتنين» */
+/** بترتيب كلام العميل: «مخزن أو متجر أو الاتنين». ولا واحد كمان مسموح */
 const KINDS = [
   { key: 'isWarehouse', label: 'مخزن' },
   { key: 'isStore', label: 'متجر' },
@@ -63,8 +63,6 @@ interface Props {
    * settings بتتبعت بس لو اتغيّرت: undefined = سيبها زي ما هي.
    */
   onSave: (premises: Premises, settings?: StoreSettingsDraft) => Promise<void>;
-  /** التعديل بس. بيرمي لو المسح فشل */
-  onDelete?: () => Promise<void>;
   onClose: () => void;
 }
 
@@ -79,7 +77,7 @@ interface Props {
  * نافذة «حدد العنوان» جنب النافذة دي مش جواها: الاتنين <dialog>، والتانية
  * بتطلع فوق الأولى لوحدها، وEsc بيقفل اللي فوق بس.
  */
-export function PremisesDialog({ open, value, mode, settings, withStoreSettings, onSave, onDelete, onClose }: Props) {
+export function PremisesDialog({ open, value, mode, settings, withStoreSettings, onSave, onClose }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   const [draft, setDraft] = useState<Premises>(value);
@@ -90,8 +88,6 @@ export function PremisesDialog({ open, value, mode, settings, withStoreSettings,
   const [pickingAddress, setPickingAddress] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [deleting, setDeleting] = useState(false);
 
   // فتح وقفل النافذة الأصلية بالتزامن مع الحالة
   useEffect(() => {
@@ -110,8 +106,6 @@ export function PremisesDialog({ open, value, mode, settings, withStoreSettings,
     setPickingAddress(false);
     setError('');
     setSaving(false);
-    setConfirmingDelete(false);
-    setDeleting(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -125,10 +119,6 @@ export function PremisesDialog({ open, value, mode, settings, withStoreSettings,
     const name = draft.name.trim();
     if (!name) {
       setError('اكتب اسم المقر.');
-      return;
-    }
-    if (!draft.isStore && !draft.isWarehouse) {
-      setError('اختار نوع المقر: مخزن أو متجر أو الاتنين.');
       return;
     }
     if (!draft.address) {
@@ -171,20 +161,6 @@ export function PremisesDialog({ open, value, mode, settings, withStoreSettings,
       setError(err instanceof Error ? err.message : 'مقدرناش نحفظ المقر. جرّب تاني.');
     } finally {
       setSaving(false);
-    }
-  }
-
-  async function handleDelete() {
-    if (!onDelete || deleting) return;
-    setDeleting(true);
-    setError('');
-    try {
-      await onDelete();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'مقدرناش نمسح المقر. جرّب تاني.');
-      setConfirmingDelete(false);
-    } finally {
-      setDeleting(false);
     }
   }
 
@@ -331,8 +307,8 @@ export function PremisesDialog({ open, value, mode, settings, withStoreSettings,
 
               {/* مع العنوان بطلب العميل: رقم المقر في وصلة شايل المقر وعنوانه */}
               <div role="group" aria-label="جهات الاتصال">
-                <span className={legendClass}>جهات الاتصال</span>
                 <ContactsField
+                  heading={<span className={legendClass}>جهات الاتصال</span>}
                   contacts={draft.contacts}
                   ownerName={draft.name.trim()}
                   hint="أرقام المقر ده — اختياري. بتتحفظ مع المقر."
@@ -353,7 +329,7 @@ export function PremisesDialog({ open, value, mode, settings, withStoreSettings,
               <button
                 type="button"
                 onClick={handleSave}
-                disabled={saving || deleting}
+                disabled={saving}
                 className="rounded-xl bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:cursor-progress disabled:opacity-70"
               >
                 {saving ? 'بنحفظ…' : mode === 'add' ? 'إضافة المقر' : 'حفظ التعديل'}
@@ -366,40 +342,6 @@ export function PremisesDialog({ open, value, mode, settings, withStoreSettings,
                 إلغاء
               </button>
             </div>
-
-            {mode === 'edit' && onDelete && (
-              <div className="mt-4 text-sm">
-                {confirmingDelete ? (
-                  <div className="flex flex-wrap items-center gap-2 rounded-xl bg-red-50 px-3 py-2.5 dark:bg-red-500/10">
-                    <span className="flex-1 text-red-700 dark:text-red-300">المقر وعنوانه هيتمسحوا. متأكد؟</span>
-                    <button
-                      type="button"
-                      onClick={handleDelete}
-                      disabled={deleting}
-                      className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-red-700 disabled:opacity-70"
-                    >
-                      {deleting ? 'بنمسح…' : 'أيوه، امسح'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConfirmingDelete(false)}
-                      disabled={deleting}
-                      className="rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium dark:border-white/15"
-                    >
-                      لأ
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setConfirmingDelete(true)}
-                    className="font-medium text-red-600 transition hover:text-red-700 dark:text-red-400"
-                  >
-                    امسح المقر
-                  </button>
-                )}
-              </div>
-            )}
           </div>
         )}
       </dialog>
