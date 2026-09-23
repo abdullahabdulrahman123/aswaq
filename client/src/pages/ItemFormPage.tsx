@@ -399,7 +399,7 @@ export function ItemFormPage() {
           </div>
 
           <div className="mt-8 border-t border-stone-200 pt-5 dark:border-white/10">
-            <div className="flex items-center gap-2">
+            <div className="relative flex items-center gap-2">
               <h2 className="font-display text-lg font-bold">الوحدات</h2>
               <HelpHint label="شرح الوحدات">
                 محتوى كل وحدة = كام من أصغر وحدة: الكرتونة فيها 12 قطعة، والدستة ممكن تكون هي أصغر

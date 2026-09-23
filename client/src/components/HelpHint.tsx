@@ -13,6 +13,9 @@ interface Props {
  * علامة استفهام بتفتح شرح بالضغطة المطولة، بطلب العميل — بدل سطور شرح ثابتة
  * تحت العنوان. الدوسة العادية مبتعملش حاجة، وأي دوسة برّه بتقفل الشرح.
  * من الكيبورد Enter أو Space بيفتحوه ويقفلوه.
+ *
+ * الشرح بيتعلّق في أقرب أب relative (سطر العنوان مثلاً) مش في العلامة نفسها:
+ * العلامة قريبة من الطرف، وشرح متعلّق فيها كان بيطلع برّه الشاشة على موبايل ٣٦٠.
  */
 export function HelpHint({ label, children }: Props) {
   const [open, setOpen] = useState(false);
@@ -33,7 +36,7 @@ export function HelpHint({ label, children }: Props) {
   const cancel = () => window.clearTimeout(timer.current);
 
   return (
-    <span ref={rootRef} className="relative inline-flex">
+    <span ref={rootRef} className="inline-flex">
       <button
         type="button"
         aria-label={label}
@@ -59,7 +62,7 @@ export function HelpHint({ label, children }: Props) {
       {open && (
         <span
           role="tooltip"
-          className="absolute start-0 top-full z-20 mt-2 block w-72 max-w-[80vw] rounded-xl border border-stone-200 bg-white p-3 text-xs font-normal leading-relaxed text-stone-600 shadow-card dark:border-white/10 dark:bg-surface-card dark:text-stone-300"
+          className="absolute start-0 top-full z-20 mt-2 block w-full max-w-sm rounded-xl border border-stone-200 bg-white p-3 text-xs font-normal leading-relaxed text-stone-600 shadow-card dark:border-white/10 dark:bg-surface-card dark:text-stone-300"
         >
           {children}
         </span>
