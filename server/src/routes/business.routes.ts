@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { requireBusinessAccess } from '../middleware/auth.js';
+import * as customerController from '../controllers/customer.controller.js';
 import * as itemController from '../controllers/item.controller.js';
 import * as storeController from '../controllers/store.controller.js';
 
@@ -25,6 +26,10 @@ scoped.post('/shops/:shopId/items', itemController.addToStore);
 
 scoped.get('/shops/settings', storeController.listSettings);
 scoped.put('/shops/:shopId/settings', storeController.updateSettings);
+
+// عملاء النشاط — لـ«مبيعات»
+scoped.get('/customers', customerController.list);
+scoped.post('/customers', customerController.create);
 
 const router = Router();
 router.use('/:accountId', scoped);

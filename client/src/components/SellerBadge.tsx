@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useSales } from '../context/SalesContext';
 import { useSeller } from '../context/SellerContext';
 import { Avatar } from './Avatar';
 
@@ -6,10 +7,14 @@ import { Avatar } from './Avatar';
  * «الطرف التاني» على شمال الناڤبار: الشركة اللي بتشتري منها، قصاد صورتك على
  * اليمين. بتظهر جوه صفحة الشركة وصفحات منتجاتها بس، والدوسة عليها بترجّعك
  * لصفحة الشركة.
+ *
+ * في «مبيعات» مبتظهرش: البائع هو المستخدم نفسه (صورته على اليمين)، والمكان
+ * ده بتاع اسم المشتري.
  */
 export function SellerBadge() {
   const seller = useSeller();
-  if (!seller) return null;
+  const { session } = useSales();
+  if (!seller || session) return null;
 
   return (
     <Link

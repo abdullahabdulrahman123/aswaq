@@ -202,6 +202,33 @@ export async function putStoreSettings(
   return settings;
 }
 
+/** عميل من عملاء النشاط — لـ«مبيعات». isTrader = أسعار الجملة */
+export interface Customer {
+  id: string;
+  /** الاسم الأدبي — «الحاج فلان» */
+  name: string;
+  /** أرقام إنجليزي. '' = مش معروف */
+  phone: string;
+  isTrader: boolean;
+}
+
+export type CustomerInput = Omit<Customer, 'id'>;
+
+const customersPath = (accountId: string) => `/api/businesses/${encodeURIComponent(accountId)}/customers`;
+
+export async function fetchCustomers(token: string, accountId: string): Promise<Customer[]> {
+  const { customers } = await request<{ customers: Customer[] }>(customersPath(accountId), token);
+  return customers;
+}
+
+export async function postCustomer(token: string, accountId: string, input: CustomerInput): Promise<Customer> {
+  const { customer } = await request<{ customer: Customer }>(customersPath(accountId), token, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  return customer;
+}
+
 /*
  * المعرض — من غير تسجيل دخول. المتاجر نفسها (أساميها وأنشطتها ومكانها) من
  * وصلة، وأسواق بيضيف عليها نطاق التوصيل والأصناف.

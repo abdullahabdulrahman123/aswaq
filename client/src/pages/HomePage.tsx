@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Avatar } from '../components/Avatar';
 import { LocationBar } from '../components/LocationBar';
 import { useBuyerLocation } from '../context/LocationContext';
+import { useSales } from '../context/SalesContext';
 import { fetchDeliveryRadii } from '../lib/aswaqApi';
 import { deliversTo, distanceKm, formatDistance } from '../lib/buyerLocation';
 import { ApiError, fetchStores, type ShowroomStore } from '../lib/waslaApi';
@@ -15,9 +16,14 @@ import { ApiError, fetchStores, type ShowroomStore } from '../lib/waslaApi';
  * لو المشتري حدد مكانه، المتاجر بتترتب من الأقرب، وكل متجر عليه المسافة
  * وبيوصّل لمكانه ولا لأ. المتجر اللي مبيوصّلش بيفضل ظاهر: ينفع يشتري منه
  * ويستلم من عنده. من غير مكان: الأحدث الأول زي ما وصلة بترجّعها.
+ *
+ * في «مبيعات» نفس الصفحة بمتاجر النشاط البائع بس، بطلب العميل — ومن غير
+ * مكان المشتري والتوصيل: البائع هو اللي بيقرر.
  */
 export function HomePage() {
-  const { location } = useBuyerLocation();
+  const { session } = useSales();
+  const { location: myLocation } = useBuyerLocation();
+  const location = session ? null : myLocation;
   /** null = لسه بنجيب */
   const [stores, setStores] = useState<ShowroomStore[] | null>(null);
   /** نطاق توصيل المتاجر اللي بتوصّل. null = أسواق مردّش — ساعتها مبنقولش حاجة عن التوصيل */
@@ -55,20 +61,23 @@ export function HomePage() {
   // sort ثابت: المتاجر اللي على نفس المسافة بتفضل الأحدث الأول
   const shown = useMemo(() => {
     if (!stores) return null;
-    const list = stores.map((store) => ({
+    const own = session ? stores.filter((store) => store.business.accountId === session.accountId) : stores;
+    const list = own.map((store) => ({
       store,
       km: location && store.location ? distanceKm(location, store.location) : null,
     }));
     return location ? list.sort((a, b) => (a.km ?? Infinity) - (b.km ?? Infinity)) : list;
-  }, [stores, location]);
+  }, [stores, location, session]);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
-      <h1 className="font-display text-2xl font-bold sm:text-3xl">المتاجر</h1>
+      <h1 className="font-display text-2xl font-bold sm:text-3xl">{session ? `متاجر ${session.businessName}` : 'المتاجر'}</h1>
 
-      <div className="mt-4 max-w-xl">
-        <LocationBar />
-      </div>
+      {!session && (
+        <div className="mt-4 max-w-xl">
+          <LocationBar />
+        </div>
+      )}
 
       <div className="mt-6">
         {error ? (
@@ -89,7 +98,7 @@ export function HomePage() {
           <p className="text-sm text-stone-500 dark:text-stone-400">بنجيب المتاجر…</p>
         ) : shown.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-stone-300 p-8 text-center text-sm text-stone-500 dark:border-white/15 dark:text-stone-400">
-            لسه مفيش متاجر.
+            {session ? 'النشاط ده ملوش متاجر لسه — علّم «متجر» على مقر من «بيانات الشركة».' : 'لسه مفيش متاجر.'}
           </p>
         ) : (
           <ul aria-label="المتاجر" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

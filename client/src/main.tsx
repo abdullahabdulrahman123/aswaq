@@ -8,6 +8,7 @@ import { StoreCartProvider } from './context/StoreCartContext';
 import { AuthProvider } from './context/AuthContext';
 import { LocationProvider } from './context/LocationContext';
 import { SellerProvider } from './context/SellerContext';
+import { SalesProvider } from './context/SalesContext';
 import './index.css';
 
 createRoot(document.getElementById('root')!).render(
@@ -16,13 +17,15 @@ createRoot(document.getElementById('root')!).render(
       <ThemeProvider>
         <AuthProvider>
           <LocationProvider>
-            <CartProvider>
-              <StoreCartProvider>
-                <SellerProvider>
-                  <App />
-                </SellerProvider>
-              </StoreCartProvider>
-            </CartProvider>
+            <SalesProvider>
+              <CartProvider>
+                <StoreCartProvider>
+                  <SellerProvider>
+                    <App />
+                  </SellerProvider>
+                </StoreCartProvider>
+              </CartProvider>
+            </SalesProvider>
           </LocationProvider>
         </AuthProvider>
       </ThemeProvider>

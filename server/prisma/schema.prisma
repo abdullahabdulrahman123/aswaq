@@ -74,6 +74,26 @@ model StoreSettings {
   @@map("store_settings")
 }
 
+/**
+ * عملاء النشاط — اللي بيبيعلهم من «مبيعات». قايمة خاصة بكل نشاط، بتكبر من
+ * نافذة «مبيعات» نفسها. مش حسابات وصلة: العميل ممكن ميكونش متسجّل خالص.
+ *
+ * isTrader بيحدد أسعاره: تاجر = جملة، فرد = قطاعي. البائع بس اللي بيشوفه.
+ */
+model Customer {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  accountId String   @db.ObjectId
+  /** الاسم الأدبي — «الحاج فلان» */
+  name      String
+  /** موبايل بأرقام إنجليزي. فاضي = مش معروف */
+  phone     String   @default("")
+  isTrader  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([accountId])
+  @@map("customers")
+}
+
 /** وحدة بيع. كل الأسعار بالقرش، والفاضي = لسه متحددش */
 type ItemUnit {
   name        String

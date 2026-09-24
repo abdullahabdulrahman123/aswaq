@@ -1,4 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode, type SetStateAction } from 'react';
+import { salesCartKey, useSales } from './SalesContext';
 
 /**
  * سلة المعرض — على الجهاز بس لحد ما الطلبات نفسها تتعمل في السيرفر.
@@ -11,6 +12,9 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
  * المتجر (مفيش أصناف محمّلة ساعتها). صفحة المتجر بتحدّثه بـ`repriceStore`
  * لما طريقة الاستلام أو نوع الحساب يغيّروا الأسعار. null = السعر لسه متحددش
  * في الشريحة دي، والسطر ساعتها بيتشال من الإجمالي.
+ *
+ * في «مبيعات» السلة دي بتاعة البيعة (العميل) مش المستخدم: كل بيعة على مفتاح
+ * لوحده، وسلة المستخدم لنفسه بتفضل زي ما هي لحد ما البيعة تخلص.
  */
 export interface CartLine {
   shopId: string;
@@ -66,9 +70,9 @@ const same = (line: CartLine, key: LineKey) =>
   line.shopId === key.shopId && line.itemId === key.itemId && line.unitName === key.unitName;
 
 /** بنقرا من الجهاز مرة واحدة، وأي حاجة شكلها غلط بنرميها بدل ما الصفحة تقع */
-function readLines(): CartLine[] {
+function readLines(key: string): CartLine[] {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(key);
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
@@ -88,30 +92,40 @@ function readLines(): CartLine[] {
 }
 
 export function StoreCartProvider({ children }: { children: ReactNode }) {
-  const [lines, setLines] = useState<CartLine[]>(readLines);
+  const { session } = useSales();
+  const key = session ? salesCartKey(session) : KEY;
+  // المفتاح والسطور مع بعض: لما البيعة تبدأ أو تخلص السطور بتتقري من المفتاح الجديد
+  // قبل أي حفظ، فسطور سلة متتكتبش على مفتاح التانية
+  const [cart, setCart] = useState(() => ({ key, lines: readLines(key) }));
+  if (cart.key !== key) setCart({ key, lines: readLines(key) });
+  const lines = cart.key === key ? cart.lines : readLines(key);
   const [focus, setFocus] = useState<CartFocus | null>(null);
+
+  const setLines = useCallback((next: SetStateAction<CartLine[]>) => {
+    setCart((prev) => ({ key: prev.key, lines: typeof next === 'function' ? next(prev.lines) : next }));
+  }, []);
 
   useEffect(() => {
     try {
-      localStorage.setItem(KEY, JSON.stringify(lines));
+      localStorage.setItem(cart.key, JSON.stringify(cart.lines));
     } catch {
       // الجهاز رافض يحفظ (تصفح خاص مثلاً) — السلة تفضل في الصفحة وبس
     }
-  }, [lines]);
+  }, [cart]);
 
   const putLine = useCallback((line: CartLine) => {
     setLines((prev) => [...prev.filter((l) => !same(l, line)), line]);
-  }, []);
+  }, [setLines]);
 
   const removeLine = useCallback((key: LineKey) => {
     setLines((prev) => prev.filter((l) => !same(l, key)));
-  }, []);
+  }, [setLines]);
 
   const setQty = useCallback((key: LineKey, qty: number) => {
     setLines((prev) =>
       qty > 0 ? prev.map((l) => (same(l, key) ? { ...l, qty } : l)) : prev.filter((l) => !same(l, key)),
     );
-  }, []);
+  }, [setLines]);
 
   const repriceStore = useCallback((shopId: string, priceOf: (itemId: string, unitName: string) => number | null | undefined) => {
     setLines((prev) => {
@@ -125,7 +139,7 @@ export function StoreCartProvider({ children }: { children: ReactNode }) {
       });
       return changed ? next : prev;
     });
-  }, []);
+  }, [setLines]);
 
   const value = useMemo<StoreCart>(() => {
     const sum = (list: CartLine[]) => list.reduce((n, l) => n + (l.unitPrice ?? 0) * l.qty, 0);

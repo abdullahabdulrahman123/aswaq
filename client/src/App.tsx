@@ -5,6 +5,7 @@ import { businessInPath } from './lib/businessRoutes';
 import { Navbar } from './components/Navbar';
 import { VendorSwitchDialog } from './components/VendorSwitchDialog';
 import { InstallPrompt } from './components/InstallPrompt';
+import { SalesDialog } from './components/SalesDialog';
 import { HomePage } from './pages/HomePage';
 import { ProductPage } from './pages/ProductPage';
 import { VendorPage } from './pages/VendorPage';
@@ -90,6 +91,7 @@ export function App() {
       </main>
       <VendorSwitchDialog />
       <InstallPrompt />
+      <SalesDialog />
     </div>
   );
 }

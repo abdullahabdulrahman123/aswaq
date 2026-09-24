@@ -22,6 +22,7 @@
 | `POST /api/businesses/:accountId/shops/:shopId/items` | `{ itemId }` — بيعمل نسخة من الصنف للمتجر |
 | `GET /api/businesses/:accountId/shops/settings` | إعدادات متاجر النشاط (نطاق التوصيل والحد الأدنى للأوردر) — لفورم المقر |
 | `PUT /api/businesses/:accountId/shops/:shopId/settings` | `{ deliveryRadiusKm, minimums }` — النطاق بالكيلو و`null` = مبيوصّلش، و`minimums` حد أدنى بالقرش لكل شريحة سعر (`onSWP`…) و`null` = مفيش |
+| `GET / POST /api/businesses/:accountId/customers` | عملاء النشاط لـ«مبيعات»: `{ name, phone, isTrader }` — `isTrader` = أسعار الجملة |
 
 `:shopId` هو **id مقر في وصلة معلّم عليه «متجر»** (`isStore`) — مفيش جدول محلات هنا، والسيرفر بيتأكد من المقر من رد وصلة زي ما بيعمل مع النشاط نفسه. إعدادات البيع بتاعته في `store_settings`: صف لكل متجر فيه نطاق التوصيل والحد الأدنى للأوردر بالشرايح الأربعة، بطلب العميل — «كل مؤسسة ولها السياسة بتاعتها».
 

@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { BuyerChip } from './BuyerChip';
 import { CartButton } from './CartButton';
 import { IdentityMenu } from './IdentityMenu';
 import { SellerBadge } from './SellerBadge';
@@ -7,6 +8,7 @@ import { SellerBadge } from './SellerBadge';
  * طرفين قصاد بعض زي أي عملية بيع وشرا، بطلب العميل:
  *   يمين: أنا — صورتي أو صورة النشاط اللي بتعامل بيه، وكل حاجة في المنيو بتاعتها
  *   شمال: البائع اللي بشتري منه — جوه صفحته وصفحات منتجاته بس، وجنبه السلة
+ * وفي «مبيعات» اسم المشتري بيظهر على شمال السلة على طول.
  */
 export function Navbar() {
   return (
@@ -21,9 +23,11 @@ export function Navbar() {
           </Link>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           {/* السلة وتحتها عدد الأصناف والإجمالي — صفحتها لسه «قريباً» */}
           <CartButton />
+
+          <BuyerChip />
 
           <SellerBadge />
         </div>

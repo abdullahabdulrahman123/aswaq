@@ -5,6 +5,7 @@ import { LocationBar } from '../components/LocationBar';
 import { StoreItemCard } from '../components/StoreItemCard';
 import { useAuth } from '../context/AuthContext';
 import { useBuyerLocation } from '../context/LocationContext';
+import { useSales } from '../context/SalesContext';
 import { useCurrentSeller } from '../context/SellerContext';
 import { useCartFocus, useStoreCart } from '../context/StoreCartContext';
 import { fetchShowroomStore, type ShowroomStoreDetails } from '../lib/aswaqApi';
@@ -23,11 +24,17 @@ const METHODS: { key: ReceivingMethod; label: string }[] = [
  * عليها، بطلب العميل. التوصيل متاح بس لو مكان المشتري جوه نطاق المتجر.
  *
  * المتجر نفسه (اسمه ونشاطه ومكانه) من وصلة، ونطاقه وأصنافه من أسواق.
+ *
+ * في «مبيعات» الأسعار بتاعة العميل (تاجر = جملة، فرد = قطاعي) وطريقة الاستلام
+ * اللي اتختارت في نافذة «مبيعات» — مكتوبة بس، من غير اختيار ولا نطاق.
  */
 export function StorePage() {
   const { storeId = '' } = useParams<{ storeId: string }>();
-  const { accountType } = useAuth();
-  const { location } = useBuyerLocation();
+  const { accountType: myAccountType } = useAuth();
+  const { session } = useSales();
+  const { location: myLocation } = useBuyerLocation();
+  const location = session ? null : myLocation;
+  const accountType = session ? (session.isTrader ? 'COMPANY' : 'INDIVIDUAL') : myAccountType;
 
   const { repriceStore } = useStoreCart();
   const [store, setStore] = useState<ShowroomStore | null>(null);
@@ -86,7 +93,11 @@ export function StorePage() {
   const radius = details?.deliveryRadiusKm ?? null;
   const km = location && store?.location ? distanceKm(location, store.location) : null;
   const canDeliver = deliversTo(store?.location ?? null, radius, location);
-  const method: ReceivingMethod = chosen === 'delivery' && !canDeliver ? 'pickup' : (chosen ?? (canDeliver ? 'delivery' : 'pickup'));
+  const method: ReceivingMethod = session
+    ? session.method
+    : chosen === 'delivery' && !canDeliver
+      ? 'pickup'
+      : (chosen ?? (canDeliver ? 'delivery' : 'pickup'));
   const priceField = buyerPriceField(method, accountType);
   /** الحد الأدنى للأوردر في الشريحة اللي المشتري شايفها — السلة بتلوّن بيه */
   const minimum = details?.minimums[priceField] ?? null;
@@ -171,52 +182,59 @@ export function StorePage() {
         </div>
       </div>
 
-      {/* مش grid: عنصر الـgrid بيكبر على قد النص، فالعنوان الطويل في شريط المكان كان بيوسّع الصفحة بدل ما يتقص */}
-      <div className="mt-5 space-y-3 sm:max-w-xl">
-        <LocationBar prompt="حدد مكانك عشان نعرف المتجر بعيد عنك قد إيه" />
+      {/* في «مبيعات» طريقة الاستلام مكتوبة بس. وإلا: مش grid — عنصر الـgrid بيكبر على قد النص، فالعنوان الطويل في شريط المكان كان بيوسّع الصفحة بدل ما يتقص */}
+      {session ? (
+        <p className="mt-5 rounded-xl bg-stone-100 px-4 py-3 text-sm leading-relaxed dark:bg-white/5 sm:max-w-xl">
+          <span className="font-semibold">{session.method === 'delivery' ? 'توصيل' : 'استلام من المتجر'}</span>
+          {session.method === 'delivery' && <span className="break-words"> — {session.address}</span>}
+        </p>
+      ) : (
+        <div className="mt-5 space-y-3 sm:max-w-xl">
+          <LocationBar prompt="حدد مكانك عشان نعرف المتجر بعيد عنك قد إيه" />
 
-        <div>
-          <div
-            role="radiogroup"
-            aria-label="طريقة الاستلام"
-            className="grid grid-cols-2 gap-1 rounded-xl bg-stone-100 p-1 dark:bg-white/5"
-          >
-            {METHODS.map(({ key, label }) => {
-              const picked = method === key;
-              const unavailable = key === 'delivery' && !canDeliver && !needsLocation;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  role="radio"
-                  aria-checked={picked}
-                  disabled={unavailable}
-                  onClick={() => {
-                    if (key === 'delivery' && needsLocation) setAskedForLocation(true);
-                    setChosen(key);
-                  }}
-                  className={`rounded-lg px-3 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                    picked
-                      ? 'bg-white text-brand-800 shadow-sm dark:bg-surface-card dark:text-brand-200'
-                      : 'text-stone-600 hover:text-stone-900 dark:text-stone-300 dark:hover:text-white'
-                  }`}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
-          {needsLocation ? (
-            askedForLocation && (
-              <p role="alert" className="mt-1.5 text-xs font-semibold leading-relaxed text-brand-700 dark:text-brand-300">
-                حدد موقعك الأول
-              </p>
-            )
-          ) : (
-            !canDeliver && <p className="mt-1.5 text-xs leading-relaxed text-stone-500 dark:text-stone-400">{noDeliveryReason}</p>
-          )}
+          <div>
+            <div
+              role="radiogroup"
+              aria-label="طريقة الاستلام"
+              className="grid grid-cols-2 gap-1 rounded-xl bg-stone-100 p-1 dark:bg-white/5"
+            >
+              {METHODS.map(({ key, label }) => {
+                const picked = method === key;
+                const unavailable = key === 'delivery' && !canDeliver && !needsLocation;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    role="radio"
+                    aria-checked={picked}
+                    disabled={unavailable}
+                    onClick={() => {
+                      if (key === 'delivery' && needsLocation) setAskedForLocation(true);
+                      setChosen(key);
+                    }}
+                    className={`rounded-lg px-3 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                      picked
+                        ? 'bg-white text-brand-800 shadow-sm dark:bg-surface-card dark:text-brand-200'
+                        : 'text-stone-600 hover:text-stone-900 dark:text-stone-300 dark:hover:text-white'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+            {needsLocation ? (
+              askedForLocation && (
+                <p role="alert" className="mt-1.5 text-xs font-semibold leading-relaxed text-brand-700 dark:text-brand-300">
+                  حدد موقعك الأول
+                </p>
+              )
+            ) : (
+              !canDeliver && <p className="mt-1.5 text-xs leading-relaxed text-stone-500 dark:text-stone-400">{noDeliveryReason}</p>
+      )}
         </div>
       </div>
+      )}
 
       <div className="mt-6">
         {details.items.length === 0 ? (

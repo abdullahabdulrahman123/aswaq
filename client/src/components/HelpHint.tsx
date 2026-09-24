@@ -1,8 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
-/** قد إيه لازم الصباع يفضل على العلامة عشان الشرح يفتح */
-const HOLD_MS = 450;
-
 interface Props {
   /** اسم العلامة لقارئ الشاشة */
   label: string;
@@ -10,9 +7,9 @@ interface Props {
 }
 
 /**
- * علامة استفهام بتفتح شرح بالضغطة المطولة، بطلب العميل — بدل سطور شرح ثابتة
- * تحت العنوان. الدوسة العادية مبتعملش حاجة، وأي دوسة برّه بتقفل الشرح.
- * من الكيبورد Enter أو Space بيفتحوه ويقفلوه.
+ * علامة استفهام بتفتح شرح بدوسة عادية على العلامة نفسها بس، بطلب العميل —
+ * بدل سطور شرح ثابتة تحت العنوان. الدوسة تاني أو أي دوسة برّه بتقفله.
+ * النصوص دي هتبقى في الآخر مقتبسة من دليل استخدام كامل.
  *
  * الشرح بيتعلّق في أقرب أب relative (سطر العنوان مثلاً) مش في العلامة نفسها:
  * العلامة قريبة من الطرف، وشرح متعلّق فيها كان بيطلع برّه الشاشة على موبايل ٣٦٠.
@@ -20,7 +17,6 @@ interface Props {
 export function HelpHint({ label, children }: Props) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLSpanElement>(null);
-  const timer = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     if (!open) return;
@@ -31,31 +27,14 @@ export function HelpHint({ label, children }: Props) {
     return () => document.removeEventListener('pointerdown', close);
   }, [open]);
 
-  useEffect(() => () => window.clearTimeout(timer.current), []);
-
-  const cancel = () => window.clearTimeout(timer.current);
-
   return (
     <span ref={rootRef} className="inline-flex">
       <button
         type="button"
         aria-label={label}
         aria-expanded={open}
-        onPointerDown={() => {
-          cancel();
-          timer.current = window.setTimeout(() => setOpen(true), HOLD_MS);
-        }}
-        onPointerUp={cancel}
-        onPointerLeave={cancel}
-        onPointerCancel={cancel}
-        // الضغطة المطولة على الموبايل بتفتح منيو النسخ — مش عايزينه هنا
-        onContextMenu={(e) => e.preventDefault()}
-        onKeyDown={(e) => {
-          if (e.key !== 'Enter' && e.key !== ' ') return;
-          e.preventDefault();
-          setOpen((v) => !v);
-        }}
-        className="flex h-5 w-5 select-none items-center justify-center rounded-full border border-stone-300 text-[11px] font-bold text-stone-500 [-webkit-touch-callout:none] dark:border-white/20 dark:text-stone-400"
+        onClick={() => setOpen((v) => !v)}
+        className="flex h-5 w-5 select-none items-center justify-center rounded-full border border-stone-300 text-[11px] font-bold text-stone-500 dark:border-white/20 dark:text-stone-400"
       >
         ?
       </button>

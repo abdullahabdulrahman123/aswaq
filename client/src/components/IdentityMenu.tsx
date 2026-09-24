@@ -2,6 +2,7 @@ import { useId, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useSales } from '../context/SalesContext';
 import { useTheme } from '../context/ThemeContext';
 import { pathAfterSwitch } from '../lib/businessRoutes';
 import { hasUnsavedWork } from '../lib/unsavedWork';
@@ -88,6 +89,7 @@ export function IdentityMenu() {
   const { user, businesses, businessesLoading, selectedBusiness, selectBusiness, signIn, signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { open, setOpen, wrapRef, close } = useDropdown();
+  const { openDialog: openSales } = useSales();
   // ليستة «حساباتي» بتبدأ مقفولة كل ما المنيو تفتح
   const [accountsOpen, setAccountsOpen] = useState(false);
   const accountsButton = useRef<HTMLButtonElement>(null);
@@ -293,6 +295,17 @@ export function IdentityMenu() {
               {selectedBusiness && (
                 <div className={sectionClass}>
                   <div className={headingClass}>تحكم في النشاط</div>
+                  {/* نفس المعرض بمتاجر النشاط ده، للبيع لعميل — بيفتح نافذة العميل الأول */}
+                  <button
+                    role="menuitem"
+                    onClick={() => {
+                      close();
+                      openSales(selectedBusiness);
+                    }}
+                    className={itemClass}
+                  >
+                    مبيعات
+                  </button>
                   <Link role="menuitem" to={`/business/${selectedBusiness.accountId}/items`} onClick={close} className={itemClass}>
                     الأصناف
                   </Link>
