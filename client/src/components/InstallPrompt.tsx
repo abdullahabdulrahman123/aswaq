@@ -148,7 +148,7 @@ export function InstallPrompt() {
       <div aria-hidden="true" className="h-44 shrink-0 sm:h-40" />
       <aside
         aria-label="تثبيت أسواق"
-        className="fixed inset-x-3 bottom-3 z-40 mx-auto max-w-md rounded-2xl border border-stone-200 bg-white p-4 shadow-card dark:border-white/10 dark:bg-surface-card sm:inset-x-auto sm:bottom-4 sm:end-4 sm:w-96"
+        className="fixed inset-x-3 bottom-16 z-40 print:hidden mx-auto max-w-md rounded-2xl border border-stone-200 bg-white p-4 shadow-card dark:border-white/10 dark:bg-surface-card sm:inset-x-auto sm:bottom-16 sm:end-4 sm:w-96"
       >
         <div className="flex items-start gap-3">
           <img

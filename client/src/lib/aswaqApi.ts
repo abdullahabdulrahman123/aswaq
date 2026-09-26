@@ -62,6 +62,7 @@ const MESSAGES: Record<number, string> = {
   400: 'البيانات فيها حاجة مش مظبوطة. راجعها وجرّب تاني.',
   404: 'مش لاقيين النشاط ده — يمكن يكون اتحذف.',
   409: 'فيه صنف بنفس الاسم في النشاط ده.',
+  422: 'فيه أصناف سعرها لسه متحددش — شيلها الأول.',
   503: 'وصلة مش رادّة دلوقتي. جرّب كمان شوية.',
 };
 
@@ -202,33 +203,6 @@ export async function putStoreSettings(
   return settings;
 }
 
-/** عميل من عملاء النشاط — لـ«مبيعات». isTrader = أسعار الجملة */
-export interface Customer {
-  id: string;
-  /** الاسم الأدبي — «الحاج فلان» */
-  name: string;
-  /** أرقام إنجليزي. '' = مش معروف */
-  phone: string;
-  isTrader: boolean;
-}
-
-export type CustomerInput = Omit<Customer, 'id'>;
-
-const customersPath = (accountId: string) => `/api/businesses/${encodeURIComponent(accountId)}/customers`;
-
-export async function fetchCustomers(token: string, accountId: string): Promise<Customer[]> {
-  const { customers } = await request<{ customers: Customer[] }>(customersPath(accountId), token);
-  return customers;
-}
-
-export async function postCustomer(token: string, accountId: string, input: CustomerInput): Promise<Customer> {
-  const { customer } = await request<{ customer: Customer }>(customersPath(accountId), token, {
-    method: 'POST',
-    body: JSON.stringify(input),
-  });
-  return customer;
-}
-
 /*
  * المعرض — من غير تسجيل دخول. المتاجر نفسها (أساميها وأنشطتها ومكانها) من
  * وصلة، وأسواق بيضيف عليها نطاق التوصيل والأصناف.
@@ -263,4 +237,111 @@ export async function fetchShowroomStore(shopId: string): Promise<ShowroomStoreD
     null,
   );
   return store;
+}
+
+/*
+ * الأوردرات — بسكيمة العميل. السيرفر هو اللي بيحسب الأسعار والإجماليات،
+ * والواجهة بتبعت الكميات بس. كل الفلوس بالقرش.
+ */
+export interface OrderAmount {
+  quantity: number;
+  unit: string;
+  price: number;
+  tax: number;
+  avg: number;
+  totalItems: number;
+}
+
+export interface OrderDetail {
+  itemId: string;
+  item: string;
+  unit: string;
+  unitContent: number;
+  bonusQuantity: number;
+  quantity: number;
+  totalQuantity: number;
+  originalPrice: number;
+  discount: number;
+  price: number;
+  tax: number;
+  avg: number;
+  profit: number;
+  totalItems: number;
+  totalDiscount: number;
+  totalTax: number;
+  netTotal: number;
+  /** وزن الوحدة بالجرام */
+  weight: number | null;
+  /** الوحدة ملهاش سعر — مينفعش تتأكد */
+  unpriced: boolean;
+  demanded: OrderAmount;
+  deviation: OrderAmount;
+}
+
+export interface Order {
+  id: string;
+  /** رقم الفاتورة — null في المسودة */
+  number: number | null;
+  state: 'draft' | 'order' | string;
+  /** me:<shopId> أو <saleId>:<shopId> — نفس مفتاح الأوردر على الجهاز */
+  ref: string;
+  createdAt: string;
+  updatedAt: string;
+  checkedOutAt: string | null;
+  creator: { acc: string; name: string };
+  seller: { acc: string; name: string };
+  from: { acc: string; subAcc: string | null };
+  to: { acc: string; subAcc: string | null };
+  names: { business: string; store: string; buyer: string; buyerPhone: string; buyerKind: 'user' | 'business' };
+  method: 'pickup' | 'delivery';
+  address: string;
+  /** بيعة «مبيعات» زي ما اتبعتت — null للمستخدم لنفسه */
+  sale: unknown;
+  totalAvg: number;
+  totalProfit: number;
+  totalItems: number;
+  totalTax: number;
+  totalDiscount: number;
+  netTotal: number;
+  totalDemanded: number;
+  totalDeviation: number;
+  /** بالجرام */
+  totalWeight: number;
+  details: OrderDetail[];
+}
+
+export interface DraftInput {
+  shopId: string;
+  method: 'pickup' | 'delivery';
+  /** للمستخدم لنفسه: نشاطه لو بيشتري بيه. فاضي = حسابه هو */
+  to?: string;
+  sale?: unknown;
+  lines: { itemId: string; unitName: string; quantity: number }[];
+}
+
+/** null = السطور فاضية والمسودة اتمسحت */
+export async function putDraft(token: string, input: DraftInput): Promise<Order | null> {
+  const { order } = await request<{ order: Order | null }>('/api/orders/draft', token, {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  });
+  return order;
+}
+
+export async function fetchOrders(token: string): Promise<Order[]> {
+  const { orders } = await request<{ orders: Order[] }>('/api/orders', token);
+  return orders;
+}
+
+export async function fetchOrder(token: string, orderId: string): Promise<Order> {
+  const { order } = await request<{ order: Order }>(`/api/orders/${encodeURIComponent(orderId)}`, token);
+  return order;
+}
+
+/** 422 = فيه وحدة من غير سعر، 409 = اتأكد قبل كده */
+export async function checkoutOrder(token: string, orderId: string): Promise<Order> {
+  const { order } = await request<{ order: Order }>(`/api/orders/${encodeURIComponent(orderId)}/checkout`, token, {
+    method: 'POST',
+  });
+  return order;
 }

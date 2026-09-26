@@ -1,119 +1,163 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useAuth, type Business } from './AuthContext';
 import type { ReceivingMethod } from '../lib/itemUnits';
+import type { Customer } from '../lib/waslaApi';
 
 /**
- * «مبيعات» بطلب العميل: نفس المعرض، بس البائع (المستخدم نفسه، باسم نشاطه)
- * بيبيع لعميل. البيعة بتبدأ من نافذة «مبيعات» في المنيو، وبعدها:
- *   - الرئيسية بتعرض متاجر النشاط ده بس
- *   - الأسعار حسب العميل (تاجر = جملة، فرد = قطاعي) وطريقة الاستلام اللي اتختارت
- *   - اسم المشتري على شمال السلة، والسلة نفسها منفصلة عن سلة المستخدم لنفسه
+ * «مبيعات» بطلب العميل: فاتورة بيحررها البائع لمشتري، على نفس المعرض. البيعة
+ * بتبدأ من نافذة «مبيعات» في المنيو، وبعدها:
+ *   - الرئيسية بتعرض متاجر النشاط البائع بس
+ *   - الأسعار حسب المشتري: شركة = جملة، مستخدم = قطاعي، × طريقة الاستلام
+ *   - اسم المشتري على شمال السلة، والسلة بتاعته هو مش بتاعة المستخدم
  *
- * الأطراف: المشتري (العميل)، والبائع (النشاط)، والمحرّر (اللي فاتح — وهو
- * دلوقتي البائع كمان؛ مندوبين البيع بعدين).
+ * المشتري حساب في وصلة، بطلب العميل («اليوزر هو العميل والبيزنس هو العميل»):
+ * مسجّل، أو واحد من حسابين ثابتين لغير المسجلين — والاسم الأدبي والرقم
+ * بيتكتبوا في الفاتورة نفسها.
+ *
+ * الأطراف: المشتري، والبائع (النشاط، واللي بيبيع — دلوقتي المستخدم نفسه)،
+ * والمحرّر (المستخدم نفسه). مندوبين البيع بعدين.
+ *
+ * البيعة بتفضل محفوظة بعد ما البائع يخرج منها — العميل عايزها لأسباب تسويقية
+ * (الهلال يقدر يكلّم اللي ما كمّلش). «الشغالة» (active) هي اللي البائع جوّاها
+ * دلوقتي: بتقفل أول ما يخرج من الأوردر، وبترجع لما يفتحه من السلة.
  *
  * على الجهاز بس لحد ما الطلبات والفواتير تتعمل في السيرفر.
  */
 export interface SalesSession {
-  /** بيفرّق سلة البيعة دي عن اللي قبلها */
+  /** بيفرّق سلة البيعة دي عن غيرها */
   id: string;
   /** النشاط البائع */
   accountId: string;
   businessName: string;
-  /** العميل من عملاء النشاط. null = عميل غير مسجل */
-  customerId: string | null;
-  /** الاسم الأدبي */
+  /** المشتري في وصلة */
+  buyer: Customer;
+  /** واحد من حسابين غير المسجلين — مالوش صورة، واسمه الأدبي هو اللي بيتكتب */
+  walkIn: boolean;
+  /** الاسم الأدبي — «الحاج فلان». فاضي = اسم الحساب */
   buyerName: string;
   phone: string;
-  isTrader: boolean;
   /** البائع — دلوقتي المستخدم اللي فاتح */
   sellerName: string;
   method: ReceivingMethod;
-  /** عنوان التوصيل كتابة. فاضي في الاستلام */
+  /** عنوان التوصيل كتابة — «جنب الجامع الكبير». فاضي في الاستلام */
   address: string;
 }
 
 export type SalesDraft = Omit<SalesSession, 'id'>;
 
+/** الاسم اللي بيظهر للمشتري: الأدبي، وإلا اسم الحساب */
+export const buyerLabel = (s: SalesSession) => s.buyerName.trim() || s.buyer.name;
+
 interface Sales {
+  /** البيعة اللي البائع جوّاها دلوقتي، أو null */
   session: SalesSession | null;
-  /** بيعة جديدة بسلة فاضية — أو تعديل البيعة الحالية (نفس النشاط) من غير ما السلة تتمسح */
+  /** كل البيعات المحفوظة على الجهاز */
+  sessions: SalesSession[];
+  /** بيعة جديدة وبتبقى هي الشغالة */
   start: (draft: SalesDraft) => void;
-  end: () => void;
-  /** نافذة «مبيعات» — مفتوحة لنشاط، أو null */
-  dialogFor: Business | null;
-  openDialog: (business: Business) => void;
+  /** تعديل بيانات البيعة الشغالة من غير ما سلتها تتمسح */
+  update: (draft: SalesDraft) => void;
+  /** يرجع لبيعة محفوظة */
+  resume: (id: string) => void;
+  /** بيعة جاية من أوردر على السيرفر (جهاز تاني مثلاً) — بتتضاف لو مش موجودة وبتبقى الشغالة */
+  restore: (session: SalesSession) => void;
+  /** يخرج من البيعة الشغالة — بتفضل محفوظة */
+  leave: () => void;
+  /** يمسح بيعة وسلتها */
+  drop: (id: string) => void;
+  /** نافذة «مبيعات» — لنشاط، ومعاها البيعة اللي بتتعدّل لو فيه */
+  dialog: { business: Business; editing: SalesSession | null } | null;
+  openDialog: (business: Business, editing?: SalesSession | null) => void;
   closeDialog: () => void;
 }
 
-const KEY = 'aswaq_sales';
+const KEY = 'aswaq_sales_sessions';
+const ACTIVE_KEY = 'aswaq_sales_active';
 /** سلة كل بيعة على مفتاح لوحده — StoreCartContext بيقراه */
-export const salesCartKey = (session: SalesSession) => `aswaq_sales_cart_${session.id}`;
+export const salesCartKey = (session: Pick<SalesSession, 'id'>) => `aswaq_sales_cart_${session.id}`;
 
-function readSession(): SalesSession | null {
+function read<T>(key: string, fallback: T): T {
   try {
-    const raw = localStorage.getItem(KEY);
-    const parsed = raw ? (JSON.parse(raw) as SalesSession) : null;
-    return parsed && typeof parsed.id === 'string' && typeof parsed.accountId === 'string' ? parsed : null;
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
   } catch {
-    return null;
+    return fallback;
   }
 }
 
-function forget(key: string) {
+function write(key: string, value: unknown) {
   try {
-    localStorage.removeItem(key);
+    if (value === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, JSON.stringify(value));
   } catch {
-    // الجهاز رافض — مفيش حاجة تتمسح
+    // الجهاز رافض يحفظ — البيعة تفضل في الصفحة وبس
   }
+}
+
+/** البيعات اللي اتحفظت قبل ما المشتري يبقى حساب في وصلة مبتتقريش */
+function readSessions(): SalesSession[] {
+  const list = read<unknown>(KEY, []);
+  return Array.isArray(list)
+    ? list.filter((s): s is SalesSession => Boolean(s) && typeof s.id === 'string' && typeof s.buyer?.accountId === 'string')
+    : [];
 }
 
 const SalesContext = createContext<Sales | null>(null);
 
 export function SalesProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const [session, setSession] = useState<SalesSession | null>(readSession);
-  const [dialogFor, setDialogFor] = useState<Business | null>(null);
+  const [sessions, setSessions] = useState<SalesSession[]>(readSessions);
+  const [activeId, setActiveId] = useState<string | null>(() => read<string | null>(ACTIVE_KEY, null));
+  const [dialog, setDialog] = useState<Sales['dialog']>(null);
 
-  useEffect(() => {
-    try {
-      if (session) localStorage.setItem(KEY, JSON.stringify(session));
-      else localStorage.removeItem(KEY);
-    } catch {
-      // الجهاز رافض يحفظ — البيعة تفضل في الصفحة وبس
-    }
-  }, [session]);
+  useEffect(() => write(KEY, sessions), [sessions]);
+  useEffect(() => write(ACTIVE_KEY, activeId), [activeId]);
 
   const start = useCallback((draft: SalesDraft) => {
-    setSession((prev) => {
-      if (prev && prev.accountId === draft.accountId) return { ...draft, id: prev.id };
-      if (prev) forget(salesCartKey(prev));
-      return { ...draft, id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}` };
-    });
+    const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    setSessions((prev) => [...prev, { ...draft, id }]);
+    setActiveId(id);
   }, []);
 
-  const end = useCallback(() => {
-    setSession((prev) => {
-      if (prev) forget(salesCartKey(prev));
-      return null;
-    });
+  const update = useCallback(
+    (draft: SalesDraft) => setSessions((prev) => prev.map((s) => (s.id === activeId ? { ...draft, id: s.id } : s))),
+    [activeId],
+  );
+
+  const drop = useCallback((id: string) => {
+    write(salesCartKey({ id }), null);
+    setSessions((prev) => prev.filter((s) => s.id !== id));
+    setActiveId((prev) => (prev === id ? null : prev));
   }, []);
 
-  // الخروج بيقفل البيعة — الجهاز ممكن يكون مشترك
+  // الخروج من الحساب بيمسح البيعات — الجهاز ممكن يكون مشترك
   useEffect(() => {
-    if (!user && session) end();
-  }, [user, session, end]);
+    if (user || sessions.length === 0) return;
+    for (const s of sessions) write(salesCartKey(s), null);
+    setSessions([]);
+    setActiveId(null);
+  }, [user, sessions]);
+
+  const session = sessions.find((s) => s.id === activeId) ?? null;
 
   const value = useMemo<Sales>(
     () => ({
       session,
+      sessions,
       start,
-      end,
-      dialogFor,
-      openDialog: setDialogFor,
-      closeDialog: () => setDialogFor(null),
+      update,
+      resume: setActiveId,
+      restore: (restored) => {
+        setSessions((prev) => (prev.some((s) => s.id === restored.id) ? prev : [...prev, restored]));
+        setActiveId(restored.id);
+      },
+      leave: () => setActiveId(null),
+      drop,
+      dialog,
+      openDialog: (business, editing = null) => setDialog({ business, editing }),
+      closeDialog: () => setDialog(null),
     }),
-    [session, start, end, dialogFor],
+    [session, sessions, start, update, drop, dialog],
   );
 
   return <SalesContext.Provider value={value}>{children}</SalesContext.Provider>;

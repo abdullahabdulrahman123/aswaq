@@ -124,6 +124,26 @@ export interface ShowroomStore {
 /** وصلة اللي قبل المكان كانت مبترجّعش location */
 const normalizeStore = (store: ShowroomStore): ShowroomStore => ({ ...store, location: store.location ?? null });
 
+/**
+ * عميل في «مبيعات» — حساب في وصلة، مستخدم أو نشاط. الشركة بتاخد أسعار الجملة
+ * والمستخدم القطاعي.
+ */
+export interface Customer {
+  accountId: string;
+  kind: 'user' | 'business';
+  name: string;
+  picture: string | null;
+  abbreviation: string | null;
+}
+
+/**
+ * walkIn: حسابين ثابتين لغير المسجلين (مستخدم وشركة). matches: اللي إيميله أو
+ * رقمه مطابق q بالظبط — وصلة مبتعملش بحث جزئي عشان محدش يتصفّح أسامي الناس.
+ */
+export async function searchCustomers(token: string, q: string): Promise<{ walkIn: Customer[]; matches: Customer[] }> {
+  return request<{ walkIn: Customer[]; matches: Customer[] }>(`/api/customers?q=${encodeURIComponent(q)}`, token);
+}
+
 /** كل المتاجر من كل الأنشطة، الأحدث الأول — من غير تسجيل دخول */
 export async function fetchStores(): Promise<ShowroomStore[]> {
   const { stores } = await request<{ stores: ShowroomStore[] }>('/api/stores', null);

@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSales } from '../context/SalesContext';
-import { fetchCustomers, postCustomer, type Customer } from '../lib/aswaqApi';
 import type { ReceivingMethod } from '../lib/itemUnits';
 import { latinDigits } from '../lib/quantity';
-import { ApiError } from '../lib/waslaApi';
+import { ApiError, searchCustomers, type Customer } from '../lib/waslaApi';
+import { Avatar, personInitial } from './Avatar';
 import { Notch, fieldClass } from './OutlinedField';
 
 const METHODS: { key: ReceivingMethod; label: string }[] = [
@@ -13,84 +13,61 @@ const METHODS: { key: ReceivingMethod; label: string }[] = [
   { key: 'delivery', label: 'توصيل' },
 ];
 
-const KINDS: { trader: boolean; label: string }[] = [
-  { trader: true, label: 'تاجر (جملة)' },
-  { trader: false, label: 'فرد (قطاعي)' },
-];
-
-/** بديل العميل المسجل — لما المشتري مش في عملاء النشاط */
-const UNREGISTERED = 'عميل غير مسجل';
-
 const legendClass = 'mb-2 block text-xs font-medium text-stone-500 dark:text-stone-400';
 
-/** أرقام إنجليزي من غير مسافات ولا شرط — والـ+ في الأول بس */
+/** أرقام إنجليزي من غير مسافات ولا شُرَط — والـ+ في الأول بس */
 const cleanPhone = (text: string) => latinDigits(text).replace(/[\s-]/g, '');
 
-function Segmented<T extends string | boolean>({
-  label,
-  options,
-  value,
-  onChange,
-}: {
-  label: string;
-  options: { key: T; label: string }[];
-  value: T;
-  onChange: (v: T) => void;
-}) {
+/** إيميل كامل أو رقم كامل — وصلة مبتدوّرش بأقل من كده */
+const searchable = (q: string) => /\S+@\S+\.\S+/.test(q) || cleanPhone(q).replace(/^\+/, '').length >= 8;
+
+function CustomerAvatar({ customer, size }: { customer: Customer; size: number }) {
   return (
-    <div role="radiogroup" aria-label={label} className="grid grid-cols-2 gap-1 rounded-xl bg-stone-100 p-1 dark:bg-white/5">
-      {options.map((o) => (
-        <button
-          key={String(o.key)}
-          type="button"
-          role="radio"
-          aria-checked={value === o.key}
-          onClick={() => onChange(o.key)}
-          className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
-            value === o.key
-              ? 'bg-white text-brand-800 shadow-sm dark:bg-surface-card dark:text-brand-200'
-              : 'text-stone-600 hover:text-stone-900 dark:text-stone-300 dark:hover:text-white'
-          }`}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
+    <Avatar
+      picture={customer.picture}
+      fallback={customer.kind === 'business' ? (customer.abbreviation ?? customer.name) : personInitial(customer.name, undefined)}
+      kind={customer.kind === 'business' ? 'business' : 'person'}
+      size={size}
+      tone="soft"
+    />
   );
 }
 
 /**
- * نافذة «مبيعات» بطلب العميل: بتفتح من المنيو قبل المعرض. فيها العميل (كومبو
- * بسيرش من عملاء النشاط، وأوله «عميل غير مسجل»)، والبائع (دلوقتي اللي فاتح
- * بس)، والموبايل والاسم الأدبي، وتاجر ولا فرد، واستلام ولا توصيل — والتوصيل
- * بيفتح خانة للعنوان. «ابدأ البيع» بيفتح المعرض بمتاجر النشاط ده بس.
+ * نافذة «مبيعات» بطلب العميل — رأس الفاتورة، قبل المعرض:
+ *   - العميل: حساب في وصلة. أوله حسابين لغير المسجلين (مستخدم = قطاعي، شركة =
+ *     جملة)، والمسجّل بيتلاقي بإيميله أو رقمه كامل — مش بحث جزئي، عشان محدش
+ *     يتصفّح أسامي الناس — وبيظهر بصورته
+ *   - البائع: دلوقتي اللي فاتح بس
+ *   - الاسم الأدبي والموبايل، واستلام ولا توصيل — والتوصيل عنوان كتابة
  *
- * العميل الجديد ينفع يتحفظ في عملاء النشاط من هنا — كده القايمة بتكبر لوحدها.
+ * «ابدأ البيع» بيفتح المعرض بمتاجر النشاط ده بس. من اسم المشتري في الناڤبار
+ * نفس النافذة بتعدّل البيعة الشغالة.
  */
 export function SalesDialog() {
-  const { dialogFor: business, closeDialog, session, start } = useSales();
+  const { dialog, closeDialog, start, update } = useSales();
   const { user, withToken } = useAuth();
   const navigate = useNavigate();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-  const open = business !== null;
+  const business = dialog?.business ?? null;
+  const editing = dialog?.editing ?? null;
+  const open = dialog !== null;
   const sellerName = user?.name ?? user?.email ?? 'أنا';
 
   /** null = لسه بنجيب */
-  const [customers, setCustomers] = useState<Customer[] | null>(null);
+  const [walkIn, setWalkIn] = useState<Customer[] | null>(null);
   const [loadError, setLoadError] = useState('');
-  /** null = عميل غير مسجل */
-  const [customerId, setCustomerId] = useState<string | null>(null);
+  const [buyer, setBuyer] = useState<Customer | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [search, setSearch] = useState('');
+  /** نتيجة آخر بحث: null = مفيش بحث، 'loading' = بندوّر */
+  const [matches, setMatches] = useState<Customer[] | 'loading' | null>(null);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [isTrader, setIsTrader] = useState(false);
   const [method, setMethod] = useState<ReceivingMethod>('pickup');
   const [address, setAddress] = useState('');
-  const [saveCustomer, setSaveCustomer] = useState(false);
   const [error, setError] = useState('');
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const d = dialogRef.current;
@@ -99,74 +76,87 @@ export function SalesDialog() {
     if (!open && d.open) d.close();
   }, [open]);
 
-  // كل فتحة: البيعة الحالية لو لنفس النشاط (تعديل)، وإلا فورم فاضي
+  // كل فتحة: البيعة اللي بتتعدّل، وإلا فورم فاضي على «مستخدم غير مسجل»
   useEffect(() => {
-    if (!business) return;
-    const current = session?.accountId === business.accountId ? session : null;
-    setCustomerId(current?.customerId ?? null);
-    setName(current?.buyerName ?? '');
-    setPhone(current?.phone ?? '');
-    setIsTrader(current?.isTrader ?? false);
-    setMethod(current?.method ?? 'pickup');
-    setAddress(current?.address ?? '');
-    setSaveCustomer(false);
+    if (!dialog) return;
+    setBuyer(editing?.buyer ?? null);
+    setName(editing?.buyerName ?? '');
+    setPhone(editing?.phone ?? '');
+    setMethod(editing?.method ?? 'pickup');
+    setAddress(editing?.address ?? '');
     setPickerOpen(false);
     setSearch('');
+    setMatches(null);
     setError('');
-    setSaving(false);
 
     let cancelled = false;
-    setCustomers(null);
+    setWalkIn(null);
     setLoadError('');
-    withToken((token) => fetchCustomers(token, business.accountId))
-      .then((list) => {
-        if (!cancelled) setCustomers(list);
+    withToken((token) => searchCustomers(token, ''))
+      .then(({ walkIn: list }) => {
+        if (cancelled) return;
+        setWalkIn(list);
+        setBuyer((prev) => prev ?? list[0] ?? null);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        setCustomers([]);
-        setLoadError(err instanceof ApiError ? err.message : 'مقدرناش نجيب العملاء.');
+        setWalkIn([]);
+        setLoadError(err instanceof ApiError ? err.message : 'مقدرناش نجيب العملاء من وصلة.');
       });
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [business]);
+  }, [dialog]);
 
   useEffect(() => {
     if (pickerOpen) searchRef.current?.focus();
   }, [pickerOpen]);
 
-  const matches = useMemo(() => {
-    const q = latinDigits(search.trim());
-    if (!customers || !q) return customers ?? [];
-    return customers.filter((c) => c.name.includes(q) || c.phone.includes(q));
-  }, [customers, search]);
+  // البحث بيستنى لحد ما الإيميل أو الرقم يكمل، ونص ثانية من غير كتابة
+  useEffect(() => {
+    const q = search.trim();
+    if (!searchable(q)) {
+      setMatches(null);
+      return;
+    }
+    setMatches('loading');
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      withToken((token) => searchCustomers(token, q.includes('@') ? q : cleanPhone(q)))
+        .then(({ matches: found }) => {
+          if (!cancelled) setMatches(found);
+        })
+        .catch(() => {
+          if (!cancelled) setMatches([]);
+        });
+    }, 500);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [search, withToken]);
 
-  const picked = customers?.find((c) => c.id === customerId) ?? null;
+  const isWalkIn = (c: Customer | null) => Boolean(c && walkIn?.some((w) => w.accountId === c.accountId));
 
-  function pick(customer: Customer | null) {
-    setCustomerId(customer?.id ?? null);
-    setName(customer?.name ?? '');
-    setPhone(customer?.phone ?? '');
-    setIsTrader(customer?.isTrader ?? false);
-    setSaveCustomer(false);
+  function pick(customer: Customer) {
+    const fromSearch = !isWalkIn(customer);
+    setBuyer(customer);
+    // المسجّل: الاسم من حسابه والرقم اللي اتدوّر بيه. غير المسجل: بيتكتبوا
+    setName(fromSearch ? customer.name : '');
+    setPhone(fromSearch && !search.includes('@') ? cleanPhone(search) : '');
     setPickerOpen(false);
     setSearch('');
+    setMatches(null);
     setError('');
   }
 
-  async function handleSubmit(e: FormEvent) {
+  function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!business || saving) return;
-    const buyerName = name.trim();
+    if (!business || !buyer) return;
     const cleanedPhone = cleanPhone(phone);
     if (!/^\+?\d{0,15}$/.test(cleanedPhone)) {
       setError('رقم الموبايل أرقام بس.');
-      return;
-    }
-    if (saveCustomer && !buyerName) {
-      setError('اكتب اسم العميل عشان يتحفظ في عملائك.');
       return;
     }
     if (method === 'delivery' && !address.trim()) {
@@ -174,36 +164,29 @@ export function SalesDialog() {
       return;
     }
 
-    let id = customerId;
-    if (customerId === null && saveCustomer) {
-      setSaving(true);
-      setError('');
-      try {
-        const saved = await withToken((token) =>
-          postCustomer(token, business.accountId, { name: buyerName, phone: cleanedPhone, isTrader }),
-        );
-        id = saved.id;
-      } catch (err) {
-        setError(err instanceof ApiError ? err.message : 'مقدرناش نحفظ العميل. جرّب تاني.');
-        setSaving(false);
-        return;
-      }
-    }
-
-    start({
+    const draft = {
       accountId: business.accountId,
       businessName: business.name,
-      customerId: id,
-      buyerName: buyerName || UNREGISTERED,
+      buyer,
+      walkIn: isWalkIn(buyer),
+      buyerName: name.trim(),
       phone: cleanedPhone,
-      isTrader,
       sellerName,
       method,
       address: method === 'delivery' ? address.trim() : '',
-    });
+    };
+    if (editing) {
+      update(draft);
+      closeDialog();
+      return;
+    }
+    start(draft);
     closeDialog();
     navigate('/');
   }
+
+  const optionClass =
+    'flex w-full items-center gap-2.5 px-3 py-2.5 text-start text-sm transition hover:bg-stone-50 dark:hover:bg-white/5';
 
   return (
     <dialog
@@ -220,7 +203,7 @@ export function SalesDialog() {
           <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">{business.name}</p>
 
           <div className="mt-6 space-y-5">
-            {/* العميل: كومبو بسيرش */}
+            {/* العميل: كومبو فيه حسابين غير المسجلين، وبحث بالإيميل أو الرقم */}
             <div className="relative">
               <button
                 type="button"
@@ -229,7 +212,8 @@ export function SalesDialog() {
                 onClick={() => setPickerOpen((v) => !v)}
                 className={`${fieldClass} flex items-center gap-2 text-start ${pickerOpen ? 'border-brand-500 ring-1 ring-inset ring-brand-500' : ''}`}
               >
-                <span className="min-w-0 flex-1 truncate">{picked ? picked.name : UNREGISTERED}</span>
+                {buyer && !isWalkIn(buyer) && <CustomerAvatar customer={buyer} size={24} />}
+                <span className="min-w-0 flex-1 truncate">{buyer ? buyer.name : 'بنجيب العملاء…'}</span>
                 <svg aria-hidden="true" viewBox="0 0 24 24" className={`h-4 w-4 shrink-0 text-stone-500 transition-transform ${pickerOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="m6 9 6 6 6-6" />
                 </svg>
@@ -238,6 +222,25 @@ export function SalesDialog() {
 
               {pickerOpen && (
                 <div className="mt-1.5 overflow-hidden rounded-xl border border-stone-200 dark:border-white/10">
+                  <ul role="listbox" aria-label="العملاء" className="max-h-60 overflow-y-auto">
+                    {(walkIn ?? []).map((c) => (
+                      <li key={c.accountId}>
+                        <button type="button" role="option" aria-selected={buyer?.accountId === c.accountId} onClick={() => pick(c)} className={`${optionClass} font-medium text-brand-700 dark:text-brand-300`}>
+                          {c.name}
+                        </button>
+                      </li>
+                    ))}
+                    {Array.isArray(matches) &&
+                      matches.map((c) => (
+                        <li key={c.accountId}>
+                          <button type="button" role="option" aria-selected={buyer?.accountId === c.accountId} onClick={() => pick(c)} className={optionClass}>
+                            <CustomerAvatar customer={c} size={28} />
+                            <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                            <span className="shrink-0 text-xs text-stone-400">{c.kind === 'business' ? 'شركة' : 'مستخدم'}</span>
+                          </button>
+                        </li>
+                      ))}
+                  </ul>
                   <input
                     ref={searchRef}
                     value={search}
@@ -248,47 +251,22 @@ export function SalesDialog() {
                         setPickerOpen(false);
                       }
                     }}
-                    placeholder="دوّر بالاسم أو الموبايل"
-                    className="w-full border-b border-stone-200 bg-transparent px-3 py-2.5 text-sm outline-none dark:border-white/10"
+                    dir="auto"
+                    inputMode="email"
+                    placeholder="عميل مسجّل؟ اكتب إيميله أو رقمه كامل"
+                    className="w-full border-t border-stone-200 bg-transparent px-3 py-2.5 text-sm outline-none dark:border-white/10"
                   />
-                  <ul role="listbox" aria-label="العملاء" className="max-h-52 overflow-y-auto">
-                    <li>
-                      <button
-                        type="button"
-                        role="option"
-                        aria-selected={customerId === null}
-                        onClick={() => pick(null)}
-                        className="block w-full px-3 py-2.5 text-start text-sm font-medium text-brand-700 transition hover:bg-stone-50 dark:text-brand-300 dark:hover:bg-white/5"
-                      >
-                        {UNREGISTERED}
-                      </button>
-                    </li>
-                    {customers === null ? (
-                      <li className="px-3 py-2.5 text-sm text-stone-400">بنجيب العملاء…</li>
-                    ) : (
-                      matches.map((c) => (
-                        <li key={c.id}>
-                          <button
-                            type="button"
-                            role="option"
-                            aria-selected={customerId === c.id}
-                            onClick={() => pick(c)}
-                            className="flex w-full items-center gap-2 px-3 py-2.5 text-start text-sm transition hover:bg-stone-50 dark:hover:bg-white/5"
-                          >
-                            <span className="min-w-0 flex-1 truncate">{c.name}</span>
-                            {c.phone && (
-                              <span dir="ltr" className="shrink-0 text-xs tabular-nums text-stone-500 dark:text-stone-400">
-                                {c.phone}
-                              </span>
-                            )}
-                          </button>
-                        </li>
-                      ))
-                    )}
-                    {customers && customers.length > 0 && matches.length === 0 && (
-                      <li className="px-3 py-2.5 text-sm text-stone-400">مفيش عميل بالاسم ده.</li>
-                    )}
-                  </ul>
+                  {search.trim() && (
+                    <p className="px-3 pb-2.5 text-xs text-stone-400">
+                      {matches === 'loading'
+                        ? 'بندوّر…'
+                        : matches === null
+                          ? 'كمّل الإيميل أو الرقم.'
+                          : matches.length === 0
+                            ? 'مفيش حساب بالإيميل أو الرقم ده.'
+                            : ''}
+                    </p>
+                  )}
                 </div>
               )}
               {loadError && <span className="mt-1.5 block text-xs text-red-600 dark:text-red-400">{loadError}</span>}
@@ -333,18 +311,25 @@ export function SalesDialog() {
             </label>
 
             <div>
-              <span className={legendClass}>نوع العميل</span>
-              <Segmented
-                label="نوع العميل"
-                options={KINDS.map((k) => ({ key: k.trader, label: k.label }))}
-                value={isTrader}
-                onChange={setIsTrader}
-              />
-            </div>
-
-            <div>
               <span className={legendClass}>الاستلام</span>
-              <Segmented label="طريقة الاستلام" options={METHODS} value={method} onChange={setMethod} />
+              <div role="radiogroup" aria-label="طريقة الاستلام" className="grid grid-cols-2 gap-1 rounded-xl bg-stone-100 p-1 dark:bg-white/5">
+                {METHODS.map((o) => (
+                  <button
+                    key={o.key}
+                    type="button"
+                    role="radio"
+                    aria-checked={method === o.key}
+                    onClick={() => setMethod(o.key)}
+                    className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                      method === o.key
+                        ? 'bg-white text-brand-800 shadow-sm dark:bg-surface-card dark:text-brand-200'
+                        : 'text-stone-600 hover:text-stone-900 dark:text-stone-300 dark:hover:text-white'
+                    }`}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
               {method === 'delivery' && (
                 <label className="relative mt-4 block">
                   <input
@@ -354,28 +339,13 @@ export function SalesDialog() {
                       setAddress(e.target.value);
                       setError('');
                     }}
-                    placeholder="الشارع، المنطقة، علامة مميزة"
+                    placeholder="مثال: كفر حمودة، جنب الجامع الكبير"
                     maxLength={200}
                   />
                   <Notch>عنوان التوصيل</Notch>
                 </label>
               )}
             </div>
-
-            {customerId === null && (
-              <label className="flex cursor-pointer items-center gap-2.5 text-sm">
-                <input
-                  type="checkbox"
-                  checked={saveCustomer}
-                  onChange={(e) => {
-                    setSaveCustomer(e.target.checked);
-                    setError('');
-                  }}
-                  className="h-4 w-4 shrink-0 accent-brand-500"
-                />
-                احفظه في عملائي
-              </label>
-            )}
           </div>
 
           {error && (
@@ -387,10 +357,10 @@ export function SalesDialog() {
           <div className="mt-6 flex flex-wrap gap-3 border-t border-stone-200 pt-5 dark:border-white/10">
             <button
               type="submit"
-              disabled={saving}
+              disabled={!buyer}
               className="rounded-xl bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-70"
             >
-              {saving ? 'بنحفظ العميل…' : session?.accountId === business.accountId ? 'حفظ' : 'ابدأ البيع'}
+              {editing ? 'حفظ' : 'ابدأ البيع'}
             </button>
             <button
               type="button"

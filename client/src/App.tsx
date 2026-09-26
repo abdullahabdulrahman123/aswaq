@@ -6,11 +6,16 @@ import { Navbar } from './components/Navbar';
 import { VendorSwitchDialog } from './components/VendorSwitchDialog';
 import { InstallPrompt } from './components/InstallPrompt';
 import { SalesDialog } from './components/SalesDialog';
+import { BottomNav } from './components/BottomNav';
+import { FollowOrderWorld } from './context/StoreCartContext';
 import { HomePage } from './pages/HomePage';
 import { ProductPage } from './pages/ProductPage';
 import { VendorPage } from './pages/VendorPage';
 import { CartPage } from './pages/CartPage';
 import { OrdersPage } from './pages/OrdersPage';
+import { InvoicePage } from './pages/InvoicePage';
+import { SavedInvoicePage } from './pages/SavedInvoicePage';
+import { TasksPage } from './pages/TasksPage';
 import { AccountPage } from './pages/AccountPage';
 import { BusinessNewPage } from './pages/BusinessNewPage';
 import { BusinessPage } from './pages/BusinessPage';
@@ -64,12 +69,15 @@ function PerBusiness({ page: Page }: { page: ComponentType }) {
 }
 
 export function App() {
+  const { user } = useAuth();
   return (
     <div className="flex min-h-screen flex-col">
       <ScrollToTop />
       <FollowBusinessInUrl />
+      <FollowOrderWorld />
       <Navbar />
-      <main className="flex-1">
+      {/* pb-12: الشريط اللي تحت ميغطّيش آخر الصفحة (للي داخل بحسابه بس) */}
+      <main className={`flex-1 ${user ? 'pb-12' : ''} print:pb-0`}>
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/store/:storeId" element={<StorePage />} />
@@ -77,6 +85,9 @@ export function App() {
           <Route path="/vendor/:id" element={<VendorPage />} />
           <Route path="/cart" element={<CartPage />} />
           <Route path="/orders" element={<OrdersPage />} />
+          <Route path="/orders/:shopId" element={<InvoicePage />} />
+          <Route path="/invoice/:orderId" element={<SavedInvoicePage />} />
+          <Route path="/tasks" element={<TasksPage />} />
           <Route path="/account" element={<AccountPage />} />
           {/* new قبل :id عشان متتقراش كـid لنشاط */}
           <Route path="/business/new" element={<BusinessNewPage />} />
@@ -92,6 +103,7 @@ export function App() {
       <VendorSwitchDialog />
       <InstallPrompt />
       <SalesDialog />
+      <BottomNav />
     </div>
   );
 }

@@ -1,5 +1,6 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode, type SetStateAction } from 'react';
-import { salesCartKey, useSales } from './SalesContext';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode, type SetStateAction } from 'react';
+import { useLocation } from 'react-router-dom';
+import { salesCartKey, useSales, type SalesSession } from './SalesContext';
 
 /**
  * سلة المعرض — على الجهاز بس لحد ما الطلبات نفسها تتعمل في السيرفر.
@@ -15,6 +16,10 @@ import { salesCartKey, useSales } from './SalesContext';
  *
  * في «مبيعات» السلة دي بتاعة البيعة (العميل) مش المستخدم: كل بيعة على مفتاح
  * لوحده، وسلة المستخدم لنفسه بتفضل زي ما هي لحد ما البيعة تخلص.
+ *
+ * الأوردر = سطور متجر واحد، لمشتري واحد (المستخدم نفسه أو مشتري بيعة). كله
+ * بيفضل محفوظ لحد ما يتشال — العميل عايزه كده لأسباب تسويقية — وبرّه المتجر
+ * السلة بتعرض عدد الأوردرات المفتوحة.
  */
 export interface CartLine {
   shopId: string;
@@ -26,6 +31,19 @@ export interface CartLine {
   qty: number;
   /** سعر الوحدة بالقرش */
   unitPrice: number | null;
+}
+
+/** أوردر مفتوح: سطور متجر واحد لمشتري واحد */
+export interface OpenOrder {
+  /** me:<shopId> لأوردرات المستخدم لنفسه، و<saleId>:<shopId> للبيعات */
+  key: string;
+  shopId: string;
+  storeName: string;
+  /** البيعة — null لو الأوردر بتاع المستخدم لنفسه */
+  sale: SalesSession | null;
+  count: number;
+  /** بالقرش — السطور اللي ملهاش سعر مش محسوبة */
+  total: number;
 }
 
 /** مفتاح السطر: وحدة واحدة من صنف في متجر */
@@ -60,6 +78,31 @@ interface StoreCart {
   count: number;
   focus: CartFocus | null;
   setFocus: (focus: CartFocus | null) => void;
+  /** كل الأوردرات المفتوحة على الجهاز — للمستخدم لنفسه وللبيعات */
+  orders: OpenOrder[];
+  /**
+   * يرجّع أوردر محفوظ على السيرفر لسلة على الجهاز (saleId = null للمستخدم
+   * لنفسه). السطور اللي على الجهاز بالفعل بتكسب.
+   */
+  restoreLines: (saleId: string | null, lines: CartLine[]) => void;
+  /** يشيل سطور متجر من سلة معيّنة — بعد تأكيد الأوردر */
+  clearShop: (saleId: string | null, shopId: string) => void;
+}
+
+const sum = (list: CartLine[]) => list.reduce((n, l) => n + (l.unitPrice ?? 0) * l.qty, 0);
+const itemCount = (list: CartLine[]) => new Set(list.map((l) => l.itemId)).size;
+
+function ordersOf(lines: CartLine[], sale: SalesSession | null): OpenOrder[] {
+  const byShop = new Map<string, CartLine[]>();
+  for (const l of lines) byShop.set(l.shopId, [...(byShop.get(l.shopId) ?? []), l]);
+  return [...byShop].map(([shopId, list]) => ({
+    key: `${sale?.id ?? 'me'}:${shopId}`,
+    shopId,
+    storeName: list[0].storeName,
+    sale,
+    count: itemCount(list),
+    total: sum(list),
+  }));
 }
 
 const KEY = 'aswaq_cart_lines';
@@ -92,7 +135,7 @@ function readLines(key: string): CartLine[] {
 }
 
 export function StoreCartProvider({ children }: { children: ReactNode }) {
-  const { session } = useSales();
+  const { session, sessions } = useSales();
   const key = session ? salesCartKey(session) : KEY;
   // المفتاح والسطور مع بعض: لما البيعة تبدأ أو تخلص السطور بتتقري من المفتاح الجديد
   // قبل أي حفظ، فسطور سلة متتكتبش على مفتاح التانية
@@ -141,9 +184,42 @@ export function StoreCartProvider({ children }: { children: ReactNode }) {
     });
   }, [setLines]);
 
+  /** سلة تانية غير الشغالة بتتعدّل على الجهاز على طول، والشغالة من الحالة */
+  const editAt = useCallback(
+    (saleId: string | null, change: (prev: CartLine[]) => CartLine[]) => {
+      const at = saleId ? salesCartKey({ id: saleId }) : KEY;
+      if (at === cart.key) {
+        setLines(change);
+        return;
+      }
+      try {
+        localStorage.setItem(at, JSON.stringify(change(readLines(at))));
+      } catch {
+        // الجهاز رافض يحفظ
+      }
+    },
+    [cart.key, setLines],
+  );
+
+  const restoreLines = useCallback(
+    (saleId: string | null, incoming: CartLine[]) =>
+      editAt(saleId, (prev) => [...prev, ...incoming.filter((l) => !prev.some((p) => same(p, l)))]),
+    [editAt],
+  );
+
+  const clearShop = useCallback(
+    (saleId: string | null, shopId: string) => editAt(saleId, (prev) => prev.filter((l) => l.shopId !== shopId)),
+    [editAt],
+  );
+
   const value = useMemo<StoreCart>(() => {
-    const sum = (list: CartLine[]) => list.reduce((n, l) => n + (l.unitPrice ?? 0) * l.qty, 0);
-    const items = (list: CartLine[]) => new Set(list.map((l) => l.itemId)).size;
+    const items = itemCount;
+    // السلة الشغالة من الحالة، والباقي من الجهاز — كل تغيير بيتحفظ هناك على طول
+    const linesAt = (at: string) => (at === key ? lines : readLines(at));
+    const orders = [
+      ...ordersOf(linesAt(KEY), null),
+      ...sessions.flatMap((sale) => ordersOf(linesAt(salesCartKey(sale)), sale)),
+    ];
     return {
       lines,
       linesOf: (shopId) => lines.filter((l) => l.shopId === shopId),
@@ -157,8 +233,11 @@ export function StoreCartProvider({ children }: { children: ReactNode }) {
       count: items(lines),
       focus,
       setFocus,
+      orders,
+      restoreLines,
+      clearShop,
     };
-  }, [lines, focus, putLine, setQty, removeLine, repriceStore]);
+  }, [key, lines, sessions, focus, putLine, setQty, removeLine, repriceStore, restoreLines, clearShop]);
 
   return <Cart.Provider value={value}>{children}</Cart.Provider>;
 }
@@ -180,4 +259,38 @@ export function useCartFocus(shopId: string | null, minimum: number | null) {
     setFocus({ shopId, minimum });
     return () => setFocus(null);
   }, [setFocus, shopId, minimum]);
+}
+
+/**
+ * «عالم الأوردر» في «مبيعات»، بطلب العميل: اسم المشتري بيظهر وإنت جوه الأوردر
+ * بس. أول ما البائع يخرج منه البيعة بتقفل (وسلتها بتفضل محفوظة):
+ *   - صفحة المتجر وفاتورته جوه الأوردر
+ *   - الرئيسية جوّاه لحد ما يختار متجر ويحط أول صنف، وبعدها الرجوع ليها خروج
+ *   - أي صفحة تانية خروج
+ * والبيعة اللي اتقفلت وسلتها فاضية بتتمسح — مفيش أوردر يتحفظ.
+ */
+export function FollowOrderWorld() {
+  const { pathname } = useLocation();
+  const { session, sessions, leave, drop } = useSales();
+  const { lines, orders } = useStoreCart();
+
+  // بنحكم مع تغيير الصفحة بس (وأول تحميل)، مش مع بداية البيعة: «ابدأ البيع»
+  // بيشغّل البيعة قبل ما الانتقال للرئيسية يوصل، وكانت هتتقفل وهي لسه على صفحة النشاط
+  const judgedPath = useRef<string | null>(null);
+  useEffect(() => {
+    if (judgedPath.current === pathname) return;
+    judgedPath.current = pathname;
+    if (!session) return;
+    const inside =
+      pathname.startsWith('/store/') || pathname.startsWith('/orders/') || (pathname === '/' && lines.length === 0);
+    if (!inside) leave();
+  }, [pathname, session, lines.length, leave]);
+
+  useEffect(() => {
+    for (const s of sessions) {
+      if (s.id !== session?.id && !orders.some((o) => o.sale?.id === s.id)) drop(s.id);
+    }
+  }, [sessions, session, orders, drop]);
+
+  return null;
 }

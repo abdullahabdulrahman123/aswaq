@@ -75,23 +75,133 @@ model StoreSettings {
 }
 
 /**
- * عملاء النشاط — اللي بيبيعلهم من «مبيعات». قايمة خاصة بكل نشاط، بتكبر من
- * نافذة «مبيعات» نفسها. مش حسابات وصلة: العميل ممكن ميكونش متسجّل خالص.
+ * الأوردر — بالسكيمة اللي العميل بعتها (٢٥ سبتمبر). مستند واحد بيعدّي على
+ * حالات: draft (السلة قبل التأكيد) ← order (بعد التأكيد) ← … ← invoice (الكائن
+ * المحاسبي). الحالة الحالية هنا برّه، والهيستوري هيبقى مستند لوحده بعدين.
  *
- * isTrader بيحدد أسعاره: تاجر = جملة، فرد = قطاعي. البائع بس اللي بيشوفه.
+ * from = البائع: النشاط (acc) ومتجره (subAcc). to = المشتري: حساب في وصلة،
+ * مستخدم أو نشاط (أو واحد من حسابين «غير مسجل»)، والـsubAcc بتاعه فاضي لحد ما
+ * يتحدد. الحسابات كلها في وصلة، فمفيش علاقة حقيقية هنا.
+ *
+ * كل الفلوس بالقرش. السيرفر هو اللي بيحسب كل سعر من صنف المتجر — مبياخدش
+ * سعر من المتصفح. البونص والخصم والضريبة صفر صريح لحد ما يتحددوا.
  */
-model Customer {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  accountId String   @db.ObjectId
-  /** الاسم الأدبي — «الحاج فلان» */
-  name      String
-  /** موبايل بأرقام إنجليزي. فاضي = مش معروف */
-  phone     String   @default("")
-  isTrader  Boolean  @default(false)
-  createdAt DateTime @default(now())
+model Order {
+  id           String      @id @default(auto()) @map("_id") @db.ObjectId
+  /** رقم الفاتورة — مسلسل لكل نشاط بائع، بيتاخد ساعة التأكيد. فاضي في المسودة */
+  number       Int?
+  /** draft | order — والباقي بعدين، وكل نشاط هيحدد حالاته */
+  state        String
+  /**
+   * مفتاح المسودة عند اللي عاملها: me:<shopId> لنفسه، <saleId>:<shopId> لبيعة.
+   * مسودة واحدة لكل مفتاح — بعد التأكيد المسودة الجاية بتبقى مستند جديد.
+   */
+  ref          String
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  checkedOutAt DateTime?
+  /** المحرّر: المستخدم اللي عامل الأوردر (id حسابه في وصلة) */
+  creator      OrderPerson
+  /** البائع — مندوب البيع. دلوقتي المحرّر نفسه */
+  seller       OrderPerson
+  from         OrderParty
+  to           OrderParty
+  /** للعرض والطباعة: نسخة من الأسامي ساعة الأوردر */
+  names        OrderNames
+  /** pickup | delivery */
+  method       String
+  /** عنوان التوصيل كتابة — «جنب الجامع الكبير» */
+  address      String      @default("")
+  /** بيانات بيعة «مبيعات» عشان ترجع زي ما هي على جهاز تاني. فاضي = المستخدم لنفسه */
+  sale         Json?
 
-  @@index([accountId])
-  @@map("customers")
+  totalAvg       Int
+  totalProfit    Int
+  totalItems     Int
+  totalTax       Int
+  totalDiscount  Int
+  /** totalItems − totalDiscount + totalTax */
+  netTotal       Int
+  totalDemanded  Int
+  totalDeviation Int
+  /** وزن الأوردر بالجرام — من وزن الوحدة، واللي ملوش وزن مش محسوب */
+  totalWeight    Float
+
+  details OrderDetail[]
+
+  @@index([creator.acc, ref, state])
+  @@index([from.acc, number])
+  @@map("orders")
+}
+
+type OrderPerson {
+  acc  String @db.ObjectId
+  name String
+}
+
+type OrderParty {
+  acc    String  @db.ObjectId
+  subAcc String? @db.ObjectId
+}
+
+type OrderNames {
+  business    String
+  store       String
+  /** الاسم الأدبي أو اسم الحساب */
+  buyer       String
+  buyerPhone  String @default("")
+  /** user | business — بيحدد الجملة من القطاعي */
+  buyerKind   String
+}
+
+/** سطر في الأوردر. demanded اللي المشتري طلبه، وdeviation الفرق بينه وبين اللي اتنفذ */
+type OrderDetail {
+  itemId         String      @db.ObjectId
+  item           String
+  unit           String
+  unitContent    Int
+  bonusQuantity  Int
+  quantity       Int
+  /** quantity + bonusQuantity */
+  totalQuantity  Int
+  originalPrice  Int
+  discount       Int
+  /** originalPrice − discount */
+  price          Int
+  tax            Int
+  avg            Int
+  /** price − avg */
+  profit         Int
+  /** quantity × price */
+  totalItems     Int
+  /** quantity × discount */
+  totalDiscount  Int
+  /** totalQuantity × tax — الضريبة على البونص كمان */
+  totalTax       Int
+  netTotal       Int
+  /** وزن الوحدة بالجرام، لو متسجّل */
+  weight         Float?
+  /** الوحدة ملهاش سعر في الشريحة دي — المسودة بتقبلها، والتأكيد لأ */
+  unpriced       Boolean     @default(false)
+  demanded       OrderAmount
+  deviation      OrderAmount
+}
+
+type OrderAmount {
+  quantity   Int
+  unit       String
+  price      Int
+  tax        Int
+  avg        Int
+  totalItems Int
+}
+
+/** عدّادات أرقام الفواتير — صف لكل نشاط بائع */
+model Counter {
+  id  String @id @map("_id")
+  seq Int
+
+  @@map("counters")
 }
 
 /** وحدة بيع. كل الأسعار بالقرش، والفاضي = لسه متحددش */

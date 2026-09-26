@@ -11,6 +11,7 @@ import { useCartFocus, useStoreCart } from '../context/StoreCartContext';
 import { fetchShowroomStore, type ShowroomStoreDetails } from '../lib/aswaqApi';
 import { deliversTo, distanceKm, formatDistance } from '../lib/buyerLocation';
 import { buyerPriceField, type ReceivingMethod } from '../lib/itemUnits';
+import { useDraftSync } from '../lib/draftSync';
 import { ApiError, fetchStore, type ShowroomStore } from '../lib/waslaApi';
 
 const METHODS: { key: ReceivingMethod; label: string }[] = [
@@ -25,18 +26,19 @@ const METHODS: { key: ReceivingMethod; label: string }[] = [
  *
  * المتجر نفسه (اسمه ونشاطه ومكانه) من وصلة، ونطاقه وأصنافه من أسواق.
  *
- * في «مبيعات» الأسعار بتاعة العميل (تاجر = جملة، فرد = قطاعي) وطريقة الاستلام
- * اللي اتختارت في نافذة «مبيعات» — مكتوبة بس، من غير اختيار ولا نطاق.
+ * في «مبيعات» الأسعار بتاعة المشتري (شركة = جملة، مستخدم = قطاعي) وطريقة
+ * الاستلام اللي اتختارت في نافذة «مبيعات» — مكتوبة بس، من غير اختيار ولا نطاق.
+ * متجر نشاط تاني مش جزء من البيعة، فدخوله خروج منها.
  */
 export function StorePage() {
   const { storeId = '' } = useParams<{ storeId: string }>();
   const { accountType: myAccountType } = useAuth();
-  const { session } = useSales();
+  const { session, leave } = useSales();
   const { location: myLocation } = useBuyerLocation();
   const location = session ? null : myLocation;
-  const accountType = session ? (session.isTrader ? 'COMPANY' : 'INDIVIDUAL') : myAccountType;
+  const accountType = session ? (session.buyer.kind === 'business' ? 'COMPANY' : 'INDIVIDUAL') : myAccountType;
 
-  const { repriceStore } = useStoreCart();
+  const { repriceStore, linesOf } = useStoreCart();
   const [store, setStore] = useState<ShowroomStore | null>(null);
   const [details, setDetails] = useState<ShowroomStoreDetails | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -79,6 +81,11 @@ export function StorePage() {
     };
   }, [storeId, attempt]);
 
+  const otherBusiness = Boolean(session && store && store.business.accountId !== session.accountId);
+  useEffect(() => {
+    if (otherBusiness) leave();
+  }, [otherBusiness, leave]);
+
   // صورة النشاط على شمال الناڤبار — «البائع» قصاد المشتري
   useCurrentSeller(
     store && {
@@ -110,6 +117,9 @@ export function StorePage() {
 
   // السلة اللي في الناڤبار تخص المتجر ده، بلون حسب حده الأدنى
   useCartFocus(store?.id ?? null, minimum);
+
+  // المسودة على السيرفر مع كل تغيير في سلة المتجر ده
+  useDraftSync(store?.id ?? null, store ? linesOf(store.id) : [], method);
 
   // الأسعار بتتغيّر مع طريقة الاستلام ونوع الحساب — سطور السلة بتمشي معاها
   useEffect(() => {

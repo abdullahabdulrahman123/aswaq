@@ -129,3 +129,59 @@ export async function requireBusinessAccess(req: Request, res: Response, next: N
   req.business = business;
   next();
 }
+
+/** المستخدم نفسه زي ما وصلة بترجّعه من /api/me — للأوردرات: هو المحرّر وممكن يبقى المشتري */
+export interface WaslaUser {
+  sub: string;
+  /** رقم حسابه في accounts بتاعة وصلة */
+  accountId: string;
+  name: string;
+}
+
+const users = new Map<string, { user: WaslaUser; expiresAt: number }>();
+
+/** بعد requireWaslaUser: التوكن سليم، فبنسأل وصلة مين صاحبه. محفوظ دقيقة زي الأنشطة */
+export async function currentUser(req: Request): Promise<WaslaUser> {
+  const token = req.waslaToken!;
+  const cached = users.get(token);
+  if (cached && cached.expiresAt > Date.now()) return cached.user;
+
+  let res: Awaited<ReturnType<typeof fetch>>;
+  try {
+    res = await fetch(`${env.waslaApiOrigin}/api/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(WASLA_TIMEOUT_MS),
+    });
+  } catch {
+    throw new WaslaAuthError(503, 'Wasla unavailable');
+  }
+  if (res.status === 401) throw new WaslaAuthError(401, 'Invalid or expired token');
+  if (!res.ok) throw new WaslaAuthError(502, 'Wasla error');
+  const { user } = (await res.json()) as { user: WaslaUser };
+  // وصلة القديمة مكانتش بترجّع accountId — من غيره مفيش «to» للمستخدم لنفسه
+  if (!user.accountId) throw new WaslaAuthError(502, 'Wasla profile has no accountId');
+
+  if (users.size >= CACHE_SWEEP_AT) {
+    const now = Date.now();
+    for (const [key, entry] of users) if (entry.expiresAt <= now) users.delete(key);
+  }
+  users.set(token, { user, expiresAt: Date.now() + CACHE_MS });
+  return user;
+}
+
+/** متجر من معرض وصلة (من غير توكن): اسمه ونشاطه. null = مش موجود أو مش متجر */
+export async function fetchWaslaStore(
+  shopId: string,
+): Promise<{ id: string; name: string; business: { accountId: string; name: string } } | null> {
+  let res: Awaited<ReturnType<typeof fetch>>;
+  try {
+    res = await fetch(`${env.waslaApiOrigin}/api/stores/${encodeURIComponent(shopId)}`, {
+      signal: AbortSignal.timeout(WASLA_TIMEOUT_MS),
+    });
+  } catch {
+    throw new WaslaAuthError(503, 'Wasla unavailable');
+  }
+  if (res.status === 404) return null;
+  if (!res.ok) throw new WaslaAuthError(502, 'Wasla error');
+  return ((await res.json()) as { store: { id: string; name: string; business: { accountId: string; name: string } } }).store;
+}

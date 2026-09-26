@@ -13,7 +13,7 @@ import { SellerBadge } from './SellerBadge';
 export function Navbar() {
   return (
     // z-[45]: فوق إعلان التثبيت (z-40) عشان المنيو المفتوحة متستخبّاش وراه، وتحت نافذة تبديل السلة (z-50)
-    <header className="sticky top-0 z-[45] border-b border-stone-200 bg-surface-light/95 backdrop-blur dark:border-white/10 dark:bg-surface-dark/95">
+    <header className="sticky top-0 z-[45] print:hidden border-b border-stone-200 bg-surface-light/95 backdrop-blur dark:border-white/10 dark:bg-surface-dark/95">
       <nav className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-2.5">
         <div className="flex items-center gap-2">
           <IdentityMenu />
