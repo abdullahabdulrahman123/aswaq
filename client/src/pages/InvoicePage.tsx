@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { buyerLabel, useSales } from '../context/SalesContext';
 import { useCartFocus, useStoreCart } from '../context/StoreCartContext';
 import { checkoutOrder, putDraft, type Order } from '../lib/aswaqApi';
-import { draftInput, rememberedMethod } from '../lib/draftSync';
+import { draftInput, draftRef, rememberDraftId, rememberedMethod } from '../lib/draftSync';
 import { orderToView } from '../lib/invoiceView';
 import { ApiError, fetchStore, type ShowroomStore } from '../lib/waslaApi';
 
@@ -54,6 +54,8 @@ export function InvoicePage() {
     const method = session?.method ?? rememberedMethod(shopId);
     withToken((token) => putDraft(token, draftInput(shopId, lines, method, session, selectedBusiness?.accountId ?? null)))
       .then((order) => {
+        // الصنف الجاي من المتجر بيتبعت لوحده على المسودة دي
+        rememberDraftId(draftRef(shopId, session), order?.id ?? null);
         if (!cancelled) setDraft(order);
       })
       .catch((err: unknown) => {
@@ -75,6 +77,7 @@ export function InvoicePage() {
     try {
       const done = await withToken((token) => checkoutOrder(token, draft.id));
       clearShop(session?.id ?? null, shopId);
+      rememberDraftId(draftRef(shopId, session), null);
       navigate(`/invoice/${done.id}`, { replace: true });
     } catch (err) {
       setError(
@@ -113,6 +116,7 @@ export function InvoicePage() {
     lines: lines.map((l) => ({ key: `${l.itemId}|${l.unitName}`, item: l.itemName, unit: l.unitName, quantity: l.qty, price: l.unitPrice })),
     total: totalOf(shopId),
     weightKg: null,
+    volumeM3: null,
   };
   const view = draft ? orderToView(draft) : local;
   const unpriced = view.lines.some((l) => l.price === null);

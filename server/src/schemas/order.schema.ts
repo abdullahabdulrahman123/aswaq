@@ -40,4 +40,15 @@ export const draftSchema = z.object({
     .max(200),
 });
 
+/**
+ * صنف واحد في مسودة موجودة — بطلب العميل الحفظ صنف صنف، والهيدر مبيتبعتش
+ * كل مرة. الكمية صفر = الصنف يتشال.
+ */
+export const lineSchema = z.object({
+  itemId: objectIdSchema,
+  unitName: z.string().min(1).max(40),
+  quantity: z.number().int().min(0).max(99_999),
+});
+
 export type DraftInput = z.infer<typeof draftSchema>;
+export type LineInput = z.infer<typeof lineSchema>;

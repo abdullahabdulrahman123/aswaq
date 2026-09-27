@@ -169,10 +169,16 @@ export async function currentUser(req: Request): Promise<WaslaUser> {
   return user;
 }
 
-/** متجر من معرض وصلة (من غير توكن): اسمه ونشاطه. null = مش موجود أو مش متجر */
-export async function fetchWaslaStore(
-  shopId: string,
-): Promise<{ id: string; name: string; business: { accountId: string; name: string } } | null> {
+/** متجر زي ما معرض وصلة بيعرضه — subAccountId null في وصلة القديمة */
+interface WaslaStore {
+  id: string;
+  subAccountId?: string | null;
+  name: string;
+  business: { accountId: string; name: string };
+}
+
+/** متجر من معرض وصلة (من غير توكن): اسمه ونشاطه وحسابه الفرعي. null = مش موجود أو مش متجر */
+export async function fetchWaslaStore(shopId: string): Promise<WaslaStore | null> {
   let res: Awaited<ReturnType<typeof fetch>>;
   try {
     res = await fetch(`${env.waslaApiOrigin}/api/stores/${encodeURIComponent(shopId)}`, {
@@ -183,5 +189,5 @@ export async function fetchWaslaStore(
   }
   if (res.status === 404) return null;
   if (!res.ok) throw new WaslaAuthError(502, 'Wasla error');
-  return ((await res.json()) as { store: { id: string; name: string; business: { accountId: string; name: string } } }).store;
+  return ((await res.json()) as { store: WaslaStore }).store;
 }

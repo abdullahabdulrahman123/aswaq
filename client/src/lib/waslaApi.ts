@@ -1,4 +1,4 @@
-import type { Business, BusinessAddress, Premises } from '../context/AuthContext';
+import type { Business, BusinessAddress, Premises, Vehicle } from '../context/AuthContext';
 import { contactInputs, type Contact, type ContactInput } from './contacts';
 import type { Coords } from './geolocate';
 import { waslaApiOrigin } from './waslaAuth';
@@ -72,6 +72,7 @@ const normalizeBusiness = (business: Business): Business => ({
   ...business,
   contacts: business.contacts ?? [],
   premises: (business.premises ?? []).map(normalizePremises),
+  vehicles: business.vehicles ?? [],
 });
 
 /** المستخدم زي ما وصلة بتعرضه — نفس أسماء الـclaims اللي في id_token، وأرقامه */
@@ -242,6 +243,29 @@ export async function deletePremises(token: string, accountId: string, premisesI
   await request<void>(`${businessPath(accountId)}/premises/${encodeURIComponent(premisesId)}`, token, {
     method: 'DELETE',
   });
+}
+
+/** المركبة زي ما وصلة بتستلمها — من غير الـids */
+function vehicleBody({ plateNumber, maxWeightKg, maxVolumeM3, startCost, costPerKm, homePremisesId }: Vehicle): string {
+  return JSON.stringify({ plateNumber, maxWeightKg, maxVolumeM3, startCost, costPerKm, homePremisesId });
+}
+
+/** المركبة وحسابها الفرعي بيتعملوا مع بعض. 400 = الجراج مش من مقرات النشاط */
+export async function postVehicle(token: string, accountId: string, vehicle: Vehicle): Promise<Vehicle> {
+  const { vehicle: saved } = await request<{ vehicle: Vehicle }>(`${businessPath(accountId)}/vehicles`, token, {
+    method: 'POST',
+    body: vehicleBody(vehicle),
+  });
+  return saved;
+}
+
+export async function putVehicle(token: string, accountId: string, vehicle: Vehicle): Promise<Vehicle> {
+  const { vehicle: saved } = await request<{ vehicle: Vehicle }>(
+    `${businessPath(accountId)}/vehicles/${encodeURIComponent(vehicle.id)}`,
+    token,
+    { method: 'PUT', body: vehicleBody(vehicle) },
+  );
+  return saved;
 }
 
 /*

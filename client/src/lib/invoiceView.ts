@@ -21,6 +21,8 @@ export function orderToView(order: Order): InvoiceView {
       price: d.unpriced ? null : d.price,
     })),
     total: order.netTotal,
+    // الوزن بالجرام والحجم بالسنتيمتر المكعب في الأوردر
     weightKg: order.details.some((d) => d.weight) ? order.totalWeight / 1000 : null,
+    volumeM3: order.details.some((d) => d.volume) ? (order.totalVolume ?? 0) / 1_000_000 : null,
   };
 }

@@ -102,10 +102,15 @@ model Order {
   checkedOutAt DateTime?
   /** المحرّر: المستخدم اللي عامل الأوردر (id حسابه في وصلة) */
   creator      OrderPerson
+  /** آخر واحد عدّل الأوردر — «Creator or editor» في سكيمة العميل */
+  editor       OrderPerson?
   /** البائع — مندوب البيع. دلوقتي المحرّر نفسه */
   seller       OrderPerson
+  /** from.acc = النشاط البائع، وfrom.subAcc = الحساب الفرعي بتاع المتجر في وصلة */
   from         OrderParty
   to           OrderParty
+  /** المقر (المتجر) اللي الأوردر منه — للرجوع لصفحته. الأوردرات الأولى من غيره: from.subAcc كان هو المقر */
+  shopId       String?     @db.ObjectId
   /** للعرض والطباعة: نسخة من الأسامي ساعة الأوردر */
   names        OrderNames
   /** pickup | delivery */
@@ -124,8 +129,10 @@ model Order {
   netTotal       Int
   totalDemanded  Int
   totalDeviation Int
-  /** وزن الأوردر بالجرام — من وزن الوحدة، واللي ملوش وزن مش محسوب */
+  /** وزن الأوردر بالجرام: مجموع totalWeight بتاع السطور */
   totalWeight    Float
+  /** حجم الأوردر بالسنتيمتر المكعب. اختياري عشان الأوردرات اللي قبل الحجم */
+  totalVolume    Float?
 
   details OrderDetail[]
 
@@ -179,8 +186,14 @@ type OrderDetail {
   /** totalQuantity × tax — الضريبة على البونص كمان */
   totalTax       Int
   netTotal       Int
-  /** وزن الوحدة بالجرام، لو متسجّل */
+  /** وزن الوحدة بالجرام — والفاضي صفر، بطلب العميل: «النال هينللك الحسبة كلها» */
   weight         Float?
+  /** حجم الوحدة بالسنتيمتر المكعب — والفاضي صفر */
+  volume         Float?
+  /** weight × totalQuantity — البونص بيتشال على العربية كمان */
+  totalWeight    Float?
+  /** volume × totalQuantity */
+  totalVolume    Float?
   /** الوحدة ملهاش سعر في الشريحة دي — المسودة بتقبلها، والتأكيد لأ */
   unpriced       Boolean     @default(false)
   demanded       OrderAmount

@@ -270,8 +270,14 @@ export interface OrderDetail {
   totalDiscount: number;
   totalTax: number;
   netTotal: number;
-  /** وزن الوحدة بالجرام */
+  /** وزن الوحدة بالجرام — الفاضي صفر */
   weight: number | null;
+  /** حجم الوحدة بالسنتيمتر المكعب — الأوردرات اللي قبل الحجم من غيره */
+  volume?: number | null;
+  /** weight × totalQuantity */
+  totalWeight?: number | null;
+  /** volume × totalQuantity */
+  totalVolume?: number | null;
   /** الوحدة ملهاش سعر — مينفعش تتأكد */
   unpriced: boolean;
   demanded: OrderAmount;
@@ -289,8 +295,13 @@ export interface Order {
   updatedAt: string;
   checkedOutAt: string | null;
   creator: { acc: string; name: string };
+  /** آخر واحد عدّل الأوردر */
+  editor?: { acc: string; name: string } | null;
   seller: { acc: string; name: string };
+  /** subAcc = الحساب الفرعي بتاع المتجر في وصلة */
   from: { acc: string; subAcc: string | null };
+  /** المتجر (المقر) — الأوردرات الأولى من غيره، وكان from.subAcc هو المقر */
+  shopId?: string | null;
   to: { acc: string; subAcc: string | null };
   names: { business: string; store: string; buyer: string; buyerPhone: string; buyerKind: 'user' | 'business' };
   method: 'pickup' | 'delivery';
@@ -307,6 +318,8 @@ export interface Order {
   totalDeviation: number;
   /** بالجرام */
   totalWeight: number;
+  /** بالسنتيمتر المكعب — الأوردرات اللي قبل الحجم من غيره */
+  totalVolume?: number | null;
   details: OrderDetail[];
 }
 
@@ -327,6 +340,28 @@ export async function putDraft(token: string, input: DraftInput): Promise<Order 
   });
   return order;
 }
+
+export interface LineInput {
+  itemId: string;
+  unitName: string;
+  /** صفر = الصنف يتشال */
+  quantity: number;
+}
+
+/**
+ * صنف واحد في مسودة موجودة — الحفظ صنف صنف، بطلب العميل. null = ده كان آخر
+ * صنف والمسودة اتمسحت. 404 أو 409 = المسودة مش موجودة أو اتأكدت.
+ */
+export async function putLine(token: string, orderId: string, line: LineInput): Promise<Order | null> {
+  const { order } = await request<{ order: Order | null }>(`/api/orders/${encodeURIComponent(orderId)}/lines`, token, {
+    method: 'PUT',
+    body: JSON.stringify(line),
+  });
+  return order;
+}
+
+/** المتجر اللي الأوردر منه — الأوردرات الأولى كانت شايلاه في from.subAcc */
+export const orderShopId = (order: Order) => order.shopId ?? order.from.subAcc ?? '';
 
 export async function fetchOrders(token: string): Promise<Order[]> {
   const { orders } = await request<{ orders: Order[] }>('/api/orders', token);

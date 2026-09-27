@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { buyerLabel, useSales, type SalesSession } from '../context/SalesContext';
 import { useStoreCart } from '../context/StoreCartContext';
 import { egp } from '../data/catalog';
-import { fetchOrders, type Order } from '../lib/aswaqApi';
+import { fetchOrders, orderShopId, type Order } from '../lib/aswaqApi';
 import { itemsLabel } from '../lib/quantity';
 import { fetchStores, type ShowroomStore } from '../lib/waslaApi';
 
@@ -97,7 +97,7 @@ export function OrdersPage() {
     const sale = (order.sale as SalesSession | null) ?? null;
     rows.push({
       key: order.id,
-      shopId: order.from.subAcc ?? '',
+      shopId: orderShopId(order),
       business: order.names.business,
       store: order.names.store,
       buyer: sale ? order.names.buyer : null,

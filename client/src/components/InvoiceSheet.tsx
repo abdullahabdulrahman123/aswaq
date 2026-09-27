@@ -28,7 +28,11 @@ export interface InvoiceView {
   total: number;
   /** بالكيلو. null = الأصناف ملهاش وزن متسجّل */
   weightKg: number | null;
+  /** بالمتر المكعب. null = الأصناف ملهاش حجم متسجّل */
+  volumeM3: number | null;
 }
+
+const amount = (n: number) => n.toLocaleString('en-EG', { maximumFractionDigits: 2 });
 
 const cell = 'border border-stone-800 px-2 py-1.5 dark:border-stone-400 print:border-black';
 const label = `${cell} bg-stone-100 font-semibold dark:bg-white/10 print:bg-stone-100`;
@@ -125,7 +129,11 @@ export function InvoiceSheet({ view }: { view: InvoiceView }) {
           </tr>
           <tr>
             <td className={`${label} text-center`}>الوزن</td>
-            <td className={`${cell} text-center tabular-nums`}>{view.weightKg === null ? '—' : `${view.weightKg.toLocaleString('en-EG', { maximumFractionDigits: 1 })} كجم`}</td>
+            {/* الحجم تحت الوزن في نفس الخانة — فاتورة الهلال الورق فيها الوزن بس */}
+            <td className={`${cell} text-center tabular-nums`}>
+              {view.weightKg === null ? '—' : `${amount(view.weightKg)} كجم`}
+              {view.volumeM3 !== null && <span className="block text-xs">{amount(view.volumeM3)} م³</span>}
+            </td>
             <td className={`${label} text-center`}>حساب سابق</td>
             <td className={cell} />
           </tr>

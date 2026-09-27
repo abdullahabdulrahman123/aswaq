@@ -22,7 +22,8 @@
 | `POST /api/businesses/:accountId/shops/:shopId/items` | `{ itemId }` — بيعمل نسخة من الصنف للمتجر |
 | `GET /api/businesses/:accountId/shops/settings` | إعدادات متاجر النشاط (نطاق التوصيل والحد الأدنى للأوردر) — لفورم المقر |
 | `PUT /api/businesses/:accountId/shops/:shopId/settings` | `{ deliveryRadiusKm, minimums }` — النطاق بالكيلو و`null` = مبيوصّلش، و`minimums` حد أدنى بالقرش لكل شريحة سعر (`onSWP`…) و`null` = مفيش |
-| `PUT /api/orders/draft` | السلة كمسودة: `{ shopId, method, to?, sale?, lines: [{ itemId, unitName, quantity }] }` — السيرفر بيحسب الأسعار والإجماليات بسكيمة العميل، وسطور فاضية = تتمسح |
+| `PUT /api/orders/draft` | المسودة كلها: `{ shopId, method, to?, sale?, lines: [{ itemId, unitName, quantity }] }` — بتتبعت مع أول صنف، ولما الهيدر يتغيّر، ولما الفاتورة تتفتح. السيرفر بيحسب الأسعار والإجماليات والوزن والحجم بسكيمة العميل، وسطور فاضية = تتمسح |
+| `PUT /api/orders/:orderId/lines` | صنف واحد في المسودة: `{ itemId, unitName, quantity }` — الحفظ صنف صنف بطلب العميل، من غير الهيدر. صفر = يتشال، وآخر صنف بيمسح المسودة. `409` = اتأكدت، `404` = مش موجودة |
 | `GET /api/orders` و`GET /api/orders/:orderId` | أوردرات المستخدم اللي هو عاملها (مسودات وأوردرات)، الأحدث الأول |
 | `POST /api/orders/:orderId/checkout` | المسودة بتبقى `order` برقم فاتورة مسلسل لكل نشاط بائع — `422` لو فيه وحدة من غير سعر |
 

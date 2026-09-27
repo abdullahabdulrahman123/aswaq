@@ -1,16 +1,21 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
-import { useAuth, type Premises } from '../context/AuthContext';
+import { useAuth, type Premises, type Vehicle } from '../context/AuthContext';
 import { aswaqApiConfigured, fetchStoreSettings, putStoreSettings } from '../lib/aswaqApi';
 import { ContactsField } from '../components/ContactsField';
 import { EMPTY_PREMISES, EMPTY_STORE_SETTINGS, PremisesDialog, type StoreSettingsDraft } from '../components/PremisesDialog';
 import { PremisesCard } from '../components/PremisesCard';
 import { PicturePicker } from '../components/PicturePicker';
 import { SessionExpiredNotice } from '../components/SessionExpiredNotice';
+import { VehicleCard } from '../components/VehicleCard';
+import { EMPTY_VEHICLE, VehicleDialog } from '../components/VehicleDialog';
 
 /**
  * صفحة النشاط التجاري — «بروفايل النشاط»، بطلب العميل: اسمه واختصاره
  * ولوجوه، وأرقامه العامة، وتحتهم ليستة مقراته (وأرقام كل مقر جواه).
+ *
+ * وتحت المقرات مركباته (مكالمة ٢٦ سبتمبر): رقم اللوحة والحمولة وتكلفة التوصيل
+ * والجراج — كل مقر وكل مركبة ليهم حساب فرعي في وصلة.
  *
  * التسجيل بياخد اسم واختصار وبس، والمقرات بتتضاف من هنا — نشاط ممكن يكون
  * له فرع ومخزن ومتجر، وممكن يفضل من غير مقرات لحد ما صاحبه يجهّز مكانه.
@@ -25,6 +30,7 @@ export function BusinessPage() {
     businessesError,
     addPremises,
     updatePremises,
+    saveVehicle,
     addBusinessContact,
     updateBusinessContact,
     removeBusinessContact,
@@ -38,6 +44,8 @@ export function BusinessPage() {
 
   /** null = مقفول، مقر بـid فاضي = إضافة، مقر بـid = تعديل */
   const [editing, setEditing] = useState<Premises | null>(null);
+  /** نفس الفكرة للمركبات: null = مقفول، id فاضي = إضافة */
+  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   /** نطاق توصيل كل متجر من أسواق. null = لسه بنجيب، أو أسواق مردّش */
   const [storeSettings, setStoreSettings] = useState<Map<string, StoreSettingsDraft> | null>(null);
 
@@ -237,6 +245,54 @@ export function BusinessPage() {
           </p>
         )}
       </section>
+
+      <section className="mt-5 rounded-2xl border border-stone-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-display text-lg font-bold">
+            المركبات
+            {business.vehicles.length > 0 && (
+              <span className="ms-2 rounded-md bg-stone-100 px-1.5 py-0.5 text-xs tabular-nums font-normal text-stone-500 dark:bg-white/10 dark:text-stone-400">
+                {business.vehicles.length}
+              </span>
+            )}
+          </h2>
+          <button
+            type="button"
+            onClick={() => setEditingVehicle(EMPTY_VEHICLE)}
+            className="rounded-lg border border-stone-300 px-3 py-2 text-xs font-medium transition hover:border-brand-400 hover:text-brand-700 dark:border-white/15 dark:hover:text-brand-400"
+          >
+            ＋ إضافة مركبة
+          </button>
+        </div>
+
+        {business.vehicles.length > 0 ? (
+          <ul className="mt-4 grid gap-2.5">
+            {business.vehicles.map((v) => (
+              <VehicleCard
+                key={v.id}
+                vehicle={v}
+                garage={business.premises.find((p) => p.id === v.homePremisesId)?.name ?? null}
+                onOpen={() => setEditingVehicle(v)}
+              />
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-4 rounded-xl border border-dashed border-stone-300 px-4 py-6 text-center text-sm text-stone-400 dark:border-white/15">
+            مفيش مركبات لسه — دوس «إضافة مركبة» وضيف عربية أو موتوسيكل.
+          </p>
+        )}
+      </section>
+
+      <VehicleDialog
+        open={editingVehicle !== null}
+        value={editingVehicle ?? EMPTY_VEHICLE}
+        premises={business.premises}
+        onSave={async (vehicle) => {
+          await saveVehicle(business.accountId, vehicle);
+          setEditingVehicle(null);
+        }}
+        onClose={() => setEditingVehicle(null)}
+      />
 
       <PremisesDialog
         open={editing !== null}

@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import type { Order, Prisma } from '@prisma/client';
 import { currentUser, fetchWaslaStore, findManagedBusiness } from '../middleware/auth.js';
 import { isObjectId } from '../schemas/common.js';
-import { draftSchema } from '../schemas/order.schema.js';
+import { draftSchema, lineSchema } from '../schemas/order.schema.js';
 import {
   buildDetails,
   checkOut,
@@ -12,18 +12,23 @@ import {
   listMine,
   nextNumber,
   priceFieldFor,
+  replaceDetails,
   saveDraft,
   storeItems,
   totalsOf,
+  withLine,
 } from '../services/order.service.js';
 
 /** الأوردر زي ما هو — كل حقول السكيمة، مفيش حاجة سرية على المحرّر نفسه */
 const toOrderView = (order: Order) => order;
 
 /**
- * PUT /api/orders/draft — السلة بتتحفظ مسودة مع كل تغيير، بطلب العميل (لأسباب
- * تسويقية: البائع يقدر يكلّم اللي ما كمّلش). مسودة واحدة لكل متجر ومشتري عند
- * المحرّر. سطور فاضية = المسودة تتمسح.
+ * PUT /api/orders/draft — المسودة كلها: الهيدر والسطور. بطلب العميل السلة
+ * بتتحفظ مسودة (لأسباب تسويقية: البائع يقدر يكلّم اللي ما كمّلش)، والنداء ده
+ * بيفتح المسودة مع أول صنف، وبيعيد تسعيرها لما الهيدر يتغيّر (طريقة الاستلام
+ * أو مشتري البيعة)، وبيطابقها مع الجهاز لما الفاتورة تتفتح. الصنف الواحد بعد
+ * كده بيتحفظ لوحده (putLine). مسودة واحدة لكل متجر ومشتري عند المحرّر.
+ * سطور فاضية = المسودة تتمسح.
  */
 export async function putDraft(req: Request, res: Response) {
   const parsed = draftSchema.safeParse(req.body);
@@ -86,8 +91,11 @@ export async function putDraft(req: Request, res: Response) {
     state: 'draft',
     ref,
     creator: { acc: me.accountId, name: me.name },
+    editor: { acc: me.accountId, name: me.name },
     seller,
-    from: { acc: store.business.accountId, subAcc: input.shopId },
+    // الحساب الفرعي بتاع المتجر في وصلة — ووصلة القديمة من غيره: المقر نفسه
+    from: { acc: store.business.accountId, subAcc: store.subAccountId ?? input.shopId },
+    shopId: input.shopId,
     to: { acc: to, subAcc: null },
     names: { business: store.business.name, store: store.name, buyer: buyerName, buyerPhone, buyerKind },
     method,
@@ -98,6 +106,56 @@ export async function putDraft(req: Request, res: Response) {
   };
   const order = await saveDraft(existing?.id ?? null, data);
   res.json({ order: toOrderView(order) });
+}
+
+/** كام مرة الصنف بيحاول تاني لو صنف تاني اتحفظ في نفس اللحظة */
+const LINE_RETRIES = 5;
+
+/**
+ * PUT /api/orders/:orderId/lines — صنف واحد في مسودة، بطلب العميل: الحفظ
+ * صنف صنف لما المشتري يدوس «تم»، والهيدر مبيتبعتش كل مرة. السعر بطريقة
+ * الاستلام ونوع المشتري اللي في المسودة. الكمية صفر بتشيل الصنف، وآخر صنف
+ * بيمسح المسودة ({ order: null }). 409 = المسودة اتأكدت، و404 = مش موجودة —
+ * والواجهة ساعتها بتبعت المسودة كلها من الأول.
+ */
+export async function putLine(req: Request, res: Response) {
+  const id = String(req.params.orderId);
+  const parsed = lineSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ message: 'Invalid input', issues: parsed.error.issues });
+    return;
+  }
+  const me = await currentUser(req);
+
+  for (let attempt = 0; attempt < LINE_RETRIES; attempt++) {
+    const order = isObjectId(id) ? await findMine(me.accountId, id) : null;
+    if (!order) {
+      res.status(404).json({ message: 'Order not found' });
+      return;
+    }
+    if (order.state !== 'draft') {
+      res.status(409).json({ message: 'Order is already checked out' });
+      return;
+    }
+
+    const shopId = order.shopId ?? order.from.subAcc ?? '';
+    const field = priceFieldFor(order.method as 'pickup' | 'delivery', order.names.buyerKind as 'user' | 'business');
+    const details = withLine(order.details, await storeItems(shopId), parsed.data, field);
+    if (typeof details === 'string') {
+      res.status(400).json({ message: details });
+      return;
+    }
+    if (details.length === 0) {
+      await deleteOrder(order.id);
+      res.json({ order: null });
+      return;
+    }
+    if (await replaceDetails(order, details, { acc: me.accountId, name: me.name })) {
+      res.json({ order: toOrderView((await findMine(me.accountId, id))!) });
+      return;
+    }
+  }
+  res.status(409).json({ message: 'Order changed while saving, try again' });
 }
 
 export async function list(req: Request, res: Response) {

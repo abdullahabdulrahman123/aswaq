@@ -16,10 +16,12 @@ import {
   postMyAddress,
   postMyContact,
   postPremises,
+  postVehicle,
   putBusinessContact,
   putMyAddress,
   putMyContact,
   putPremises,
+  putVehicle,
   SessionExpiredError,
   type WaslaProfile,
 } from '../lib/waslaApi';
@@ -77,6 +79,29 @@ export interface Premises {
   address: BusinessAddress | null;
   /** أرقام الفرع ده — بتتحفظ مع المقر، وفي وصلة كل رقم شايل عنوان المقر كمان */
   contacts: Contact[];
+  /** الحساب الفرعي بتاع المقر في وصلة — فاضي في المقر الجديد لحد ما يتحفظ */
+  subAccountId?: string | null;
+}
+
+/**
+ * مركبة من مركبات النشاط — أي حاجة بتنقل من نقطة لنقطة، بطلب العميل. المهم
+ * فيها أقصى وزن وحجم، وتكلفة البداية والكيلو. ليها حساب فرعي في وصلة زي المقر.
+ */
+export interface Vehicle {
+  /** فاضي = مركبة جديدة لسه متحفظتش */
+  id: string;
+  subAccountId?: string | null;
+  plateNumber: string;
+  /** بالكيلو. null = لسه متحددش */
+  maxWeightKg: number | null;
+  /** بالمتر المكعب */
+  maxVolumeM3: number | null;
+  /** بالقرش */
+  startCost: number | null;
+  /** بالقرش */
+  costPerKm: number | null;
+  /** الجراج الأساسي: مقر من مقرات النشاط */
+  homePremisesId: string | null;
 }
 
 /**
@@ -101,6 +126,8 @@ export interface Business {
    * غير مقرات خالص وتتضاف بعدين من صفحة النشاط.
    */
   premises: Premises[];
+  /** مركبات النشاط — وصلة القديمة من غيرها، فبتبقى ليستة فاضية */
+  vehicles: Vehicle[];
   createdAt: string;
 }
 
@@ -134,6 +161,8 @@ interface AuthContextValue {
   addPremises: (accountId: string, premises: Omit<Premises, 'id'>) => Promise<Premises>;
   updatePremises: (accountId: string, premises: Premises) => Promise<void>;
   removePremises: (accountId: string, premisesId: string) => Promise<void>;
+  /** المركبة بتتحفظ في وصلة وبترجع بالـid وحسابها الفرعي. بترمي لو الحفظ فشل */
+  saveVehicle: (accountId: string, vehicle: Vehicle) => Promise<Vehicle>;
   /** أرقام النشاط العامة من صفحته — بتتحفظ في وصلة على طول، وبترمي لو الحفظ فشل */
   addBusinessContact: (accountId: string, input: ContactInput) => Promise<void>;
   updateBusinessContact: (accountId: string, contactId: string, input: ContactInput) => Promise<void>;
@@ -486,6 +515,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [withToken, mapPremises],
   );
 
+  /** إضافة مركبة أو تعديلها — الـid الفاضي إضافة */
+  const saveVehicle = useCallback(
+    async (accountId: string, vehicle: Vehicle) => {
+      const saved = await withToken((token) =>
+        vehicle.id ? putVehicle(token, accountId, vehicle) : postVehicle(token, accountId, vehicle),
+      );
+      commit((prev) =>
+        prev.map((b) =>
+          b.accountId !== accountId
+            ? b
+            : {
+                ...b,
+                vehicles: b.vehicles.some((v) => v.id === saved.id)
+                  ? b.vehicles.map((v) => (v.id === saved.id ? saved : v))
+                  : [...b.vehicles, saved],
+              },
+        ),
+      );
+      return saved;
+    },
+    [withToken, commit],
+  );
+
   /** تعديل أرقام نشاط واحد العامة من غير ما نلمس الباقي */
   const mapBusinessContacts = useCallback(
     (accountId: string, update: (list: Contact[]) => Contact[]) =>
@@ -623,6 +675,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         addPremises,
         updatePremises,
         removePremises,
+        saveVehicle,
         addBusinessContact,
         updateBusinessContact,
         removeBusinessContact,

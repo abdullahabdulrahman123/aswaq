@@ -9,6 +9,7 @@ const router = Router();
 
 router.get('/', orderController.list);
 router.put('/draft', orderController.putDraft);
+router.put('/:orderId/lines', orderController.putLine);
 router.get('/:orderId', orderController.get);
 router.post('/:orderId/checkout', orderController.checkout);
 
