@@ -243,14 +243,16 @@ function save(key: string, value: unknown) {
 
 /**
  * الأنشطة المحفوظة على الجهاز. النسخة اللي اتحفظت قبل المقرات مفيهاش premises
- * (كان فيها addresses)، واللي قبل جهات الاتصال مفيهاش contacts — بتتعرض
- * بليستات فاضية لحد ما وصلة ترد، بدل ما الصفحة تقع.
+ * (كان فيها addresses)، واللي قبل جهات الاتصال مفيهاش contacts، واللي قبل
+ * المركبات مفيهاش vehicles — بتتعرض بليستات فاضية لحد ما وصلة ترد، بدل ما
+ * الصفحة تقع.
  */
 function loadBusinesses(sub: string): Business[] {
   return (load<Business[]>(cacheKey(sub)) ?? []).map((b) => ({
     ...b,
     contacts: b.contacts ?? [],
     premises: (b.premises ?? []).map((p) => ({ ...p, contacts: p.contacts ?? [] })),
+    vehicles: b.vehicles ?? [],
   }));
 }
 
