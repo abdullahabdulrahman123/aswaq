@@ -9,8 +9,9 @@
  *   /business/:id/items/new         إضافة صنف
  *   /business/:id/items/:item/edit  تعديل صنف
  *   /business/:id/store-items       إدارة أصناف المتاجر
+ *   /business/:id/incoming          الطلبات الواردة
  */
-const BUSINESS_PATH = /^\/business\/([^/]+)(\/store-items|\/items(?:\/(new|[^/]+\/edit))?)?\/?$/;
+const BUSINESS_PATH = /^\/business\/([^/]+)(\/store-items|\/incoming|\/items(?:\/(new|[^/]+\/edit))?)?\/?$/;
 
 /** النشاط اللي الصفحة دي بتاعته — null لو مش صفحة نشاط */
 export function businessInPath(pathname: string): string | null {
@@ -34,6 +35,8 @@ export function pathAfterSwitch(pathname: string, accountId: string | null): str
   if (!section) return base;
   // أصناف المتاجر: نفس الصفحة للنشاط الجديد — بتختار أول متجر من مقراته هو
   if (section === '/store-items') return `${base}/store-items`;
+  // الطلبات الواردة: طلبات النشاط الجديد
+  if (section === '/incoming') return `${base}/incoming`;
   // إضافة صنف: فورم فاضي للنشاط الجديد. تعديل صنف: الصنف بتاع النشاط القديم، فنروح لأصناف الجديد
   return itemPage === 'new' ? `${base}/items/new` : `${base}/items`;
 }

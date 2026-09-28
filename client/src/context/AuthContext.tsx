@@ -201,6 +201,8 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 const USER_KEY = 'aswaq_user';
+/** آخر مرة الجلسة خلصت واتحوّلنا لتسجيل الدخول — عشان منلفّش في دايرة */
+const EXPIRED_REDIRECT_KEY = 'aswaq_expired_redirect_at';
 
 /**
  * آخر قايمة أنشطة جت من وصلة، لكل مستخدم لوحده.
@@ -635,6 +637,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       demo: true,
     });
   }, []);
+
+  /**
+   * الجلسة خلصت ومتجدّدتش: على صفحة تسجيل الدخول على طول، بطلب العميل (٢٧
+   * سبتمبر) — «لو مفيش user وديني للـlogin». بيرجع لنفس الصفحة بعدها، ولو
+   * جلسة وصلة لسه شغالة بيرجع من غير ما يكتب حاجة. مرة واحدة كل دقيقة: لو
+   * رجع وبرضه اترفض، التنبيه بيفضل بدل ما يلف في دايرة.
+   */
+  useEffect(() => {
+    if (!sessionExpired || !user || user.demo || !waslaConfigured) return;
+    try {
+      const last = Number(sessionStorage.getItem(EXPIRED_REDIRECT_KEY) ?? 0);
+      if (Date.now() - last < 60_000) return;
+      sessionStorage.setItem(EXPIRED_REDIRECT_KEY, String(Date.now()));
+    } catch {
+      return;
+    }
+    void signIn('login');
+  }, [sessionExpired, user, signIn]);
 
   const completeSignIn = useCallback((u: WaslaUser, s: WaslaSession) => {
     saveSession(s);

@@ -30,9 +30,13 @@ export interface InvoiceView {
   weightKg: number | null;
   /** بالمتر المكعب. null = الأصناف ملهاش حجم متسجّل */
   volumeM3: number | null;
+  /** فيه صنف وزنه أو حجمه مش متسجّل — الإجماليات ممكن تبقى أقل من الحقيقة */
+  measuresMissing?: boolean;
 }
 
 const amount = (n: number) => n.toLocaleString('en-EG', { maximumFractionDigits: 2 });
+/** الحجم بالمتر المكعب لحد اللتر (٣ أرقام) — كيسين ١.٥ لتر = 0.003 م³ مش 0 */
+const volume = (n: number) => n.toLocaleString('en-EG', { maximumFractionDigits: 3 });
 
 const cell = 'border border-stone-800 px-2 py-1.5 dark:border-stone-400 print:border-black';
 const label = `${cell} bg-stone-100 font-semibold dark:bg-white/10 print:bg-stone-100`;
@@ -132,7 +136,7 @@ export function InvoiceSheet({ view }: { view: InvoiceView }) {
             {/* الحجم تحت الوزن في نفس الخانة — فاتورة الهلال الورق فيها الوزن بس */}
             <td className={`${cell} text-center tabular-nums`}>
               {view.weightKg === null ? '—' : `${amount(view.weightKg)} كجم`}
-              {view.volumeM3 !== null && <span className="block text-xs">{amount(view.volumeM3)} م³</span>}
+              {view.volumeM3 !== null && <span className="block text-xs">{volume(view.volumeM3)} م³</span>}
             </td>
             <td className={`${label} text-center`}>حساب سابق</td>
             <td className={cell} />
@@ -151,6 +155,13 @@ export function InvoiceSheet({ view }: { view: InvoiceView }) {
           </tr>
         </tbody>
       </table>
+
+      {/* نص العميل بالحرف (٢٧ سبتمبر) */}
+      {view.measuresMissing && (
+        <p className="mt-2 text-xs text-amber-700 dark:text-amber-300 print:text-black">
+          ربما تكون هذه الحسابات غير دقيقة نتيجة لعدم تسجيل الحجم أو الوزن لبعض الأصناف.
+        </p>
+      )}
 
       {unpriced && (
         <p className="mt-2 text-xs text-stone-500 dark:text-stone-400 print:text-black">

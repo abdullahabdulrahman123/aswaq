@@ -79,6 +79,12 @@ async function fetchBusinesses(token: string): Promise<WaslaBusiness[]> {
   return businesses;
 }
 
+/** الأنشطة اللي صاحب التوكن بيديرها — من النسخة المحفوظة لو لسه صالحة. للـsocket (realtime.ts) */
+export async function businessesForToken(token: string): Promise<WaslaBusiness[]> {
+  const cached = cache.get(token);
+  return cached && cached.expiresAt > Date.now() ? cached.businesses : fetchBusinesses(token);
+}
+
 export async function requireWaslaUser(req: Request, _res: Response, next: NextFunction) {
   const header = req.headers.authorization;
   if (!header?.startsWith('Bearer ')) throw new WaslaAuthError(401, 'Authentication required');
@@ -141,8 +147,12 @@ export interface WaslaUser {
 const users = new Map<string, { user: WaslaUser; expiresAt: number }>();
 
 /** بعد requireWaslaUser: التوكن سليم، فبنسأل وصلة مين صاحبه. محفوظ دقيقة زي الأنشطة */
-export async function currentUser(req: Request): Promise<WaslaUser> {
-  const token = req.waslaToken!;
+export function currentUser(req: Request): Promise<WaslaUser> {
+  return userForToken(req.waslaToken!);
+}
+
+/** المستخدم صاحب التوكن من /api/me — متخزّن دقيقة */
+export async function userForToken(token: string): Promise<WaslaUser> {
   const cached = users.get(token);
   if (cached && cached.expiresAt > Date.now()) return cached.user;
 

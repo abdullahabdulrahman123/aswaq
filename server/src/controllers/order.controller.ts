@@ -2,13 +2,16 @@ import type { Request, Response } from 'express';
 import type { Order, Prisma } from '@prisma/client';
 import { currentUser, fetchWaslaStore, findManagedBusiness } from '../middleware/auth.js';
 import { isObjectId } from '../schemas/common.js';
+import { announceIncoming } from '../realtime.js';
 import { draftSchema, lineSchema } from '../schemas/order.schema.js';
 import {
   buildDetails,
   checkOut,
   deleteOrder,
   findDraft,
+  findById,
   findMine,
+  listIncoming,
   listMine,
   nextNumber,
   priceFieldFor,
@@ -163,10 +166,18 @@ export async function list(req: Request, res: Response) {
   res.json({ orders: (await listMine(me.accountId)).map(toOrderView) });
 }
 
+/**
+ * الأوردر لصاحبه (المحرّر) — وللنشاط البائع كمان لو اتأكد: «الطلبات الواردة»
+ * بتفتح فاتورته. المسودة للمحرّر بس.
+ */
 export async function get(req: Request, res: Response) {
   const id = String(req.params.orderId);
   const me = await currentUser(req);
-  const order = isObjectId(id) ? await findMine(me.accountId, id) : null;
+  let order = isObjectId(id) ? await findMine(me.accountId, id) : null;
+  if (!order && isObjectId(id)) {
+    const sold = await findById(id);
+    if (sold && sold.state !== 'draft' && (await findManagedBusiness(req, sold.from.acc))) order = sold;
+  }
   if (!order) {
     res.status(404).json({ message: 'Order not found' });
     return;
@@ -192,5 +203,17 @@ export async function checkout(req: Request, res: Response) {
     return;
   }
   const done = await checkOut(order.id, await nextNumber(order.from.acc));
+  // «الطلبات الواردة» عند النشاط البائع — لحظة بلحظة
+  await announceIncoming(done).catch(() => undefined);
   res.json({ order: toOrderView(done) });
+}
+
+/**
+ * GET /api/businesses/:accountId/incoming — «الطلبات الواردة»، بطلب العميل: الأوردرات
+ * المؤكدة اللي النشاط ده بائعها (from.acc) ولسه مخلصتش. الاستعلام بسيط لحد
+ * ما إدارة الحالات تتعمل («خليها تكويري بعبط»): كل اللي حالته order. المسودات
+ * مش هنا — دي للتسويق وليها تقارير لوحدها.
+ */
+export async function incoming(req: Request, res: Response) {
+  res.json({ orders: (await listIncoming(req.business!.accountId)).map(toOrderView) });
 }

@@ -50,6 +50,7 @@ function detailOf(item: Item, unit: Item['units'][number], quantity: number, fie
     totalWeight: weight * totalQuantity,
     totalVolume: volume * totalQuantity,
     unpriced: unit[field] == null,
+    measuresMissing: unit.weight == null || unit.volume == null,
     // لحد ما المخزن يعدّل الكميات: المطلوب هو اللي اتطلب، والانحراف صفر
     demanded: { quantity, unit: unit.name, price, tax, avg, totalItems },
     deviation: { quantity: 0, unit: unit.name, price, tax, avg, totalItems: 0 },
@@ -141,6 +142,19 @@ export function deleteOrder(id: string) {
 /** أوردرات المستخدم — اللي عملها هو، الأحدث الأول. من غير فلاتر لحد ما الحالات تتحدد */
 export function listMine(creatorAcc: string) {
   return prisma.order.findMany({ where: { creator: { is: { acc: creatorAcc } } }, orderBy: { updatedAt: 'desc' }, take: 200 });
+}
+
+/** الأوردرات المؤكدة اللي النشاط ده بائعها — الأحدث تأكيداً الأول */
+export function listIncoming(sellerAcc: string) {
+  return prisma.order.findMany({
+    where: { from: { is: { acc: sellerAcc } }, state: 'order' },
+    orderBy: { checkedOutAt: 'desc' },
+    take: 200,
+  });
+}
+
+export function findById(id: string) {
+  return prisma.order.findUnique({ where: { id } });
 }
 
 export function findMine(creatorAcc: string, id: string) {

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { requireBusinessAccess } from '../middleware/auth.js';
 import * as itemController from '../controllers/item.controller.js';
 import * as storeController from '../controllers/store.controller.js';
+import * as orderController from '../controllers/order.controller.js';
 
 /**
  * كل حاجة في أسواق تبع نشاط تجاري، فكل المسارات تحت /api/businesses/:accountId.
@@ -24,6 +25,7 @@ scoped.get('/shops/:shopId/items/available', itemController.listAvailableForStor
 scoped.post('/shops/:shopId/items', itemController.addToStore);
 
 scoped.get('/shops/settings', storeController.listSettings);
+scoped.get('/incoming', orderController.incoming);
 scoped.put('/shops/:shopId/settings', storeController.updateSettings);
 
 const router = Router();

@@ -23,6 +23,8 @@ function toItemView(item: Item) {
     id: item.id,
     accountId: item.accountId,
     shopId: item.shopId,
+    /** نسخة المتجر: الصنف الأصلي — بياناته الأساسية من هناك */
+    sourceItemId: item.sourceItemId ?? null,
     name: item.name,
     picture: item.picture,
     avgCost: item.avgCost,

@@ -32,6 +32,12 @@ model Item {
   accountId String     @db.ObjectId
   /** id المقر (المتجر) في وصلة */
   shopId    String?    @db.ObjectId
+  /**
+   * نسخة المتجر: الصنف الأصلي (المرجع) اللي اتنسخت منه. بطلب العميل (٢٧ سبتمبر)
+   * البيانات الأساسية من الأصل وبتتعمم على النسخ، والأسعار بس لكل متجر.
+   * فاضي في الصنف الأصلي نفسه.
+   */
+  sourceItemId String? @db.ObjectId
   name      String
   picture   String?
   /** بالقرش. بيتحسب من المشتريات (متوسط مرجّح) — مش بيتكتب بإيد */
@@ -47,6 +53,7 @@ model Item {
   @@unique([accountId, shopId, name])
   /** صفحة «إدارة أصناف المتاجر» بتسأل بالمتجر */
   @@index([shopId])
+  @@index([sourceItemId])
   @@map("items")
 }
 
@@ -196,6 +203,8 @@ type OrderDetail {
   totalVolume    Float?
   /** الوحدة ملهاش سعر في الشريحة دي — المسودة بتقبلها، والتأكيد لأ */
   unpriced       Boolean     @default(false)
+  /** وزن الوحدة أو حجمها مش متسجّل (اتحسب صفر) — الفاتورة بتنبّه إن الإجمالي ممكن يبقى أقل */
+  measuresMissing Boolean    @default(false)
   demanded       OrderAmount
   deviation      OrderAmount
 }

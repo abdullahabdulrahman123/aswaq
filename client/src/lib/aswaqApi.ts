@@ -11,6 +11,8 @@ const ORIGIN = (import.meta.env.VITE_ASWAQ_API_ORIGIN ?? '').trim().replace(/\/+
 
 /** سيرفر الأصناف متوصّل؟ لو لأ الصفحات بتقول كده بدل ما ترمي خطأ */
 export const aswaqApiConfigured = Boolean(ORIGIN);
+/** سيرفر أسواق — الـsocket.io (الطلبات الواردة) على نفس الأصل */
+export const aswaqApiOrigin = ORIGIN;
 
 /** وحدة بيع للصنف. الأسعار بالقرش، وnull = لسه متحددش */
 export interface ItemUnit {
@@ -280,6 +282,8 @@ export interface OrderDetail {
   totalVolume?: number | null;
   /** الوحدة ملهاش سعر — مينفعش تتأكد */
   unpriced: boolean;
+  /** وزن الوحدة أو حجمها مش متسجّل (اتحسب صفر) — الأوردرات اللي قبل ٢٧ سبتمبر من غيره */
+  measuresMissing?: boolean;
   demanded: OrderAmount;
   deviation: OrderAmount;
 }
@@ -362,6 +366,12 @@ export async function putLine(token: string, orderId: string, line: LineInput): 
 
 /** المتجر اللي الأوردر منه — الأوردرات الأولى كانت شايلاه في from.subAcc */
 export const orderShopId = (order: Order) => order.shopId ?? order.from.subAcc ?? '';
+
+/** «الطلبات الواردة»: الأوردرات المؤكدة اللي النشاط ده بائعها — الأحدث الأول */
+export async function fetchIncoming(token: string, accountId: string): Promise<Order[]> {
+  const { orders } = await request<{ orders: Order[] }>(`/api/businesses/${encodeURIComponent(accountId)}/incoming`, token);
+  return orders;
+}
 
 export async function fetchOrders(token: string): Promise<Order[]> {
   const { orders } = await request<{ orders: Order[] }>('/api/orders', token);

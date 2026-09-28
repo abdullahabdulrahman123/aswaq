@@ -10,7 +10,8 @@ export function orderToView(order: Order): InvoiceView {
     date: new Date(order.checkedOutAt ?? order.updatedAt),
     buyer: order.names.buyer,
     buyerPhone: order.names.buyerPhone,
-    seller: order.seller.name,
+    // البائع = مندوب البيع في «مبيعات». المشتري لنفسه ملوش مندوب — مش اسمه هو
+    seller: order.sale ? order.seller.name : '',
     method: order.method,
     address: order.address,
     lines: order.details.map((d) => ({
@@ -24,5 +25,6 @@ export function orderToView(order: Order): InvoiceView {
     // الوزن بالجرام والحجم بالسنتيمتر المكعب في الأوردر
     weightKg: order.details.some((d) => d.weight) ? order.totalWeight / 1000 : null,
     volumeM3: order.details.some((d) => d.volume) ? (order.totalVolume ?? 0) / 1_000_000 : null,
+    measuresMissing: order.details.some((d) => d.measuresMissing),
   };
 }
