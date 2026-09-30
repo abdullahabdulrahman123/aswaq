@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { DialogCloseButton } from './DialogClose';
 
 /**
  * المستخدم بيغيّر الحساب وهو في نص صنف لسه متحفظش — بنسأله الأول بدل ما يضيع
@@ -35,7 +36,7 @@ export function UnsavedSwitchDialog({
         if (e.target === e.currentTarget) onCancel();
       }}
     >
-      <div className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl dark:border-white/10 dark:bg-surface-card">
+      <div className="relative w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl dark:border-white/10 dark:bg-surface-card">
         <h2 id="unsaved-switch-title" className="font-display text-lg font-bold">
           الصنف اللي بتكتبه مش هيتحفظ
         </h2>
@@ -59,6 +60,8 @@ export function UnsavedSwitchDialog({
             أيوه، غيّر الحساب
           </button>
         </div>
+
+        <DialogCloseButton onClick={onCancel} />
       </div>
     </div>
   );

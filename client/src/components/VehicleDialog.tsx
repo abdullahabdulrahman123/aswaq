@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Premises, Vehicle } from '../context/AuthContext';
+import { DialogCloseButton, useBackdropClose } from './DialogClose';
 import { Notch, compactFieldClass, fieldClass } from './OutlinedField';
 
 /** المسودة اللي بتبدأ بيها أي إضافة */
@@ -70,6 +71,7 @@ interface Props {
  */
 export function VehicleDialog({ open, value, premises, onSave, onClose }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const backdropClose = useBackdropClose();
   const [draft, setDraft] = useState<Draft>(() => draftOf(value));
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -134,6 +136,7 @@ export function VehicleDialog({ open, value, premises, onSave, onClose }: Props)
   return (
     <dialog
       ref={dialogRef}
+      {...backdropClose}
       onClose={onClose}
       aria-label={mode === 'add' ? 'إضافة مركبة' : 'تعديل المركبة'}
       // العرض في style مش كلاس — نفس سبب باقي النوافذ
@@ -255,6 +258,7 @@ export function VehicleDialog({ open, value, premises, onSave, onClose }: Props)
           </div>
         </div>
       )}
+      <DialogCloseButton />
     </dialog>
   );
 }

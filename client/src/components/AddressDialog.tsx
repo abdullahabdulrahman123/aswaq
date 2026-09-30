@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { BusinessAddress } from '../context/AuthContext';
 import { COUNTRIES, GOVERNORATE_NAMES, citiesOf } from '../data/egypt';
+import { DialogCloseButton, useBackdropClose } from './DialogClose';
 import { LocationPicker } from './LocationPicker';
 import { Notch, fieldClass } from './OutlinedField';
 import {
@@ -59,6 +60,7 @@ interface Props {
  */
 export function AddressDialog({ open, value, premisesName, onDone, onClose, placeNoun = 'المقر' }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const backdropClose = useBackdropClose();
 
   const [draft, setDraft] = useState<BusinessAddress>(value);
   const [error, setError] = useState('');
@@ -169,6 +171,7 @@ export function AddressDialog({ open, value, premisesName, onDone, onClose, plac
   return (
     <dialog
       ref={dialogRef}
+      {...backdropClose}
       // الإغلاق ممكن ييجي من Esc كمان، مش من زرار الإلغاء بس
       onClose={onClose}
       aria-label="حدد العنوان"
@@ -182,7 +185,7 @@ export function AddressDialog({ open, value, premisesName, onDone, onClose, plac
       {/* المحتوى بيتركّب بس والنافذة مفتوحة — الخريطة محتاجة مقاس حقيقي وقت الإنشاء */}
       {open && (
         <div className="max-h-[85vh] overflow-y-auto p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 pe-7">
             <h2 className="font-display text-lg font-bold">حدد العنوان</h2>
             <button
               type="button"
@@ -352,6 +355,7 @@ export function AddressDialog({ open, value, premisesName, onDone, onClose, plac
           </div>
         </div>
       )}
+      <DialogCloseButton />
     </dialog>
   );
 }

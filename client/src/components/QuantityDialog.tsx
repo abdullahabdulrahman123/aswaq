@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { egp } from '../data/catalog';
 import { MAX_QTY, clampQty, moneyInput, qtyInput, toPiastres, toPounds } from '../lib/quantity';
+import { DialogCloseButton, useBackdropClose } from './DialogClose';
 import { Notch, compactFieldClass } from './OutlinedField';
 
 /**
@@ -40,6 +41,7 @@ export function QuantityDialog({
   onClose: () => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const backdropClose = useBackdropClose();
   const inputRef = useRef<HTMLInputElement>(null);
   const [text, setText] = useState('1');
   const [priceText, setPriceText] = useState('');
@@ -69,6 +71,7 @@ export function QuantityDialog({
   return (
     <dialog
       ref={dialogRef}
+      {...backdropClose}
       onClose={onClose}
       aria-label="الكمية"
       // العرض والمكان في style مش كلاس — نفس سبب باقي النوافذ. فوق الشاشة عشان الكيبورد ميغطيهاش
@@ -84,7 +87,7 @@ export function QuantityDialog({
             onDone(clampQty(qty), editPrice && price !== unitPrice ? price : undefined);
           }}
         >
-          <h2 className="truncate text-sm font-bold leading-snug">
+          <h2 className="truncate pe-8 text-sm font-bold leading-snug">
             {itemName}
             <span className="font-normal text-stone-500 dark:text-stone-400">
               {' '}· {unitName}
@@ -140,6 +143,7 @@ export function QuantityDialog({
           </p>
         </form>
       )}
+      <DialogCloseButton />
     </dialog>
   );
 }

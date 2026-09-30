@@ -5,6 +5,7 @@ import { oneLine } from '../lib/address';
 import { fromAddress } from '../lib/buyerLocation';
 import { getCoords, GeolocateError, type Coords } from '../lib/geolocate';
 import { AddressDialog, EMPTY_ADDRESS } from './AddressDialog';
+import { DialogCloseButton, useBackdropClose } from './DialogClose';
 import { LocationPicker } from './LocationPicker';
 import { PinIcon } from './PinIcon';
 
@@ -22,6 +23,7 @@ const pickedOption = 'border-brand-500 bg-brand-50 dark:border-brand-400 dark:bg
  */
 export function LocationDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const backdropClose = useBackdropClose();
   const { user, userAddresses, userAddressesError, addUserAddress, signIn } = useAuth();
   const { location, setLocation } = useBuyerLocation();
 
@@ -75,6 +77,7 @@ export function LocationDialog({ open, onClose }: { open: boolean; onClose: () =
     <>
       <dialog
         ref={dialogRef}
+        {...backdropClose}
         onClose={onClose}
         aria-label="مكانك"
         // العرض في style مش كلاس — نفس سبب AddressDialog
@@ -233,6 +236,7 @@ export function LocationDialog({ open, onClose }: { open: boolean; onClose: () =
             )}
           </div>
         )}
+        <DialogCloseButton />
       </dialog>
 
       {/* نافذة العنوان جنب دي مش جواها — زي فورم المقر */}

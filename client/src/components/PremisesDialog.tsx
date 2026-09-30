@@ -6,6 +6,7 @@ import type { Minimums } from '../lib/aswaqApi';
 import { PRICE_FIELDS, PRICE_LABELS, type PriceField } from '../lib/itemUnits';
 import { AddressDialog, EMPTY_ADDRESS } from './AddressDialog';
 import { ContactsField } from './ContactsField';
+import { DialogCloseButton, useBackdropClose } from './DialogClose';
 import { MapPreview } from './MapPreview';
 import { Notch, compactFieldClass, fieldClass } from './OutlinedField';
 import { PinIcon } from './PinIcon';
@@ -79,6 +80,7 @@ interface Props {
  */
 export function PremisesDialog({ open, value, mode, settings, withStoreSettings, onSave, onClose }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const backdropClose = useBackdropClose();
 
   const [draft, setDraft] = useState<Premises>(value);
   /** نص مش رقم: الخانة ممكن تبقى فاضية، أو فيها «٢٫٥» وهو بيكتب */
@@ -168,6 +170,7 @@ export function PremisesDialog({ open, value, mode, settings, withStoreSettings,
     <>
       <dialog
         ref={dialogRef}
+        {...backdropClose}
         // الإغلاق ممكن ييجي من Esc كمان، مش من زرار الإلغاء بس
         onClose={onClose}
         aria-label={mode === 'add' ? 'إضافة مقر' : 'تعديل المقر'}
@@ -344,6 +347,7 @@ export function PremisesDialog({ open, value, mode, settings, withStoreSettings,
             </div>
           </div>
         )}
+        <DialogCloseButton />
       </dialog>
 
       <AddressDialog

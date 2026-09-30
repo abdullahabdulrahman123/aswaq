@@ -6,6 +6,7 @@ import type { ReceivingMethod } from '../lib/itemUnits';
 import { latinDigits } from '../lib/quantity';
 import { ApiError, searchCustomers, type Customer } from '../lib/waslaApi';
 import { Avatar, personInitial } from './Avatar';
+import { DialogCloseButton, useBackdropClose } from './DialogClose';
 import { Notch, fieldClass } from './OutlinedField';
 
 const METHODS: { key: ReceivingMethod; label: string }[] = [
@@ -53,6 +54,7 @@ export function SalesDialog() {
   const { user, withToken } = useAuth();
   const navigate = useNavigate();
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const backdropClose = useBackdropClose();
   const searchRef = useRef<HTMLInputElement>(null);
   const business = dialog?.business ?? null;
   const editing = dialog?.editing ?? null;
@@ -200,6 +202,7 @@ export function SalesDialog() {
   return (
     <dialog
       ref={dialogRef}
+      {...backdropClose}
       onClose={closeDialog}
       aria-label="مبيعات"
       // العرض في style مش كلاس — نفس سبب باقي النوافذ
@@ -209,7 +212,7 @@ export function SalesDialog() {
       {business && (
         <form onSubmit={handleSubmit} className="p-5 sm:p-6">
           {dialog?.notice && (
-            <p role="status" className="mb-4 rounded-lg bg-accent-50 px-3 py-2.5 text-sm font-medium text-accent-700 dark:bg-accent-500/10 dark:text-accent-300">
+            <p role="status" className="mb-4 me-6 rounded-lg bg-accent-50 px-3 py-2.5 text-sm font-medium text-accent-700 dark:bg-accent-500/10 dark:text-accent-300">
               {dialog.notice}
             </p>
           )}
@@ -401,6 +404,7 @@ export function SalesDialog() {
           </div>
         </form>
       )}
+      <DialogCloseButton />
     </dialog>
   );
 }

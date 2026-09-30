@@ -10,6 +10,7 @@ import {
 } from '../lib/contacts';
 import { ApiError } from '../lib/waslaApi';
 import { ContactIcon } from './ContactIcon';
+import { DialogCloseButton, useBackdropClose } from './DialogClose';
 import { Notch, fieldClass } from './OutlinedField';
 
 interface Props {
@@ -44,6 +45,7 @@ function saveErrorMessage(err: unknown): string {
  */
 export function ContactDialog({ open, value, others, ownerName, onSave, onDelete, onClose }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const backdropClose = useBackdropClose();
   // اسم مجموعة الأنواع: الراديو اللي من غير فورم بيتجمّع على مستوى الصفحة كلها
   const typeGroup = useId();
 
@@ -125,6 +127,7 @@ export function ContactDialog({ open, value, others, ownerName, onSave, onDelete
   return createPortal(
     <dialog
       ref={dialogRef}
+      {...backdropClose}
       onCancel={stop}
       onClose={(event) => {
         stop(event);
@@ -255,6 +258,7 @@ export function ContactDialog({ open, value, others, ownerName, onSave, onDelete
           )}
         </div>
       )}
+      <DialogCloseButton />
     </dialog>,
     document.body,
   );
