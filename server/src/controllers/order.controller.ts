@@ -84,7 +84,8 @@ export async function putDraft(req: Request, res: Response) {
   }
 
   const method = input.sale?.method ?? input.method;
-  const details = buildDetails(await storeItems(input.shopId), input.lines, priceFieldFor(method, buyerKind));
+  // السعر اللي في السطر بيتاخد في «مبيعات» بس — البائع اتأكد فوق إنه بيدير النشاط
+  const details = buildDetails(await storeItems(input.shopId), input.lines, priceFieldFor(Boolean(input.sale), buyerKind), Boolean(input.sale));
   if (typeof details === 'string') {
     res.status(400).json({ message: details });
     return;
@@ -116,8 +117,9 @@ const LINE_RETRIES = 5;
 
 /**
  * PUT /api/orders/:orderId/lines — صنف واحد في مسودة، بطلب العميل: الحفظ
- * صنف صنف لما المشتري يدوس «تم»، والهيدر مبيتبعتش كل مرة. السعر بطريقة
- * الاستلام ونوع المشتري اللي في المسودة. الكمية صفر بتشيل الصنف، وآخر صنف
+ * صنف صنف لما المشتري يدوس «تم»، والهيدر مبيتبعتش كل مرة. السعر بنوع
+ * المشتري اللي في المسودة، وبأسعار المحل لو هي «مبيعات» — وفيها البائع يقدر
+ * يكتب السعر بنفسه (price). الكمية صفر بتشيل الصنف، وآخر صنف
  * بيمسح المسودة ({ order: null }). 409 = المسودة اتأكدت، و404 = مش موجودة —
  * والواجهة ساعتها بتبعت المسودة كلها من الأول.
  */
@@ -129,6 +131,8 @@ export async function putLine(req: Request, res: Response) {
     return;
   }
   const me = await currentUser(req);
+  /** سعر البائع: في مسودة «مبيعات» بس، ولسه بيدير النشاط البائع */
+  let pricedBySeller: boolean | null = null;
 
   for (let attempt = 0; attempt < LINE_RETRIES; attempt++) {
     const order = isObjectId(id) ? await findMine(me.accountId, id) : null;
@@ -142,8 +146,11 @@ export async function putLine(req: Request, res: Response) {
     }
 
     const shopId = order.shopId ?? order.from.subAcc ?? '';
-    const field = priceFieldFor(order.method as 'pickup' | 'delivery', order.names.buyerKind as 'user' | 'business');
-    const details = withLine(order.details, await storeItems(shopId), parsed.data, field);
+    const field = priceFieldFor(Boolean(order.sale), order.names.buyerKind as 'user' | 'business');
+    if (pricedBySeller === null) {
+      pricedBySeller = parsed.data.price !== undefined && order.sale != null && Boolean(await findManagedBusiness(req, order.from.acc));
+    }
+    const details = withLine(order.details, await storeItems(shopId), parsed.data, field, pricedBySeller);
     if (typeof details === 'string') {
       res.status(400).json({ message: details });
       return;

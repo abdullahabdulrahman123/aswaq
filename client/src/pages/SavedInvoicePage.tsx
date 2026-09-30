@@ -1,20 +1,29 @@
-import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { InvoiceSheet } from '../components/InvoiceSheet';
 import { useAuth } from '../context/AuthContext';
-import { fetchOrder, type Order } from '../lib/aswaqApi';
+import { useSales } from '../context/SalesContext';
+import { fetchOrder, orderShopId, type Order } from '../lib/aswaqApi';
 import { orderToView } from '../lib/invoiceView';
 import { ApiError } from '../lib/waslaApi';
 
 /**
  * فاتورة أوردر اتأكد — من السيرفر برقمها. للطباعة وللرجوع ليها من «الطلبات».
  * بتتقري بس: التعديل بعد التأكيد لسه متحددش.
+ *
+ * جاية من «تأكيد وطباعة» (state.print) بتفتح الطباعة لوحدها أول ما تترسم. زرار
+ * «الطلبات» اتشال بطلب العميل (الطلبات من السلة)، وفي «مبيعات» مكانه «فاتورة جديدة».
  */
 export function SavedInvoicePage() {
   const { orderId = '' } = useParams<{ orderId: string }>();
-  const { withToken, user } = useAuth();
+  const { withToken, user, businesses } = useAuth();
+  const { openDialog } = useSales();
+  const navigate = useNavigate();
+  const { pathname, state } = useLocation();
   const [order, setOrder] = useState<Order | null>(null);
   const [error, setError] = useState('');
+  const printOnOpen = (state as { print?: boolean } | null)?.print === true;
+  const printed = useRef(false);
 
   useEffect(() => {
     if (!user) return;
@@ -31,12 +40,25 @@ export function SavedInvoicePage() {
     };
   }, [orderId, user, withToken]);
 
+  // «تأكيد وطباعة»: الطباعة بعد ما الورقة تترسم، والطلب بيتشال من التاريخ عشان الـrefresh ميطبعش تاني
+  useEffect(() => {
+    if (!order || !printOnOpen || printed.current) return;
+    printed.current = true;
+    requestAnimationFrame(() => {
+      window.print();
+      navigate(pathname, { replace: true, state: null });
+    });
+  }, [order, printOnOpen, pathname, navigate]);
+
   if (error || !user) {
     return <p className="mx-auto max-w-md px-4 py-20 text-center text-sm text-stone-500 dark:text-stone-400">{error || 'سجّل دخول عشان تشوف الفاتورة.'}</p>;
   }
   if (!order) {
     return <p className="mx-auto max-w-2xl px-4 py-8 text-sm text-stone-500 dark:text-stone-400">بنجيب الفاتورة…</p>;
   }
+
+  // البيعة بتتقفل أول ما الفاتورة المؤكدة تفتح (برا «عالم الأوردر») — فالنشاط من الفاتورة نفسها
+  const saleBusiness = order.sale != null ? businesses.find((b) => b.accountId === order.from.acc) : undefined;
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 print:max-w-none print:p-0">
@@ -54,9 +76,18 @@ export function SavedInvoicePage() {
         >
           اطبع / PDF
         </button>
-        <Link to="/orders" className="rounded-xl border border-stone-300 px-6 py-3 text-sm font-medium transition hover:border-stone-400 dark:border-white/15">
-          الطلبات
-        </Link>
+        {saleBusiness && (
+          <button
+            type="button"
+            onClick={() => {
+              navigate(`/store/${orderShopId(order)}`);
+              openDialog(saleBusiness);
+            }}
+            className="rounded-xl border border-accent-600 px-6 py-3 text-sm font-semibold text-accent-700 transition hover:bg-accent-50 dark:text-accent-300 dark:hover:bg-accent-500/10"
+          >
+            فاتورة جديدة
+          </button>
+        )}
       </div>
     </div>
   );

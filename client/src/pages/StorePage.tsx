@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Avatar } from '../components/Avatar';
 import { LocationBar } from '../components/LocationBar';
@@ -21,12 +21,12 @@ const METHODS: { key: ReceivingMethod; label: string }[] = [
 
 /**
  * صفحة المتجر في المعرض: أصنافه ككروت (StoreItemCard). فوق الكروت المشتري
- * بيختار طريقة الاستلام — استلام من المتجر أو توصيل — والأسعار كلها بتمشي
- * عليها، بطلب العميل. التوصيل متاح بس لو مكان المشتري جوه نطاق المتجر.
+ * بيختار طريقة الاستلام — استلام من المتجر أو توصيل. الأسعار مبتتغيّرش معاها
+ * (أونلاين في الحالتين، بطلب العميل). التوصيل متاح بس لو مكان المشتري جوه نطاق المتجر.
  *
  * المتجر نفسه (اسمه ونشاطه ومكانه) من وصلة، ونطاقه وأصنافه من أسواق.
  *
- * في «مبيعات» الأسعار بتاعة المشتري (شركة = جملة، مستخدم = قطاعي) وطريقة
+ * في «مبيعات» الأسعار أسعار المحل بتاعة المشتري (شركة = جملة، مستخدم = قطاعي) وطريقة
  * الاستلام اللي اتختارت في نافذة «مبيعات» — مكتوبة بس، من غير اختيار ولا نطاق.
  * متجر نشاط تاني مش جزء من البيعة، فدخوله خروج منها.
  */
@@ -81,10 +81,16 @@ export function StorePage() {
     };
   }, [storeId, attempt]);
 
-  const otherBusiness = Boolean(session && store && store.business.accountId !== session.accountId);
+  // متجر نشاط تاني بيخرّج من البيعة — بيتشيك لما المتجر نفسه يتغيّر بس. بيعة بتبدأ
+  // والصفحة لسه على متجر نشاط تاني (التنقل بيتأخر شوية عن بداية البيعة) كانت
+  // بتتقفل على طول، واسم المشتري ميظهرش جنب السلة — مكالمة ٢٨ سبتمبر.
+  const sales = useRef({ session, leave });
+  sales.current = { session, leave };
+  const storeBusiness = store?.business.accountId ?? null;
   useEffect(() => {
-    if (otherBusiness) leave();
-  }, [otherBusiness, leave]);
+    const { session: active, leave: leaveSale } = sales.current;
+    if (storeBusiness && active && active.accountId !== storeBusiness) leaveSale();
+  }, [storeBusiness]);
 
   // صورة النشاط على شمال الناڤبار — «البائع» قصاد المشتري
   useCurrentSeller(
@@ -105,7 +111,7 @@ export function StorePage() {
     : chosen === 'delivery' && !canDeliver
       ? 'pickup'
       : (chosen ?? (canDeliver ? 'delivery' : 'pickup'));
-  const priceField = buyerPriceField(method, accountType);
+  const priceField = buyerPriceField(Boolean(session), accountType);
   /** الحد الأدنى للأوردر في الشريحة اللي المشتري شايفها — السلة بتلوّن بيه */
   const minimum = details?.minimums[priceField] ?? null;
   /**
@@ -121,7 +127,7 @@ export function StorePage() {
   // المسودة على السيرفر مع كل تغيير في سلة المتجر ده
   useDraftSync(store?.id ?? null, store ? linesOf(store.id) : [], method);
 
-  // الأسعار بتتغيّر مع طريقة الاستلام ونوع الحساب — سطور السلة بتمشي معاها
+  // الأسعار بتتغيّر مع نوع الحساب ولما البيعة تبدأ — سطور السلة بتمشي معاها
   useEffect(() => {
     if (!details) return;
     const prices = new Map(
@@ -180,12 +186,13 @@ export function StorePage() {
         : `المتجر بيوصّل لحد ${formatDistance(radius)}، ومكانك على بعد ${formatDistance(km)}.`;
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
-      <div className="flex items-center gap-3">
-        <Avatar picture={store.business.picture} fallback={store.business.abbreviation} kind="business" size={56} tone="soft" />
+    <div className="mx-auto max-w-6xl px-4 py-5">
+      {/* سطر المتجر صغير — المشتري مهتم بالأصناف أكتر، بطلب العميل (٢٨ سبتمبر) */}
+      <div className="flex items-center gap-2.5">
+        <Avatar picture={store.business.picture} fallback={store.business.abbreviation} kind="business" size={36} tone="soft" />
         <div className="min-w-0">
-          <h1 className="break-words font-display text-2xl font-bold leading-tight sm:text-3xl">{store.name}</h1>
-          <p className="mt-0.5 break-words text-sm text-stone-500 dark:text-stone-400">
+          <h1 className="break-words font-display text-lg font-bold leading-tight sm:text-xl">{store.name}</h1>
+          <p className="break-words text-xs text-stone-500 dark:text-stone-400">
             {store.business.name}
             {km !== null && <span className="tabular-nums"> · {formatDistance(km)}</span>}
           </p>
@@ -194,12 +201,12 @@ export function StorePage() {
 
       {/* في «مبيعات» طريقة الاستلام مكتوبة بس. وإلا: مش grid — عنصر الـgrid بيكبر على قد النص، فالعنوان الطويل في شريط المكان كان بيوسّع الصفحة بدل ما يتقص */}
       {session ? (
-        <p className="mt-5 rounded-xl bg-stone-100 px-4 py-3 text-sm leading-relaxed dark:bg-white/5 sm:max-w-xl">
+        <p className="mt-3 rounded-lg bg-stone-100 px-3 py-1.5 text-xs leading-relaxed dark:bg-white/5 sm:max-w-xl">
           <span className="font-semibold">{session.method === 'delivery' ? 'توصيل' : 'استلام من المتجر'}</span>
           {session.method === 'delivery' && <span className="break-words"> — {session.address}</span>}
         </p>
       ) : (
-        <div className="mt-5 space-y-3 sm:max-w-xl">
+        <div className="mt-4 space-y-3 sm:max-w-xl">
           <LocationBar prompt="حدد مكانك عشان نعرف المتجر بعيد عنك قد إيه" />
 
           <div>
@@ -246,15 +253,15 @@ export function StorePage() {
       </div>
       )}
 
-      <div className="mt-6">
+      <div className="mt-4">
         {details.items.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-stone-300 p-8 text-center text-sm text-stone-500 dark:border-white/15 dark:text-stone-400">
             لسه مفيش أصناف في المتجر ده.
           </p>
         ) : (
-          <ul aria-label="أصناف المتجر" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <ul aria-label="أصناف المتجر" className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {details.items.map((item) => (
-              <StoreItemCard key={item.id} item={item} priceField={priceField} shopId={store.id} storeName={store.name} />
+              <StoreItemCard key={item.id} item={item} priceField={priceField} shopId={store.id} storeName={store.name} sellerPrices={Boolean(session)} />
             ))}
           </ul>
         )}

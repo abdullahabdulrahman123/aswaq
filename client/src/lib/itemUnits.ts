@@ -36,16 +36,18 @@ export const PRICE_GROUPS: { label: string; fields: { field: PriceField; label: 
   },
 ];
 
-/** طريقة الاستلام — «في المحل» يعني المشتري بيستلم من المتجر، و«أونلاين» يعني توصيل */
+/** طريقة الاستلام — استلام من المتجر أو توصيل لعنوان */
 export type ReceivingMethod = 'pickup' | 'delivery';
 
 /**
  * السعر اللي المشتري بيشوفه في المتجر، بطلب العميل: الشركة بتشوف الجملة،
- * والحساب الشخصي والزائر القطاعي. والاستلام من المتجر بسعر المحل، والتوصيل
- * بسعر الأونلاين. كلمة جملة أو قطاعي مبتظهرش للمشتري نفسه — بيشوف «السعر» بس.
+ * والحساب الشخصي والزائر القطاعي. «مبيعات» (فاتورة بيحررها البائع في المحل)
+ * بسعر المحل، والمعرض بسعر الأونلاين — والاستلام والتوصيل مبيغيّروش السعر
+ * (مكالمة ٢٨ سبتمبر: تكلفة التوصيل خطوة لوحدها بعد التأكيد). كلمة جملة أو
+ * قطاعي مبتظهرش للمشتري نفسه — بيشوف «السعر» بس.
  */
-export function buyerPriceField(method: ReceivingMethod, accountType: AccountType): PriceField {
+export function buyerPriceField(inSales: boolean, accountType: AccountType): PriceField {
   const wholesale = accountType === 'COMPANY';
-  if (method === 'pickup') return wholesale ? 'onSWP' : 'onSRP';
+  if (inSales) return wholesale ? 'onSWP' : 'onSRP';
   return wholesale ? 'onLWP' : 'onLRP';
 }

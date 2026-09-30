@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useSales } from '../context/SalesContext';
+import { lastSalesShop, rememberSalesShop, useSales } from '../context/SalesContext';
 import type { ReceivingMethod } from '../lib/itemUnits';
 import { latinDigits } from '../lib/quantity';
 import { ApiError, searchCustomers, type Customer } from '../lib/waslaApi';
@@ -17,6 +17,9 @@ const legendClass = 'mb-2 block text-xs font-medium text-stone-500 dark:text-sto
 
 /** أرقام إنجليزي من غير مسافات ولا شُرَط — والـ+ في الأول بس */
 const cleanPhone = (text: string) => latinDigits(text).replace(/[\s-]/g, '');
+
+/** أسعار المشتري في «مبيعات» — للبائع بس، عشان الفرق بين خياري غير المسجل يبان (مكالمة ٢٨ سبتمبر) */
+const priceHint = (c: Customer) => (c.kind === 'business' ? 'أسعار جملة المحل' : 'أسعار قطاعي المحل');
 
 /** إيميل كامل أو رقم كامل — وصلة مبتدوّرش بأقل من كده */
 const searchable = (q: string) => /\S+@\S+\.\S+/.test(q) || cleanPhone(q).replace(/^\+/, '').length >= 8;
@@ -35,14 +38,15 @@ function CustomerAvatar({ customer, size }: { customer: Customer; size: number }
 
 /**
  * نافذة «مبيعات» بطلب العميل — رأس الفاتورة، قبل المعرض:
- *   - العميل: حساب في وصلة. أوله حسابين لغير المسجلين (مستخدم = قطاعي، شركة =
- *     جملة)، والمسجّل بيتلاقي بإيميله أو رقمه كامل — مش بحث جزئي، عشان محدش
- *     يتصفّح أسامي الناس — وبيظهر بصورته
+ *   - المتجر اللي البائع بيبيع منه — عميل الشباك بيشتري من متجر واحد، فالنافذة
+ *     بتفتح على آخر متجر اتباع منه، و«ابدأ البيع» بيدخل على أصنافه على طول
+ *   - العميل: حساب في وصلة. أوله حسابين لغير المسجلين (مستخدم = قطاعي المحل،
+ *     شركة = جملة المحل)، والمسجّل بيتلاقي بإيميله أو رقمه كامل — مش بحث جزئي،
+ *     عشان محدش يتصفّح أسامي الناس — وبيظهر بصورته
  *   - البائع: دلوقتي اللي فاتح بس
  *   - الاسم الأدبي والموبايل، واستلام ولا توصيل — والتوصيل عنوان كتابة
  *
- * «ابدأ البيع» بيفتح المعرض بمتاجر النشاط ده بس. من اسم المشتري في الناڤبار
- * نفس النافذة بتعدّل البيعة الشغالة.
+ * من اسم المشتري في الناڤبار نفس النافذة بتعدّل البيعة الشغالة.
  */
 export function SalesDialog() {
   const { dialog, closeDialog, start, update } = useSales();
@@ -54,6 +58,7 @@ export function SalesDialog() {
   const editing = dialog?.editing ?? null;
   const open = dialog !== null;
   const sellerName = user?.name ?? user?.email ?? 'أنا';
+  const stores = business?.premises.filter((p) => p.isStore) ?? [];
 
   /** null = لسه بنجيب */
   const [walkIn, setWalkIn] = useState<Customer[] | null>(null);
@@ -67,6 +72,7 @@ export function SalesDialog() {
   const [phone, setPhone] = useState('');
   const [method, setMethod] = useState<ReceivingMethod>('pickup');
   const [address, setAddress] = useState('');
+  const [shopId, setShopId] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -84,6 +90,9 @@ export function SalesDialog() {
     setPhone(editing?.phone ?? '');
     setMethod(editing?.method ?? 'pickup');
     setAddress(editing?.address ?? '');
+    const remembered = business ? lastSalesShop(business.accountId) : null;
+    const choices = stores.map((p) => p.id);
+    setShopId([editing?.shopId, remembered].find((id) => id && choices.includes(id)) ?? choices[0] ?? '');
     setPickerOpen(false);
     setSearch('');
     setMatches(null);
@@ -174,15 +183,15 @@ export function SalesDialog() {
       sellerName,
       method,
       address: method === 'delivery' ? address.trim() : '',
+      shopId: shopId || undefined,
     };
-    if (editing) {
-      update(draft);
-      closeDialog();
-      return;
-    }
-    start(draft);
+    if (shopId) rememberSalesShop(business.accountId, shopId);
+    const moved = shopId && shopId !== editing?.shopId;
+    if (editing) update(draft);
+    else start(draft);
     closeDialog();
-    navigate('/');
+    // على أصناف المتجر على طول — من غير صفحة المتاجر
+    if (!editing || moved) navigate(shopId ? `/store/${shopId}` : '/');
   }
 
   const optionClass =
@@ -199,10 +208,28 @@ export function SalesDialog() {
     >
       {business && (
         <form onSubmit={handleSubmit} className="p-5 sm:p-6">
+          {dialog?.notice && (
+            <p role="status" className="mb-4 rounded-lg bg-accent-50 px-3 py-2.5 text-sm font-medium text-accent-700 dark:bg-accent-500/10 dark:text-accent-300">
+              {dialog.notice}
+            </p>
+          )}
           <h2 className="font-display text-xl font-bold">مبيعات</h2>
           <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">{business.name}</p>
 
           <div className="mt-6 space-y-5">
+            {stores.length > 0 && (
+              <label className="relative block">
+                <select className={fieldClass} value={shopId} onChange={(e) => setShopId(e.target.value)}>
+                  {stores.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+                <Notch>المتجر</Notch>
+              </label>
+            )}
+
             {/* العميل: كومبو فيه حسابين غير المسجلين، وبحث بالإيميل أو الرقم */}
             <div className="relative">
               <button
@@ -226,7 +253,8 @@ export function SalesDialog() {
                     {(walkIn ?? []).map((c) => (
                       <li key={c.accountId}>
                         <button type="button" role="option" aria-selected={buyer?.accountId === c.accountId} onClick={() => pick(c)} className={`${optionClass} font-medium text-brand-700 dark:text-brand-300`}>
-                          {c.name}
+                          <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                          <span className="shrink-0 text-xs font-normal text-stone-400">{priceHint(c)}</span>
                         </button>
                       </li>
                     ))}
@@ -269,6 +297,7 @@ export function SalesDialog() {
                   )}
                 </div>
               )}
+              {buyer && !pickerOpen && <span className="mt-1.5 block text-xs text-stone-500 dark:text-stone-400">{priceHint(buyer)}</span>}
               {loadError && <span className="mt-1.5 block text-xs text-red-600 dark:text-red-400">{loadError}</span>}
             </div>
 

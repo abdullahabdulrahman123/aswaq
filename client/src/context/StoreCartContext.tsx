@@ -29,9 +29,17 @@ export interface CartLine {
   unitName: string;
   /** عدد صحيح أكبر من صفر — الصفر معناه السطر يتشال */
   qty: number;
-  /** سعر الوحدة بالقرش */
+  /** سعر الوحدة بالقرش — من المتجر، بالشريحة اللي المشتري شايفها */
   unitPrice: number | null;
+  /**
+   * السعر اللي البائع كتبه بنفسه في «مبيعات» (مكالمة ٢٨ سبتمبر) — بيكسب على
+   * unitPrice. فاضي = سعر المتجر.
+   */
+  price?: number;
 }
+
+/** السعر اللي السطر بيتحسب بيه: اللي البائع كتبه، وإلا سعر المتجر */
+export const linePrice = (l: Pick<CartLine, 'unitPrice' | 'price'>) => l.price ?? l.unitPrice;
 
 /** أوردر مفتوح: سطور متجر واحد لمشتري واحد */
 export interface OpenOrder {
@@ -89,7 +97,7 @@ interface StoreCart {
   clearShop: (saleId: string | null, shopId: string) => void;
 }
 
-const sum = (list: CartLine[]) => list.reduce((n, l) => n + (l.unitPrice ?? 0) * l.qty, 0);
+const sum = (list: CartLine[]) => list.reduce((n, l) => n + (linePrice(l) ?? 0) * l.qty, 0);
 const itemCount = (list: CartLine[]) => new Set(list.map((l) => l.itemId)).size;
 
 function ordersOf(lines: CartLine[], sale: SalesSession | null): OpenOrder[] {

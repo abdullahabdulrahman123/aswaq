@@ -19,6 +19,9 @@ const saleSchema = z
   })
   .passthrough();
 
+/** سعر كتبه البائع في «مبيعات» (مكالمة ٢٨ سبتمبر) — بالقرش */
+const sellerPrice = z.number().int().min(0).max(100_000_000).optional();
+
 /**
  * المسودة من السلة: المتجر والسطور بالكمية بس — الأسعار والإجماليات السيرفر
  * هو اللي بيحسبها. مفيش sale = المستخدم بيشتري لنفسه (أو لنشاطه: to).
@@ -35,6 +38,8 @@ export const draftSchema = z.object({
         itemId: objectIdSchema,
         unitName: z.string().min(1).max(40),
         quantity: z.number().int().min(1).max(99_999),
+        /** سعر الوحدة بالقرش اللي البائع كتبه — في «مبيعات» بس، وغير كده بيتجاهل */
+        price: sellerPrice,
       }),
     )
     .max(200),
@@ -48,6 +53,7 @@ export const lineSchema = z.object({
   itemId: objectIdSchema,
   unitName: z.string().min(1).max(40),
   quantity: z.number().int().min(0).max(99_999),
+  price: sellerPrice,
 });
 
 export type DraftInput = z.infer<typeof draftSchema>;

@@ -4,20 +4,29 @@ import type { DraftInput, LineInput } from '../schemas/order.schema.js';
 
 type PriceField = 'onSWP' | 'onSRP' | 'onLWP' | 'onLRP';
 
-/** نفس قاعدة الواجهة (lib/itemUnits.ts): النشاط جملة والفرد قطاعي، والاستلام سعر المحل والتوصيل الأونلاين */
-export function priceFieldFor(method: 'pickup' | 'delivery', buyerKind: 'user' | 'business'): PriceField {
+/**
+ * نفس قاعدة الواجهة (lib/itemUnits.ts): النشاط جملة والفرد قطاعي. «مبيعات» (فاتورة بيحررها
+ * البائع في المحل) بأسعار المحل، والمعرض بأسعار الأونلاين — والاستلام والتوصيل مبيغيّروش
+ * السعر، بطلب العميل (٢٨ سبتمبر): التوصيل تكلفته خطوة لوحدها بعد التأكيد.
+ */
+export function priceFieldFor(sale: boolean, buyerKind: 'user' | 'business'): PriceField {
   const wholesale = buyerKind === 'business';
-  if (method === 'pickup') return wholesale ? 'onSWP' : 'onSRP';
+  if (sale) return wholesale ? 'onSWP' : 'onSRP';
   return wholesale ? 'onLWP' : 'onLRP';
 }
 
 /** سطر واحد من وحدة صنف — الأسعار من المتجر، والإجماليات بالسكيمة اللي العميل بعتها */
-function detailOf(item: Item, unit: Item['units'][number], quantity: number, field: PriceField): OrderDetail {
+/**
+ * soldPrice: السعر اللي البائع كتبه في «مبيعات» (مكالمة ٢٨ سبتمبر — مؤقتاً عشان المصنع يشتغل، بيبيعوا لكل
+ * عميل بسعر حسب الكمية). originalPrice بيفضل سعر الصنف من الداتا و«price» اللي اتباع بيه، بسكيمة العميل.
+ * الخصم بيفضل صفر: الإجمالي = الكمية × السعر، والخصم لو اتحسب كمان كان هيتطرح مرتين.
+ */
+function detailOf(item: Item, unit: Item['units'][number], quantity: number, field: PriceField, soldPrice?: number): OrderDetail {
   const originalPrice = unit[field] ?? 0;
   const discount = 0;
   const tax = 0;
   const bonusQuantity = 0;
-  const price = originalPrice - discount;
+  const price = soldPrice ?? originalPrice - discount;
   const avg = unit.avgCost ?? 0;
   const totalQuantity = quantity + bonusQuantity;
   const totalItems = quantity * price;
@@ -49,7 +58,7 @@ function detailOf(item: Item, unit: Item['units'][number], quantity: number, fie
     // في الكمية الكلية مش الكمية — البونص بيتشال على العربية كمان، بطلب العميل
     totalWeight: weight * totalQuantity,
     totalVolume: volume * totalQuantity,
-    unpriced: unit[field] == null,
+    unpriced: soldPrice == null && unit[field] == null,
     measuresMissing: unit.weight == null || unit.volume == null,
     // لحد ما المخزن يعدّل الكميات: المطلوب هو اللي اتطلب، والانحراف صفر
     demanded: { quantity, unit: unit.name, price, tax, avg, totalItems },
@@ -66,12 +75,13 @@ function unitOf(items: Item[], line: LineRef) {
   return item && unit ? { item, unit } : `Item ${line.itemId} / ${line.unitName} is not in this store`;
 }
 
-export function buildDetails(items: Item[], lines: DraftInput['lines'], field: PriceField): OrderDetail[] | string {
+/** pricedBySeller: «مبيعات» — السعر اللي في السطر بيتاخد. غير كده بيتجاهل والسعر من المتجر */
+export function buildDetails(items: Item[], lines: DraftInput['lines'], field: PriceField, pricedBySeller = false): OrderDetail[] | string {
   const details: OrderDetail[] = [];
   for (const line of lines) {
     const found = unitOf(items, line);
     if (typeof found === 'string') return found;
-    details.push(detailOf(found.item, found.unit, line.quantity, field));
+    details.push(detailOf(found.item, found.unit, line.quantity, field, pricedBySeller ? line.price : undefined));
   }
   return details;
 }
@@ -80,12 +90,12 @@ export function buildDetails(items: Item[], lines: DraftInput['lines'], field: P
  * صنف واحد اتغيّر في مسودة: بيحل محل سطره (في نفس مكانه)، أو بيتضاف في
  * الآخر، أو بيتشال لو الكمية صفر. الباقي زي ما هو.
  */
-export function withLine(details: OrderDetail[], items: Item[], line: LineInput, field: PriceField): OrderDetail[] | string {
+export function withLine(details: OrderDetail[], items: Item[], line: LineInput, field: PriceField, pricedBySeller = false): OrderDetail[] | string {
   const same = (d: OrderDetail) => d.itemId === line.itemId && d.unit === line.unitName;
   if (line.quantity === 0) return details.filter((d) => !same(d));
   const found = unitOf(items, line);
   if (typeof found === 'string') return found;
-  const detail = detailOf(found.item, found.unit, line.quantity, field);
+  const detail = detailOf(found.item, found.unit, line.quantity, field, pricedBySeller ? line.price : undefined);
   return details.some(same) ? details.map((d) => (same(d) ? detail : d)) : [...details, detail];
 }
 

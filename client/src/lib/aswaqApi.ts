@@ -333,7 +333,8 @@ export interface DraftInput {
   /** للمستخدم لنفسه: نشاطه لو بيشتري بيه. فاضي = حسابه هو */
   to?: string;
   sale?: unknown;
-  lines: { itemId: string; unitName: string; quantity: number }[];
+  /** price: السعر اللي البائع كتبه بالقرش — السيرفر بياخده في «مبيعات» بس */
+  lines: { itemId: string; unitName: string; quantity: number; price?: number }[];
 }
 
 /** null = السطور فاضية والمسودة اتمسحت */
@@ -350,6 +351,8 @@ export interface LineInput {
   unitName: string;
   /** صفر = الصنف يتشال */
   quantity: number;
+  /** السعر اللي البائع كتبه في «مبيعات» بالقرش */
+  price?: number;
 }
 
 /**

@@ -20,7 +20,10 @@ export function rememberedMethod(shopId: string): ReceivingMethod {
   }
 }
 
-/** المسودة زي ما السيرفر عايزها — الكميات بس، والأسعار هو اللي بيحسبها */
+/**
+ * المسودة زي ما السيرفر عايزها — الكميات، والأسعار هو اللي بيحسبها. غير في
+ * «مبيعات»: السعر اللي البائع كتبه بيتبعت مع السطر.
+ */
 export function draftInput(
   shopId: string,
   lines: CartLine[],
@@ -33,7 +36,12 @@ export function draftInput(
     method: session?.method ?? method,
     to: session ? undefined : (businessAccountId ?? undefined),
     sale: session ?? undefined,
-    lines: lines.map((l) => ({ itemId: l.itemId, unitName: l.unitName, quantity: l.qty })),
+    lines: lines.map((l) => ({
+      itemId: l.itemId,
+      unitName: l.unitName,
+      quantity: l.qty,
+      ...(session && l.price !== undefined ? { price: l.price } : {}),
+    })),
   };
 }
 
@@ -67,6 +75,10 @@ export function rememberDraftId(ref: string, id: string | null) {
 export const draftRef = (shopId: string, session: SalesSession | null) => `${session?.id ?? 'me'}:${shopId}`;
 
 const lineKey = (l: { itemId: string; unitName: string }) => `${l.itemId}|${l.unitName}`;
+
+/** اللي السيرفر شايله من السطر: الكمية والسعر اللي البائع كتبه — لو أي واحد اتغيّر السطر بيتبعت */
+type SyncedLine = DraftInput['lines'][number];
+const lineState = (l: SyncedLine | undefined) => (l ? `${l.quantity}@${l.price ?? ''}` : '');
 
 /** الهيدر من غير السطور — لو اتغيّر المسودة كلها بتتبعت عشان الأسعار تتحسب تاني */
 const headerOf = ({ lines: _lines, ...header }: DraftInput) => JSON.stringify(header);
@@ -111,7 +123,7 @@ export function useDraftSync(shopId: string | null, lines: CartLine[], method: R
    * اللي السيرفر شايله: الهيدر وكمية كل صنف. null = مش عارفين (أول مرة، أو
    * طلب فشل) — ساعتها المسودة كلها بتتبعت.
    */
-  const synced = useRef<{ ref: string; header: string; qty: Map<string, number> } | null>(null);
+  const synced = useRef<{ ref: string; header: string; lines: Map<string, string> } | null>(null);
   const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const queue = useRef<Promise<unknown>>(Promise.resolve());
 
@@ -128,7 +140,7 @@ export function useDraftSync(shopId: string | null, lines: CartLine[], method: R
     if (!now) return;
     const order = await withToken((token) => putDraft(token, now));
     rememberDraftId(nowRef, order?.id ?? null);
-    synced.current = { ref: nowRef, header: headerOf(now), qty: new Map(now.lines.map((l) => [lineKey(l), l.quantity])) };
+    synced.current = { ref: nowRef, header: headerOf(now), lines: new Map(now.lines.map((l) => [lineKey(l), lineState(l)])) };
   }, [withToken]);
 
   /** صنف واحد على رقم المسودة. من غير رقم، أو لو المسودة راحت: المسودة كلها */
@@ -138,14 +150,14 @@ export function useDraftSync(shopId: string | null, lines: CartLine[], method: R
       const state = synced.current;
       const orderId = draftIds()[nowRef];
       if (!now || !state || state.ref !== nowRef || state.header !== headerOf(now) || !orderId) return saveAll();
-      const quantity = now.lines.find((l) => lineKey(l) === key)?.quantity ?? 0;
-      if ((state.qty.get(key) ?? 0) === quantity) return;
+      const line = now.lines.find((l) => lineKey(l) === key);
+      if ((state.lines.get(key) ?? '') === lineState(line)) return;
       const [itemId, unitName] = key.split('|');
       try {
-        const order = await withToken((token) => putLine(token, orderId, { itemId, unitName, quantity }));
+        const order = await withToken((token) => putLine(token, orderId, { itemId, unitName, quantity: line?.quantity ?? 0, price: line?.price }));
         if (order === null) rememberDraftId(nowRef, null);
-        if (quantity > 0) state.qty.set(key, quantity);
-        else state.qty.delete(key);
+        if (line) state.lines.set(key, lineState(line));
+        else state.lines.delete(key);
       } catch (err) {
         if (!(err instanceof ApiError && (err.status === 404 || err.status === 409))) throw err;
         rememberDraftId(nowRef, null);
@@ -203,10 +215,9 @@ export function useDraftSync(shopId: string | null, lines: CartLine[], method: R
       return;
     }
     if (timers.current.has(ALL)) return schedule(ALL);
-    const keys = new Set([...state.qty.keys(), ...input.lines.map(lineKey)]);
+    const keys = new Set([...state.lines.keys(), ...input.lines.map(lineKey)]);
     for (const key of keys) {
-      const qty = input.lines.find((l) => lineKey(l) === key)?.quantity ?? 0;
-      if ((state.qty.get(key) ?? 0) !== qty) schedule(key);
+      if ((state.lines.get(key) ?? '') !== lineState(input.lines.find((l) => lineKey(l) === key))) schedule(key);
     }
     // signature بدل input: الكائن بيتعمل جديد مع كل رسمة
     // eslint-disable-next-line react-hooks/exhaustive-deps

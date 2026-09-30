@@ -169,11 +169,8 @@ export function IdentityMenu() {
         className="flex items-center gap-0.5 rounded-xl p-0.5 transition hover:bg-stone-100 dark:hover:bg-white/10"
       >
         {user ? (
-          <span className="relative">
-            {current(34)}
-            {/* الطلبات الواردة الجديدة — المنيو مقفول فالعداد بيظهر على الصورة */}
-            <CountBadge count={unseen} className="absolute -end-1.5 -top-1.5 ring-2 ring-surface-light dark:ring-surface-dark" />
-          </span>
+          // عداد الطلبات الواردة الجديدة اتنقل على سلة البيع (مكالمة ٢٨ سبتمبر)
+          <span className="relative">{current(34)}</span>
         ) : (
           <span className="flex h-[34px] w-[34px] items-center justify-center rounded-full border border-stone-300 text-stone-600 dark:border-white/15 dark:text-stone-300">
             <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">

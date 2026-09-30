@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { InvoiceSheet, type InvoiceView } from '../components/InvoiceSheet';
 import { useAuth } from '../context/AuthContext';
 import { buyerLabel, useSales } from '../context/SalesContext';
-import { useCartFocus, useStoreCart } from '../context/StoreCartContext';
+import { linePrice, useCartFocus, useStoreCart } from '../context/StoreCartContext';
 import { checkoutOrder, putDraft, type Order } from '../lib/aswaqApi';
 import { draftInput, draftRef, rememberDraftId, rememberedMethod } from '../lib/draftSync';
 import { orderToView } from '../lib/invoiceView';
@@ -18,17 +18,27 @@ import { ApiError, fetchStore, type ShowroomStore } from '../lib/waslaApi';
  * للي داخل بحسابه الصفحة بتحفظ السلة مسودة على السيرفر وبتعرضها زي ما السيرفر
  * حسبها (بالوزن)، و«تأكيد الطلب» بيحوّلها أوردر برقم فاتورة. الزائر بيشوف
  * سلته من الجهاز، ومحتاج يسجّل دخول عشان يأكد.
+ *
+ * مكالمة ٢٨ سبتمبر: «تأكيد وطباعة» على أقصى اليمين — بيحفظ ويفتح الطباعة على طول
+ * من غير المرور على صفحة الفاتورة كل مرة. وفي «مبيعات» «تأكيد وجديد» — بيأكد ويفتح
+ * نافذة «مبيعات» فاضية للفاتورة اللي بعدها.
  */
+type AfterCheckout = 'view' | 'print' | 'next';
+
+const outlineAccent =
+  'rounded-xl border border-accent-600 px-5 py-3 text-sm font-semibold text-accent-700 transition hover:bg-accent-50 disabled:opacity-60 dark:text-accent-300 dark:hover:bg-accent-500/10';
+
 export function InvoicePage() {
   const { shopId = '' } = useParams<{ shopId: string }>();
   const { linesOf, totalOf, clearShop } = useStoreCart();
-  const { session } = useSales();
+  const { session, next } = useSales();
   const { user, sessionExpired, selectedBusiness, withToken, signIn } = useAuth();
   const navigate = useNavigate();
   const [store, setStore] = useState<ShowroomStore | null>(null);
   const [draft, setDraft] = useState<Order | null>(null);
   const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
+  /** الزرار اللي بيأكد دلوقتي */
+  const [busy, setBusy] = useState<AfterCheckout | null>(null);
   const [now] = useState(() => new Date());
 
   const lines = linesOf(shopId);
@@ -70,15 +80,20 @@ export function InvoicePage() {
   // السلة في الناڤبار تفضل على الأوردر ده
   useCartFocus(shopId, null);
 
-  async function handleCheckout() {
+  async function handleCheckout(then: AfterCheckout) {
     if (!draft || busy) return;
-    setBusy(true);
+    setBusy(then);
     setError('');
     try {
       const done = await withToken((token) => checkoutOrder(token, draft.id));
       clearShop(session?.id ?? null, shopId);
       rememberDraftId(draftRef(shopId, session), null);
-      navigate(`/invoice/${done.id}`, { replace: true });
+      if (then === 'next') {
+        navigate(`/store/${shopId}`, { replace: true });
+        next(`اتأكدت فاتورة رقم ${done.number}`);
+        return;
+      }
+      navigate(`/invoice/${done.id}`, { replace: true, state: then === 'print' ? { print: true } : null });
     } catch (err) {
       setError(
         err instanceof ApiError && err.status === 409
@@ -87,7 +102,7 @@ export function InvoicePage() {
             ? err.message
             : 'مقدرناش نأكد الطلب. جرّب تاني.',
       );
-      setBusy(false);
+      setBusy(null);
     }
   }
 
@@ -113,7 +128,7 @@ export function InvoicePage() {
     seller: session?.sellerName ?? '',
     method: session?.method ?? null,
     address: session?.address ?? '',
-    lines: lines.map((l) => ({ key: `${l.itemId}|${l.unitName}`, item: l.itemName, unit: l.unitName, quantity: l.qty, price: l.unitPrice })),
+    lines: lines.map((l) => ({ key: `${l.itemId}|${l.unitName}`, item: l.itemName, unit: l.unitName, quantity: l.qty, price: linePrice(l) })),
     total: totalOf(shopId),
     weightKg: null,
     volumeM3: null,
@@ -133,14 +148,34 @@ export function InvoicePage() {
 
       <div className="mt-5 flex flex-wrap gap-3 print:hidden">
         {signedIn ? (
-          <button
-            type="button"
-            onClick={handleCheckout}
-            disabled={!draft || busy || unpriced}
-            className="rounded-xl bg-accent-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-accent-700 disabled:opacity-60"
-          >
-            {busy ? 'بنأكد…' : 'تأكيد الطلب'}
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => handleCheckout('print')}
+              disabled={!draft || Boolean(busy) || unpriced}
+              className="rounded-xl bg-accent-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-accent-700 disabled:opacity-60"
+            >
+              {busy === 'print' ? 'بنأكد…' : 'تأكيد وطباعة'}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleCheckout('view')}
+              disabled={!draft || Boolean(busy) || unpriced}
+              className={outlineAccent}
+            >
+              {busy === 'view' ? 'بنأكد…' : 'تأكيد الطلب'}
+            </button>
+            {session && (
+              <button
+                type="button"
+                onClick={() => handleCheckout('next')}
+                disabled={!draft || Boolean(busy) || unpriced}
+                className={outlineAccent}
+              >
+                {busy === 'next' ? 'بنأكد…' : 'تأكيد وجديد'}
+              </button>
+            )}
+          </>
         ) : (
           <button
             type="button"
@@ -153,13 +188,13 @@ export function InvoicePage() {
         <button
           type="button"
           onClick={() => window.print()}
-          className="rounded-xl bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-600"
+          className="rounded-xl border border-stone-300 px-5 py-3 text-sm font-medium transition hover:border-stone-400 dark:border-white/15"
         >
           اطبع / PDF
         </button>
         <Link
           to={`/store/${shopId}`}
-          className="rounded-xl border border-stone-300 px-6 py-3 text-sm font-medium transition hover:border-stone-400 dark:border-white/15"
+          className="rounded-xl border border-stone-300 px-5 py-3 text-sm font-medium transition hover:border-stone-400 dark:border-white/15"
         >
           ارجع للمتجر
         </Link>

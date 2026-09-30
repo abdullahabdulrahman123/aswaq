@@ -1,32 +1,48 @@
 import { useEffect, useRef, useState } from 'react';
 import { egp } from '../data/catalog';
-import { MAX_QTY, clampQty, qtyInput } from '../lib/quantity';
+import { MAX_QTY, clampQty, moneyInput, qtyInput, toPiastres, toPounds } from '../lib/quantity';
+import { Notch, compactFieldClass } from './OutlinedField';
 
 /**
- * نافذة الكمية — بتفتح من زرار (+) اللي جنب كومبو الوحدات في كارت الصنف،
- * بطلب العميل: «ديالوج صغير فيه الكمية واحد وسلكتد، وعلى يمينه زائد وعلى
- * شماله ناقص، وبعديهم زرار تمام». الرقم بيبقى معلّم عشان كيبورد الأرقام
- * يفتح على طول والكتابة تحل محله من غير مسح.
+ * نافذة الكمية — بتفتح من (+) على وحدة لسه متطلبتش في كارت الصنف، بطلب العميل:
+ * الكمية واحد ومتعلّمة، وعلى يمينها زائد وعلى شمالها ناقص، وبعدهم «تم».
+ *
+ * مكالمة ٢٨ سبتمبر:
+ *   - كله في صف واحد مع «تم»، والنافذة فوق الشاشة مش في النص — الكيبورد كان
+ *     بيغطي «تم» والبياع يقفله الأول عشان يدوس.
+ *   - في «مبيعات» (editPrice) خانة السعر مكتوب فيها سعر الوحدة والبائع يقدر
+ *     يغيّره — مؤقتاً، المصنع بيبيع لكل عميل بسعر حسب الكمية. السعر زي سعر
+ *     المتجر = مفيش سعر خاص.
  */
 export function QuantityDialog({
   open,
   itemName,
   unitName,
   unitPrice,
+  initialQty = 1,
+  initialPrice,
+  editPrice = false,
   onDone,
   onClose,
 }: {
   open: boolean;
   itemName: string;
   unitName: string;
-  /** سعر الوحدة بالقرش */
+  /** سعر الوحدة من المتجر بالقرش */
   unitPrice: number;
-  onDone: (qty: number) => void;
+  /** سطر موجود بيتعدّل — كميته */
+  initialQty?: number;
+  /** السعر اللي البائع كتبه قبل كده على السطر */
+  initialPrice?: number;
+  editPrice?: boolean;
+  /** price: اللي البائع كتبه لو غير سعر المتجر */
+  onDone: (qty: number, price?: number) => void;
   onClose: () => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [text, setText] = useState('1');
+  const [priceText, setPriceText] = useState('');
 
   useEffect(() => {
     const d = dialogRef.current;
@@ -35,49 +51,50 @@ export function QuantityDialog({
     if (!open && d.open) d.close();
   }, [open]);
 
-  // كل فتحة بتبدأ من واحد، والرقم متعلّم بعد ما النافذة تركّز على الخانة
+  // كل فتحة: الكمية (واحد، أو كمية السطر) متعلّمة بعد ما النافذة تركّز على الخانة
   useEffect(() => {
     if (!open) return;
-    setText('1');
+    setText(String(initialQty));
+    setPriceText(toPounds(initialPrice ?? unitPrice));
     const timer = setTimeout(() => inputRef.current?.select(), 30);
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const qty = Number(text) || 0;
   const step = (n: number) => setText(String(clampQty(n)));
+  const typedPrice = editPrice ? toPiastres(priceText) : null;
+  const price = typedPrice ?? initialPrice ?? unitPrice;
 
   return (
     <dialog
       ref={dialogRef}
       onClose={onClose}
       aria-label="الكمية"
-      // العرض في style مش كلاس — نفس سبب باقي النوافذ
-      style={{ width: 'min(20rem, 88vw)' }}
+      // العرض والمكان في style مش كلاس — نفس سبب باقي النوافذ. فوق الشاشة عشان الكيبورد ميغطيهاش
+      style={{ width: 'min(23rem, 94vw)', margin: '0.75rem auto auto' }}
       className="rounded-2xl bg-white p-0 text-stone-900 shadow-card backdrop:bg-black/50 dark:bg-surface-card dark:text-stone-100"
     >
       {open && (
         <form
           method="dialog"
-          className="p-5 text-center"
+          className="p-3"
           onSubmit={(e) => {
             e.preventDefault();
-            onDone(clampQty(qty));
+            onDone(clampQty(qty), editPrice && price !== unitPrice ? price : undefined);
           }}
         >
-          <h2 className="font-display text-sm font-bold leading-snug">{itemName}</h2>
-          <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
-            {unitName} · <span className="tabular-nums">{egp(unitPrice)}</span>
-          </p>
+          <h2 className="truncate text-sm font-bold leading-snug">
+            {itemName}
+            <span className="font-normal text-stone-500 dark:text-stone-400">
+              {' '}· {unitName}
+              {!editPrice && <span className="tabular-nums"> · {egp(unitPrice)}</span>}
+            </span>
+          </h2>
 
-          {/* (+) على اليمين و(−) على الشمال، بطلب العميل */}
-          <div className="mt-4 flex items-center justify-center gap-3">
-            <button
-              type="button"
-              aria-label="زوّد"
-              onClick={() => step(qty + 1)}
-              disabled={qty >= MAX_QTY}
-              className={stepClass}
-            >
+          {/* (+) على اليمين و(−) على الشمال، بطلب العميل — والصف كله مع «تم» */}
+          <div className="mt-3 flex items-center justify-center gap-1.5">
+            <button type="button" aria-label="زوّد" onClick={() => step(qty + 1)} disabled={qty >= MAX_QTY} className={stepClass}>
               +
             </button>
             <input
@@ -89,25 +106,38 @@ export function QuantityDialog({
               onFocus={(e) => e.currentTarget.select()}
               onClick={(e) => e.currentTarget.select()}
               onBlur={() => setText(String(clampQty(qty)))}
-              className="w-24 rounded-xl border border-brand-500 bg-transparent px-3 py-2.5 text-center text-lg font-bold tabular-nums outline-none ring-1 ring-inset ring-brand-500"
+              className="h-10 w-14 shrink-0 rounded-xl border border-brand-500 bg-transparent px-1 text-center text-base font-bold tabular-nums outline-none ring-1 ring-inset ring-brand-500"
             />
-            <button
-              type="button"
-              aria-label="قلّل"
-              onClick={() => step(qty - 1)}
-              disabled={qty <= 1}
-              className={stepClass}
-            >
+            <button type="button" aria-label="قلّل" onClick={() => step(qty - 1)} disabled={qty <= 1} className={stepClass}>
               −
+            </button>
+
+            {editPrice && (
+              <label className="relative ms-1 block w-20 shrink-0">
+                <input
+                  aria-label="السعر"
+                  inputMode="decimal"
+                  value={priceText}
+                  onChange={(e) => setPriceText(moneyInput(e.target.value))}
+                  onFocus={(e) => e.currentTarget.select()}
+                  onClick={(e) => e.currentTarget.select()}
+                  className={`${compactFieldClass} h-10 py-0 text-center font-bold tabular-nums`}
+                />
+                <Notch compact>السعر</Notch>
+              </label>
+            )}
+
+            <button
+              type="submit"
+              className="ms-1 h-10 shrink-0 rounded-xl bg-brand-500 px-4 text-sm font-semibold text-white transition hover:bg-brand-600"
+            >
+              تم
             </button>
           </div>
 
-          <button
-            type="submit"
-            className="mt-5 w-full rounded-xl bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-600"
-          >
-            تم
-          </button>
+          <p className="mt-2 text-center text-xs text-stone-500 dark:text-stone-400">
+            الإجمالي <span className="font-bold tabular-nums text-stone-800 dark:text-stone-100">{egp(price * clampQty(qty))}</span>
+          </p>
         </form>
       )}
     </dialog>
@@ -115,4 +145,4 @@ export function QuantityDialog({
 }
 
 const stepClass =
-  'grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brand-50 text-xl font-bold leading-none text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-brand-50 dark:bg-brand-500/15 dark:text-brand-300 dark:disabled:text-stone-600';
+  'grid h-10 w-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-xl font-bold leading-none text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-brand-50 dark:bg-brand-500/15 dark:text-brand-300 dark:disabled:text-stone-600';
