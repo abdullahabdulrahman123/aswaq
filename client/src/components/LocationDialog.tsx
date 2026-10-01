@@ -19,7 +19,8 @@ const pickedOption = 'border-brand-500 bg-brand-50 dark:border-brand-400 dark:bg
  * بيوصّله. تلات طرق زي ما العميل قال: عنوان من «عناويني»، أو «موقعي الحالي»
  * من المتصفح، أو نقطة على الخريطة (دي مؤقتة، مبتتحفظش كعنوان).
  *
- * الزائر ملوش «عناويني» — بيختار بالموقع أو الخريطة، والمكان بيتفتكر على جهازه.
+ * الزائر ملوش «عناويني» — بيختار بالموقع أو الخريطة. الاتنين للزيارة دي بس
+ * (مكالمة ٣٠ سبتمبر) — شوف LocationContext.
  */
 export function LocationDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -109,7 +110,7 @@ export function LocationDialog({ open, onClose }: { open: boolean; onClose: () =
                     }}
                     locating={locating}
                     label="خريطة لاختيار مكانك"
-                    hint="اسحب الدبوس أو دوس على الخريطة. المكان ده بيتفتكر على جهازك بس، مش بيتحفظ في عناوينك."
+                    hint="اسحب الدبوس أو دوس على الخريطة. المكان ده للزيارة دي بس، ومش بيتحفظ في عناوينك."
                   />
                 </div>
                 <div className="mt-5 flex flex-wrap gap-3 border-t border-stone-200 pt-5 dark:border-white/10">

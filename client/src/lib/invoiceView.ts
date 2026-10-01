@@ -10,12 +10,11 @@ export function orderToView(order: Order): InvoiceView {
     date: new Date(order.checkedOutAt ?? order.updatedAt),
     buyer: order.names.buyer,
     buyerPhone: order.names.buyerPhone,
-    // البائع = مندوب البيع في «مبيعات». المشتري لنفسه ملوش مندوب — مش اسمه هو
-    seller: order.sale ? order.seller.name : '',
     method: order.method,
     address: order.address,
     lines: order.details.map((d) => ({
       key: `${d.itemId}|${d.unit}`,
+      itemId: d.itemId,
       item: d.item,
       unit: d.unit,
       quantity: d.quantity,

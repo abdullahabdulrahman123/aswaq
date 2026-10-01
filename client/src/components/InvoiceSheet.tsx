@@ -4,6 +4,8 @@ const dateFormat = new Intl.DateTimeFormat('ar-EG', { dateStyle: 'long', timeSty
 
 export interface InvoiceLine {
   key: string;
+  /** الصنف في المتجر (نسخة المتجر) — لـ«التسعير» من الفاتورة */
+  itemId: string;
   item: string;
   unit: string;
   quantity: number;
@@ -20,7 +22,6 @@ export interface InvoiceView {
   date: Date;
   buyer: string;
   buyerPhone: string;
-  seller: string;
   method: 'pickup' | 'delivery' | null;
   address: string;
   lines: InvoiceLine[];
@@ -42,15 +43,20 @@ const cell = 'border border-stone-800 px-2 py-1.5 dark:border-stone-400 print:bo
 const label = `${cell} bg-stone-100 font-semibold dark:bg-white/10 print:bg-stone-100`;
 
 /**
- * الفاتورة بشكل فاتورة الهلال الورق اللي العميل بعتها (٢٥ سبتمبر): جدول بخطوط،
- * فوق رقم الفاتورة واسم الشركة، وجنبه التاريخ والعميل والبائع والسائق، وبعدين
- * الصنف والكمية والسعر والإجمالي، وتحت إجمالي الكمية والوزن والمبلغ، والخانات
+ * الفاتورة بشكل فاتورة الهلال الورق اللي العميل بعتها (٢٥ سبتمبر): الصنف والكمية
+ * والسعر والإجمالي في جدول بخطوط، وتحت إجمالي الكمية والوزن والمبلغ، والخانات
  * اللي بتتملي بإيد (حساب سابق، المدفوع، يعتمد) فاضية.
+ *
+ * مكالمة ٣٠ سبتمبر: اللي فوق الأصناف رأس الفاتورة من غير جدول ولا خطوط — اسم
+ * الشركة والمتجر، ورقم الفاتورة والتاريخ، والعميل والاستلام. البائع والسائق
+ * اتشالوا دلوقتي.
+ *
+ * onPrice (للبائع بس): اسم الصنف بيبقى زرار بيفتح «التسعير». في الورقة شكله نص عادي.
  *
  * بيانات الشركة الرسمية (س.ت، ب.ض، رخصة) وسطر آخر الفاتورة لسه مش متسجّلين
  * في النشاط، فمش ظاهرين.
  */
-export function InvoiceSheet({ view }: { view: InvoiceView }) {
+export function InvoiceSheet({ view, onPrice }: { view: InvoiceView; onPrice?: (line: InvoiceLine) => void }) {
   const totalQty = view.lines.reduce((n, l) => n + l.quantity, 0);
   const unpriced = view.lines.some((l) => l.price === null);
 
@@ -59,53 +65,55 @@ export function InvoiceSheet({ view }: { view: InvoiceView }) {
       aria-label="الفاتورة"
       className="bg-white text-sm text-stone-900 dark:bg-surface-card dark:text-stone-100 print:bg-white print:text-black"
     >
-      <table className="w-full border-collapse">
-        <tbody>
-          <tr>
-            <td className={`${label} text-center text-base`} colSpan={2}>
-              فاتورة رقم {view.number ?? '—'}
-            </td>
-            <td className={`${cell} text-center`} colSpan={2}>
-              {view.number === null && <span className="text-xs font-semibold text-amber-700 dark:text-amber-400 print:text-black">مسودة</span>}
-            </td>
-          </tr>
-          <tr>
-            <td className={`${cell} font-bold`} colSpan={2} rowSpan={view.method === 'delivery' ? 5 : 4}>
-              <span className="block text-base">{view.businessName}</span>
-              <span className="mt-1 block text-xs font-normal text-stone-500 dark:text-stone-400 print:text-black">{view.storeName}</span>
-            </td>
-            <td className={label}>التاريخ</td>
-            <td className={cell}>{dateFormat.format(view.date)}</td>
-          </tr>
-          <tr>
-            <td className={label}>العميل</td>
-            <td className={cell}>
-              {view.buyer}
-              {view.buyerPhone && (
-                <span dir="ltr" className="block text-end tabular-nums">
-                  {view.buyerPhone}
-                </span>
+      <header className="pb-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="font-display text-xl font-bold leading-tight">{view.businessName}</p>
+            {view.storeName && <p className="mt-1 text-sm text-stone-500 dark:text-stone-400 print:text-black">{view.storeName}</p>}
+          </div>
+          <div className="shrink-0 text-end">
+            <p className="font-display text-lg font-bold leading-tight">
+              {view.number === null ? (
+                <>
+                  فاتورة{' '}
+                  <span className="rounded-md bg-amber-50 px-1.5 py-0.5 align-middle text-xs font-semibold text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 print:bg-transparent print:text-black">
+                    مسودة
+                  </span>
+                </>
+              ) : (
+                <>فاتورة رقم {view.number}</>
               )}
-            </td>
-          </tr>
-          <tr>
-            <td className={label}>البائع</td>
-            <td className={cell}>{view.seller}</td>
-          </tr>
-          <tr>
-            <td className={label}>{view.method === 'delivery' ? 'السائق' : 'الاستلام'}</td>
-            <td className={cell}>{view.method === 'pickup' ? 'من المتجر' : ''}</td>
-          </tr>
-          {view.method === 'delivery' && (
-            <tr>
-              <td className={label}>العنوان</td>
-              <td className={`${cell} break-words`}>{view.address}</td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+            </p>
+            <p className="mt-1 text-xs tabular-nums text-stone-500 dark:text-stone-400 print:text-black">{dateFormat.format(view.date)}</p>
+          </div>
+        </div>
 
-      <table className="mt-[-1px] w-full border-collapse">
+        <dl className="mt-4 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5">
+          <dt className="text-stone-500 dark:text-stone-400 print:text-black">العميل</dt>
+          <dd className="font-semibold">
+            {view.buyer}
+            {view.buyerPhone && (
+              <span dir="ltr" className="ms-2 inline-block font-normal tabular-nums">
+                {view.buyerPhone}
+              </span>
+            )}
+          </dd>
+          {view.method && (
+            <>
+              <dt className="text-stone-500 dark:text-stone-400 print:text-black">الاستلام</dt>
+              <dd>{view.method === 'pickup' ? 'من المتجر' : 'توصيل'}</dd>
+            </>
+          )}
+          {view.method === 'delivery' && view.address && (
+            <>
+              <dt className="text-stone-500 dark:text-stone-400 print:text-black">العنوان</dt>
+              <dd className="break-words">{view.address}</dd>
+            </>
+          )}
+        </dl>
+      </header>
+
+      <table className="w-full border-collapse">
         <thead>
           <tr>
             <th className={`${label} w-[40%] text-center`}>الصنف</th>
@@ -118,7 +126,20 @@ export function InvoiceSheet({ view }: { view: InvoiceView }) {
           {view.lines.map((l) => (
             <tr key={l.key}>
               <td className={`${cell} font-semibold`}>
-                {l.item} <span className="font-normal text-stone-500 dark:text-stone-400 print:text-black">({l.unit})</span>
+                {onPrice ? (
+                  <button
+                    type="button"
+                    onClick={() => onPrice(l)}
+                    aria-label={`تسعير ${l.item}`}
+                    className="text-start font-semibold underline decoration-stone-300 decoration-dotted underline-offset-4 hover:text-brand-700 dark:decoration-white/25 dark:hover:text-brand-400 print:no-underline"
+                  >
+                    {l.item} <span className="font-normal text-stone-500 dark:text-stone-400 print:text-black">({l.unit})</span>
+                  </button>
+                ) : (
+                  <>
+                    {l.item} <span className="font-normal text-stone-500 dark:text-stone-400 print:text-black">({l.unit})</span>
+                  </>
+                )}
               </td>
               <td className={`${cell} text-center tabular-nums`}>{l.quantity}</td>
               <td className={`${cell} text-center tabular-nums`}>{l.price === null ? '—' : egp(l.price)}</td>

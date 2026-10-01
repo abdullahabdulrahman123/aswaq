@@ -4,7 +4,7 @@ import { linePrice, useStoreCart, type CartLine } from '../context/StoreCartCont
 import type { ShowroomItem } from '../lib/aswaqApi';
 import { thumbnail } from '../lib/cloudinary';
 import type { PriceField } from '../lib/itemUnits';
-import { MAX_QTY, clampQty, moneyInput, qtyInput, toPiastres, toPounds } from '../lib/quantity';
+import { MAX_QTY, clampQty, moneyInput, toPiastres, toPounds } from '../lib/quantity';
 import { QuantityDialog } from './QuantityDialog';
 
 /** ارتفاع سطر الوحدة بالبيكسل — العجلة بتتحرك سطر سطر */
@@ -23,13 +23,16 @@ type Unit = ShowroomItem['units'][number];
  *   و(−)، والإجمالي في الآخر. مفيش كومبو (العميل شايفه مش مريح).
  *
  * الصنف اللي فيه أكتر من وحدتين (كيس وكرتونة وجرام للميزان) بيعرض وحدتين،
- * والباقي بيتسكرول فوق وتحت سطر سطر زي عجلة المنبه. جنبها سهم صغير بعدد
- * الوحدات اللي مش باينة («+1») — الشكل اللي العميل اختاره من الاقتراحات.
+ * والباقي بيطلع سطر سطر بسهم صغير جنبها بعدد الوحدات اللي مش باينة («+1») —
+ * الشكل اللي العميل اختاره من الاقتراحات. مكالمة ٣٠ سبتمبر: الوحدات مبتتحركش
+ * بالصباع (السهم بس) — كانت بتمسك السكرول لما الصباع ييجي عليها والصفحة تعلّق.
  *
  * الكمية والإجمالي فاضيين لحد ما الوحدة تتطلب، ومفيش لون مختلف للصنف
  * المطلوب — «الأرقام هي اللي معبّرة». (+) على وحدة لسه متطلبتش بيفتح نافذة
- * الكمية، وبعدها (+) و(−) بيزوّدوا ويقلّلوا واحد. الكمية والإجمالي بيتكتبوا
- * كمان: الإجمالي بيحسب أقرب كمية صحيحة من تحت.
+ * الكمية، وبعدها (+) و(−) بيزوّدوا ويقلّلوا واحد. الدوسة على الكمية بتفتح
+ * النافذة (٣٠ سبتمبر — الكتابة في الكارت مكانتش بتحسب الإجمالي غير لما تسيب
+ * الخانة). الإجمالي بيتكتب: الكمية بتتحسب مع كل رقم (أقرب كمية صحيحة من تحت)
+ * وبتتحفظ لما تسيب الخانة أو تدوس Enter.
  *
  * في «مبيعات» (sellerPrices) السعر نفسه زرار: بيفتح النافذة بخانة السعر عشان
  * البائع يكتب سعر للعميل ده — مؤقتاً، بطلب العميل. السعر الخاص بيبان بلون تاني.
@@ -85,7 +88,9 @@ export function StoreItemCard({
             ref={wheel}
             aria-label={`وحدات ${item.name}`}
             onScroll={(e) => setFirst(Math.round(e.currentTarget.scrollTop / ROW))}
-            className="h-10 min-w-0 flex-1 snap-y snap-mandatory overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            // overflow-hidden: السهم بيحرّكها بالكود، والصباع عليها بيحرّك الصفحة. الـsnap بيفضل عشان
+            // المتصفح لما يجيب وحدة مستخبية قدام العين (التركيز مثلاً) ميوقفش بين سطرين
+            className="h-10 min-w-0 flex-1 snap-y snap-mandatory overflow-hidden"
           >
             {item.units.map((u) => (
               <UnitRow
@@ -158,7 +163,7 @@ function Chevron({ down = false }: { down?: boolean }) {
 
 /**
  * سطر وحدة: اسمها وسعرها، و(+) والكمية و(−)، والإجمالي. (−) وهي واحد بتشيل
- * السطر. الوحدة اللي ملهاش سعر في الشريحة دي مبتتطلبش.
+ * السطر. الوحدة اللي ملهاش سعر في الشريحة دي مبتتطلبش. الكمية زرار بيفتح النافذة.
  */
 function UnitRow({
   itemName,
@@ -182,13 +187,18 @@ function UnitRow({
   onRemove: (line: CartLine) => void;
 }) {
   /** null = مش بيكتب دلوقتي، فالخانة بتعرض القيمة المحفوظة */
-  const [qtyText, setQtyText] = useState<string | null>(null);
   const [totalText, setTotalText] = useState<string | null>(null);
 
   const price = line ? linePrice(line) : storePrice;
   const priced = price !== null;
   const total = line && priced ? price * line.qty : null;
   const special = line?.price !== undefined;
+  /** الكمية من الإجمالي اللي بيتكتب — null = مفيش إجمالي بيتكتب */
+  const typedQty = (() => {
+    if (totalText === null || totalText === '' || !priced || price === 0) return null;
+    const piastres = toPiastres(totalText);
+    return piastres === null ? null : Math.floor(piastres / price);
+  })();
 
   /** الخانة بتتعلّم كلها أول ما تتفتح — اللي يتكتب يحل محلها */
   const selectAll = (el: HTMLInputElement | null) => el?.setSelectionRange(0, el.value.length);
@@ -201,18 +211,9 @@ function UnitRow({
     } else if (qty > 0) onPut(Math.min(MAX_QTY, qty));
   }
 
-  function commitQty() {
-    const typed = qtyText;
-    setQtyText(null);
-    if (typed !== null && typed !== '') apply(Math.trunc(Number(typed) || 0));
-  }
-
   function commitTotal() {
-    const typed = totalText;
     setTotalText(null);
-    if (typed === null || typed === '' || !priced || price === 0) return;
-    const piastres = toPiastres(typed);
-    if (piastres !== null) apply(Math.floor(piastres / price));
+    if (typedQty !== null) apply(typedQty);
   }
 
   const priceText = priced ? egp(price) : 'السعر لسه متحددش';
@@ -250,17 +251,9 @@ function UnitRow({
         +
       </button>
 
-      <input
-        aria-label={`كمية ${unit.name}`}
-        inputMode="numeric"
-        disabled={!priced}
-        value={qtyText ?? (line ? String(line.qty) : '')}
-        onChange={(e) => setQtyText(qtyInput(e.target.value))}
-        onFocus={(e) => selectAll(e.currentTarget)}
-        onClick={(e) => selectAll(e.currentTarget)}
-        onBlur={commitQty}
-        className={`${boxClass} w-7`}
-      />
+      <button type="button" aria-label={`كمية ${unit.name}`} onClick={onAsk} disabled={!priced} className={`${boxClass} w-7`}>
+        {typedQty ?? line?.qty ?? ''}
+      </button>
 
       <button
         type="button"
@@ -286,6 +279,7 @@ function UnitRow({
           requestAnimationFrame(() => selectAll(el));
         }}
         onClick={(e) => selectAll(e.currentTarget)}
+        onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
         onBlur={commitTotal}
         className={`${boxClass} w-12`}
       />

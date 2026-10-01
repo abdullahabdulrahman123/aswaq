@@ -1,12 +1,11 @@
 /**
  * أيقونة العربة — في الناڤبار وفي صفحة طلباتي.
  *
- * السلتين (مكالمة ٢٨ سبتمبر، الشكل اللي العميل اختاره): سهمين زي InstaPay.
- *   in:  سهم داخل العربة — «طلباتي»، اللي أنا بشتريه. نازل جوه العربة شوية عشان يبان
- *   out: سهم طالع منها — «الطلبات الواردة»، اللي أنا ببيعه
- * العربة نفسها زي ما هي.
+ * in: سهم داخل العربة زي InstaPay — «طلباتي»، اللي أنا بشتريه (الشكل اللي
+ * العميل اختاره ٢٨ سبتمبر). نازل جوه العربة شوية عشان يبان. سهم «الطلبات
+ * الواردة» الطالع اتشال مع سلتها (٣٠ سبتمبر).
  */
-export function CartIcon({ className, arrow }: { className?: string; arrow?: 'in' | 'out' }) {
+export function CartIcon({ className, arrow }: { className?: string; arrow?: 'in' }) {
   return (
     <svg
       aria-hidden="true"
@@ -22,7 +21,6 @@ export function CartIcon({ className, arrow }: { className?: string; arrow?: 'in
       <circle cx="9.5" cy="19.5" r="1.3" />
       <circle cx="17" cy="19.5" r="1.3" />
       {arrow === 'in' && <path d="M13 1v11m-2.7-2.7L13 12l2.7-2.7" />}
-      {arrow === 'out' && <path d="M13 12.5V1.5m-2.7 2.7L13 1.5l2.7 2.7" />}
     </svg>
   );
 }

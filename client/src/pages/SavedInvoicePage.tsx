@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { InvoiceSheet } from '../components/InvoiceSheet';
+import { PriceDialogFor } from '../components/PriceDialog';
 import { useAuth } from '../context/AuthContext';
 import { useSales } from '../context/SalesContext';
 import { fetchOrder, orderShopId, type Order } from '../lib/aswaqApi';
@@ -13,6 +14,10 @@ import { ApiError } from '../lib/waslaApi';
  *
  * جاية من «تأكيد وطباعة» (state.print) بتفتح الطباعة لوحدها أول ما تترسم. زرار
  * «الطلبات» اتشال بطلب العميل (الطلبات من السلة)، وفي «مبيعات» مكانه «فاتورة جديدة».
+ *
+ * للبائع (النشاط اللي بيبيع): اسم الصنف بيفتح «التسعير» (٣٠ سبتمبر). الفاتورة
+ * المؤكدة متتغيّرش — العميل وافق على السعر وممكن تكون اتطبعت — والسعر الجديد
+ * للطلبات الجاية بس.
  */
 export function SavedInvoicePage() {
   const { orderId = '' } = useParams<{ orderId: string }>();
@@ -24,6 +29,7 @@ export function SavedInvoicePage() {
   const [error, setError] = useState('');
   const printOnOpen = (state as { print?: boolean } | null)?.print === true;
   const printed = useRef(false);
+  const [pricingId, setPricingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -59,6 +65,8 @@ export function SavedInvoicePage() {
 
   // البيعة بتتقفل أول ما الفاتورة المؤكدة تفتح (برا «عالم الأوردر») — فالنشاط من الفاتورة نفسها
   const saleBusiness = order.sale != null ? businesses.find((b) => b.accountId === order.from.acc) : undefined;
+  // البائع بس اللي بيسعّر: النشاط اللي الأوردر مطلوب منه
+  const canPrice = order.state !== 'draft' && businesses.some((b) => b.accountId === order.from.acc);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 print:max-w-none print:p-0">
@@ -67,7 +75,16 @@ export function SavedInvoicePage() {
           اتأكد الطلب — فاتورة رقم {order.number}
         </p>
       )}
-      <InvoiceSheet view={orderToView(order)} />
+      <InvoiceSheet view={orderToView(order)} onPrice={canPrice ? (l) => setPricingId(l.itemId) : undefined} />
+      {pricingId && (
+        <PriceDialogFor
+          accountId={order.from.acc}
+          itemId={pricingId}
+          note={`فاتورة رقم ${order.number} متأكدة ومش هتتغيّر — السعر الجديد للطلبات الجاية من «${order.names.store}».`}
+          onSaved={() => setPricingId(null)}
+          onClose={() => setPricingId(null)}
+        />
+      )}
       <div className="mt-5 flex flex-wrap gap-3 print:hidden">
         <button
           type="button"

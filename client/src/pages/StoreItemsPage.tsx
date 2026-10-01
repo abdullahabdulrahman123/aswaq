@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { SessionExpiredNotice } from '../components/SessionExpiredNotice';
 import { fieldClass, Notch } from '../components/OutlinedField';
+import { PriceDialog } from '../components/PriceDialog';
 import { ApiError, SessionExpiredError } from '../lib/waslaApi';
 import {
   aswaqApiConfigured,
@@ -138,6 +139,8 @@ export function StoreItemsPage() {
   const [error, setError] = useState('');
   const [confirmingId, setConfirmingId] = useState('');
   const [removingId, setRemovingId] = useState('');
+  /** الصنف اللي نافذة تسعيره مفتوحة */
+  const [pricing, setPricing] = useState<Item | null>(null);
 
   const business = businesses.find((b) => b.accountId === accountId);
   const stores = useMemo(
@@ -353,7 +356,15 @@ export function StoreItemsPage() {
                   className="flex items-center gap-3 rounded-2xl border border-stone-200 bg-white p-3 dark:border-white/10 dark:bg-surface-card"
                 >
                   <ItemThumb item={item} size="md" />
-                  <span className="min-w-0 flex-1 truncate font-semibold">{item.name}</span>
+                  {/* الدوسة على الاسم بتفتح «التسعير» بطلب العميل (٣٠ سبتمبر) */}
+                  <button
+                    type="button"
+                    onClick={() => setPricing(item)}
+                    aria-label={`تسعير ${item.name}`}
+                    className="min-w-0 flex-1 truncate text-start font-semibold underline decoration-stone-300 decoration-dotted underline-offset-4 transition hover:text-brand-700 dark:decoration-white/25 dark:hover:text-brand-400"
+                  >
+                    {item.name}
+                  </button>
 
                   {/* تأكيد في المكان بدل نافذة المتصفح */}
                   {confirmingId === item.id ? (
@@ -389,6 +400,18 @@ export function StoreItemsPage() {
             </ul>
           )}
         </>
+      )}
+
+      {pricing && (
+        <PriceDialog
+          key={pricing.id}
+          item={pricing}
+          onSaved={(saved) => {
+            setItems((prev) => prev?.map((i) => (i.id === saved.id ? saved : i)) ?? prev);
+            setPricing(null);
+          }}
+          onClose={() => setPricing(null)}
+        />
       )}
     </div>
   );

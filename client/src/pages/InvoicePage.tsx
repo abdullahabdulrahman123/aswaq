@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { InvoiceSheet, type InvoiceView } from '../components/InvoiceSheet';
+import { PriceDialogFor } from '../components/PriceDialog';
 import { useAuth } from '../context/AuthContext';
 import { buyerLabel, useSales } from '../context/SalesContext';
 import { linePrice, useCartFocus, useStoreCart } from '../context/StoreCartContext';
 import { checkoutOrder, putDraft, type Order } from '../lib/aswaqApi';
 import { draftInput, draftRef, rememberDraftId, rememberedMethod } from '../lib/draftSync';
 import { orderToView } from '../lib/invoiceView';
+import { buyerPriceField } from '../lib/itemUnits';
 import { ApiError, fetchStore, type ShowroomStore } from '../lib/waslaApi';
 
 /**
@@ -22,6 +24,11 @@ import { ApiError, fetchStore, type ShowroomStore } from '../lib/waslaApi';
  * مكالمة ٢٨ سبتمبر: «تأكيد وطباعة» على أقصى اليمين — بيحفظ ويفتح الطباعة على طول
  * من غير المرور على صفحة الفاتورة كل مرة. وفي «مبيعات» «تأكيد وجديد» — بيأكد ويفتح
  * نافذة «مبيعات» فاضية للفاتورة اللي بعدها.
+ *
+ * مكالمة ٣٠ سبتمبر: اسم العميل في الناڤبار بقى بيفتح الفاتورة دي (سلة البيع
+ * اتشالت)، فتعديل بياناته من زرار «تعديل العميل» هنا. وفي «مبيعات» اسم الصنف
+ * بيفتح «التسعير» — الفاتورة دي لسه متأكدتش فبتاخد السعر الجديد على طول، إلا
+ * الصنف اللي البائع كتبله سعر خاص للعميل ده.
  */
 type AfterCheckout = 'view' | 'print' | 'next';
 
@@ -30,15 +37,17 @@ const outlineAccent =
 
 export function InvoicePage() {
   const { shopId = '' } = useParams<{ shopId: string }>();
-  const { linesOf, totalOf, clearShop } = useStoreCart();
-  const { session, next } = useSales();
-  const { user, sessionExpired, selectedBusiness, withToken, signIn } = useAuth();
+  const { linesOf, totalOf, clearShop, repriceStore } = useStoreCart();
+  const { session, next, openDialog } = useSales();
+  const { user, businesses, sessionExpired, selectedBusiness, withToken, signIn } = useAuth();
   const navigate = useNavigate();
   const [store, setStore] = useState<ShowroomStore | null>(null);
   const [draft, setDraft] = useState<Order | null>(null);
   const [error, setError] = useState('');
   /** الزرار اللي بيأكد دلوقتي */
   const [busy, setBusy] = useState<AfterCheckout | null>(null);
+  /** الصنف اللي «التسعير» بتاعه مفتوح */
+  const [pricingId, setPricingId] = useState<string | null>(null);
   const [now] = useState(() => new Date());
 
   const lines = linesOf(shopId);
@@ -125,20 +134,45 @@ export function InvoicePage() {
     date: now,
     buyer: session ? buyerLabel(session) : (selectedBusiness?.name ?? user?.name ?? 'زائر'),
     buyerPhone: session?.phone ?? '',
-    seller: session?.sellerName ?? '',
     method: session?.method ?? null,
     address: session?.address ?? '',
-    lines: lines.map((l) => ({ key: `${l.itemId}|${l.unitName}`, item: l.itemName, unit: l.unitName, quantity: l.qty, price: linePrice(l) })),
+    lines: lines.map((l) => ({ key: `${l.itemId}|${l.unitName}`, itemId: l.itemId, item: l.itemName, unit: l.unitName, quantity: l.qty, price: linePrice(l) })),
     total: totalOf(shopId),
     weightKg: null,
     volumeM3: null,
   };
   const view = draft ? orderToView(draft) : local;
   const unpriced = view.lines.some((l) => l.price === null);
+  const saleBusiness = session ? businesses.find((b) => b.accountId === session.accountId) : undefined;
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 print:max-w-none print:p-0">
-      <InvoiceSheet view={view} />
+      {session && saleBusiness && (
+        <div className="mb-3 flex justify-end print:hidden">
+          <button
+            type="button"
+            onClick={() => openDialog(saleBusiness, session)}
+            className="rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium transition hover:border-stone-400 dark:border-white/15"
+          >
+            تعديل العميل
+          </button>
+        </div>
+      )}
+      <InvoiceSheet view={view} onPrice={session && saleBusiness ? (l) => setPricingId(l.itemId) : undefined} />
+      {pricingId && session && (
+        <PriceDialogFor
+          accountId={session.accountId}
+          itemId={pricingId}
+          note="الفاتورة دي لسه متأكدتش، فهتاخد السعر الجديد على طول — إلا الصنف اللي كتبتله سعر خاص للعميل ده."
+          onSaved={(saved) => {
+            // سطور الصنف ده في الفاتورة بسعر المحل الجديد — والسلة المتغيّرة بتتبعت مسودة تاني والسيرفر بيحسب
+            const field = buyerPriceField(true, session.buyer.kind === 'business' ? 'COMPANY' : 'INDIVIDUAL');
+            repriceStore(shopId, (itemId, unitName) => (itemId === saved.id ? (saved.units.find((u) => u.name === unitName)?.[field] ?? null) : undefined));
+            setPricingId(null);
+          }}
+          onClose={() => setPricingId(null)}
+        />
+      )}
 
       {error && (
         <p role="alert" className="mt-4 rounded-lg bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-300 print:hidden">

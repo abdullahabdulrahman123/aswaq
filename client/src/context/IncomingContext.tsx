@@ -43,8 +43,8 @@ const readSeen = (accountId: string) => {
 };
 const confirmedAt = (o: Order) => Date.parse(o.checkedOutAt ?? o.updatedAt);
 
-/** الصفحة نفسها — التنبيه مبيطلعش وهو عليها */
-const onIncomingPage = (pathname: string, accountId: string) => pathname === `/business/${accountId}/incoming`;
+/** «مهامي» فيها الطلبات الواردة (مكالمة ٣٠ سبتمبر) — التنبيه مبيطلعش وهو عليها */
+const onIncomingPage = (pathname: string) => pathname === '/tasks';
 
 export function IncomingProvider({ children }: { children: ReactNode }) {
   const { user, sessionExpired, selectedBusiness, withToken } = useAuth();
@@ -96,7 +96,7 @@ export function IncomingProvider({ children }: { children: ReactNode }) {
     socket.on('order:new', ({ order, own }: { order: Order; own: boolean }) => {
       if (order.from.acc !== accountId) return;
       setOrders((prev) => [order, ...(prev ?? []).filter((o) => o.id !== order.id)]);
-      if (!own && !onIncomingPage(here.current, accountId)) setToast(order);
+      if (!own && !onIncomingPage(here.current)) setToast(order);
     });
     return () => {
       socket.disconnect();

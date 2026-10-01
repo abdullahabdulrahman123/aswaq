@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ComponentType } from 'react';
-import { Route, Routes, useLocation, useParams } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { businessInPath } from './lib/businessRoutes';
 import { Navbar } from './components/Navbar';
@@ -8,7 +8,6 @@ import { InstallPrompt } from './components/InstallPrompt';
 import { SalesDialog } from './components/SalesDialog';
 import { BottomNav } from './components/BottomNav';
 import { IncomingToast } from './components/IncomingToast';
-import { IncomingOrdersPage } from './pages/IncomingOrdersPage';
 import { FollowOrderWorld } from './context/StoreCartContext';
 import { HomePage } from './pages/HomePage';
 import { ProductPage } from './pages/ProductPage';
@@ -98,7 +97,8 @@ export function App() {
           <Route path="/business/:accountId/items/new" element={<PerBusiness page={ItemFormPage} />} />
           <Route path="/business/:accountId/items/:itemId/edit" element={<PerBusiness page={ItemFormPage} />} />
           <Route path="/business/:accountId/store-items" element={<PerBusiness page={StoreItemsPage} />} />
-          <Route path="/business/:accountId/incoming" element={<PerBusiness page={IncomingOrdersPage} />} />
+          {/* الطلبات الواردة بقت في «مهامي» (مكالمة ٣٠ سبتمبر) — اللينك القديم بيوديها */}
+          <Route path="/business/:accountId/incoming" element={<Navigate to="/tasks" replace />} />
           <Route path="/auth/wasla/callback" element={<AuthCallbackPage />} />
           <Route path="*" element={<HomePage />} />
         </Routes>

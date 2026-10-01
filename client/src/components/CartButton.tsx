@@ -1,6 +1,4 @@
 import { Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { useIncoming } from '../context/IncomingContext';
 import { useSales } from '../context/SalesContext';
 import { useStoreCart } from '../context/StoreCartContext';
 import { egp } from '../data/catalog';
@@ -8,17 +6,16 @@ import { itemsLabel } from '../lib/quantity';
 import { CartIcon } from './CartIcon';
 
 /**
- * السلتين في الناڤبار، بطلب العميل (مكالمة ٢٨ سبتمبر) — الشرا والبيع كانوا في
- * سلة واحدة ومتلخبطين:
- *   - «طلباتي» (سهم داخل): اللي أنا طالبه لنفسي أو لنشاطي
- *   - «الطلبات الواردة» (سهم طالع، بلون تاني): المطلوب من نشاطي، وفيها فواتير «مبيعات»
+ * «طلباتي» في الناڤبار (سهم داخل العربة): اللي أنا طالبه لنفسي أو لنشاطي.
  *
- * جوه أوردر السلة بتاعته هي اللي بتبقى الأوردر ده: الرقم عدد أصنافه وتحتها
- * الإجمالي — أحمر لحد ما يوصل الحد الأدنى للأوردر عند المتجر وبعدين يخضر —
- * والدوسة بتفتح الفاتورة. برّه الأوردر الدوسة بتفتح ليستة السلة.
+ * جوه أوردر السلة بتبقى الأوردر ده: الرقم عدد أصنافه وتحتها الإجمالي — أحمر
+ * لحد ما يوصل الحد الأدنى للأوردر عند المتجر وبعدين يخضر — والدوسة بتفتح
+ * الفاتورة. برّه الأوردر الدوسة بتفتح ليستة الطلبات. الرقم على الأيقونة نفسها
+ * زي عدّاد رسايل الواتساب.
  *
- * الرقم على الأيقونة نفسها زي عدّاد رسايل الواتساب. الأحمر للطلبات الواردة
- * الجديدة بس (من آخر مرة الصفحة اتفتحت)، وأي عدّ تاني لونه هادي.
+ * كان فيه سلة بيع جنبها (٢٨ سبتمبر) واتشالت في مكالمة ٣٠ سبتمبر: الطلبات
+ * الواردة بقت في «مهامي»، وفي «مبيعات» عدد الأصناف والإجمالي على اسم العميل
+ * (BuyerChip).
  */
 export function BuyCartButton() {
   const { focus, countOf, totalOf, orders } = useStoreCart();
@@ -39,44 +36,9 @@ export function BuyCartButton() {
             ? `طلباتي — ${count === 1 ? 'طلب واحد' : `${count} طلبات`}`
             : 'طلباتي'
       }
-      arrow="in"
       count={count}
       total={inOrder ? totalOf(inOrder.shopId) : null}
       minimum={inOrder?.minimum ?? null}
-    />
-  );
-}
-
-/** بتظهر للي بيبيع بس: نشاط مختار، أو جوه بيعة */
-export function SellCartButton() {
-  const { focus, countOf, totalOf } = useStoreCart();
-  const { session } = useSales();
-  const { selectedBusiness } = useAuth();
-  const { unseen } = useIncoming();
-  const accountId = session?.accountId ?? selectedBusiness?.accountId ?? null;
-  if (!accountId) return null;
-  const inOrder = focus && session ? focus : null;
-  const count = inOrder ? countOf(inOrder.shopId) : unseen;
-
-  return (
-    <CartLink
-      to={inOrder ? `/orders/${inOrder.shopId}` : `/business/${accountId}/incoming`}
-      title={inOrder ? 'الفاتورة' : 'الطلبات الواردة'}
-      label={
-        inOrder
-          ? count > 0
-            ? `الفاتورة — ${itemsLabel(count)} بـ${egp(totalOf(inOrder.shopId))}`
-            : 'الفاتورة'
-          : count > 0
-            ? `الطلبات الواردة — ${count === 1 ? 'طلب جديد' : `${count} طلبات جديدة`}`
-            : 'الطلبات الواردة'
-      }
-      arrow="out"
-      count={count}
-      alert={!inOrder}
-      total={inOrder ? totalOf(inOrder.shopId) : null}
-      minimum={inOrder?.minimum ?? null}
-      sell
     />
   );
 }
@@ -85,24 +47,17 @@ function CartLink({
   to,
   title,
   label,
-  arrow,
   count,
   total,
   minimum,
-  alert = false,
-  sell = false,
 }: {
   to: string;
   title: string;
   label: string;
-  arrow: 'in' | 'out';
   count: number;
   /** null = برّه الأوردر، مفيش إجمالي */
   total: number | null;
   minimum: number | null;
-  /** العدّ ده طلبات واردة جديدة — أحمر */
-  alert?: boolean;
-  sell?: boolean;
 }) {
   const reached = minimum === null || (total ?? 0) >= minimum;
   return (
@@ -110,20 +65,14 @@ function CartLink({
       to={to}
       aria-label={label}
       title={title}
-      className={`flex min-w-9 shrink-0 flex-col items-center gap-0.5 rounded-lg px-1.5 py-1 transition ${
-        sell
-          ? 'text-accent-700 hover:bg-accent-500/10 dark:text-accent-300'
-          : 'text-stone-700 hover:bg-stone-100 dark:text-stone-200 dark:hover:bg-white/10'
-      }`}
+      className="flex min-w-9 shrink-0 flex-col items-center gap-0.5 rounded-lg px-1.5 py-1 text-stone-700 transition hover:bg-stone-100 dark:text-stone-200 dark:hover:bg-white/10"
     >
       <span className="relative">
-        <CartIcon arrow={arrow} className="h-6 w-6" />
+        <CartIcon arrow="in" className="h-6 w-6" />
         {count > 0 && (
           <span
             data-badge
-            className={`absolute -end-2 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none tabular-nums ring-2 ring-surface-light dark:ring-surface-dark ${
-              alert ? 'bg-red-600 text-white' : 'bg-stone-700 text-white dark:bg-stone-200 dark:text-stone-900'
-            }`}
+            className="absolute -end-2 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-stone-700 px-1 text-[10px] font-bold leading-none tabular-nums text-white ring-2 ring-surface-light dark:bg-stone-200 dark:text-stone-900 dark:ring-surface-dark"
           >
             {count > 99 ? '99+' : count}
           </span>

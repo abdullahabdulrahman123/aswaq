@@ -1,15 +1,14 @@
 import { Link } from 'react-router-dom';
 import { BuyerChip } from './BuyerChip';
-import { BuyCartButton, SellCartButton } from './CartButton';
+import { BuyCartButton } from './CartButton';
 import { IdentityMenu } from './IdentityMenu';
 import { SellerBadge } from './SellerBadge';
 
 /**
  * طرفين قصاد بعض زي أي عملية بيع وشرا، بطلب العميل:
  *   يمين: أنا — صورتي أو صورة النشاط اللي بتعامل بيه، وكل حاجة في المنيو بتاعتها
- *   شمال: البائع اللي بشتري منه — جوه صفحته وصفحات منتجاته بس، وجنبه السلتين
- *         («طلباتي» و«الطلبات الواردة» — مكالمة ٢٨ سبتمبر)
- * وفي «مبيعات» اسم المشتري بيظهر على شمال السلتين على طول.
+ *   شمال: البائع اللي بشتري منه — جوه صفحته وصفحات منتجاته بس، وجنبه «طلباتي»
+ * وفي «مبيعات» اسم المشتري وتحته الإجمالي (مكالمة ٣٠ سبتمبر) — مفيش سلة بيع.
  */
 export function Navbar() {
   return (
@@ -25,9 +24,8 @@ export function Navbar() {
         </div>
 
         <div className="flex min-w-0 items-center gap-1.5">
-          {/* السلتين وتحت اللي جوه أوردر عدد الأصناف والإجمالي */}
+          {/* «طلباتي» — وجوه أوردر عدد أصنافه والإجمالي */}
           <BuyCartButton />
-          <SellCartButton />
 
           <BuyerChip />
 

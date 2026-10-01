@@ -9,7 +9,7 @@ const TOAST_MS = 8000;
 
 /**
  * تنبيه صغير لما طلب وارد يوصل والمستخدم في صفحة تانية، بطلب العميل: «بس يجيلك
- * toast ما يزعلكش». الدوسة بتفتح الطلبات الواردة، وبيختفي لوحده.
+ * toast ما يزعلكش». الدوسة بتفتح «مهامي» (فيها الطلبات الواردة)، وبيختفي لوحده.
  */
 export function IncomingToast() {
   const { toast, dismissToast } = useIncoming();
@@ -26,7 +26,7 @@ export function IncomingToast() {
   return (
     <div role="status" className="fixed inset-x-3 bottom-16 z-50 mx-auto max-w-sm print:hidden">
       <div className="flex items-center gap-3 rounded-2xl bg-stone-900 px-4 py-3 text-white shadow-card dark:bg-white dark:text-stone-900">
-        <Link to={`/business/${selectedBusiness.accountId}/incoming`} onClick={dismissToast} className="min-w-0 flex-1">
+        <Link to="/tasks" onClick={dismissToast} className="min-w-0 flex-1">
           <span className="block text-sm font-bold">طلب وارد جديد · فاتورة {toast.number}</span>
           <span className="block truncate text-xs opacity-80">
             {toast.names.buyer} · {toast.names.store} · {egp(toast.netTotal)}

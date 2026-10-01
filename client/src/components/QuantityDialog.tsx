@@ -140,6 +140,8 @@ export function QuantityDialog({
 
           <p className="mt-2 text-center text-xs text-stone-500 dark:text-stone-400">
             الإجمالي <span className="font-bold tabular-nums text-stone-800 dark:text-stone-100">{egp(price * clampQty(qty))}</span>
+            {/* غير «التسعير» اللي بيغيّر سعر المتجر لكل العملاء (٣٠ سبتمبر) */}
+            {editPrice && <span className="ms-1.5">· السعر ده للفاتورة دي بس</span>}
           </p>
         </form>
       )}

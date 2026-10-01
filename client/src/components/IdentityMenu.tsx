@@ -2,7 +2,6 @@ import { useId, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useIncoming } from '../context/IncomingContext';
 import { useSales } from '../context/SalesContext';
 import { useTheme } from '../context/ThemeContext';
 import { pathAfterSwitch } from '../lib/businessRoutes';
@@ -16,18 +15,6 @@ const itemClass =
   'flex w-full items-center gap-3 px-4 py-2.5 text-start text-sm transition hover:bg-stone-50 dark:hover:bg-white/5';
 const sectionClass = 'border-t border-stone-100 py-1 dark:border-white/5';
 
-/** العداد الأحمر — نفس شكل بتاع السلة */
-function CountBadge({ count, className = '' }: { count: number; className?: string }) {
-  if (count <= 0) return null;
-  return (
-    <span
-      data-badge
-      className={`flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold leading-none tabular-nums text-white ${className}`}
-    >
-      {count > 99 ? '99+' : count}
-    </span>
-  );
-}
 const headingClass = 'px-4 pb-1 pt-2 text-[11px] font-medium text-stone-400';
 /** سطر في ليستة «حساباتي» */
 const rowClass =
@@ -104,7 +91,6 @@ export function IdentityMenu() {
   const { theme, toggleTheme } = useTheme();
   const { open, setOpen, wrapRef, close } = useDropdown();
   const { openDialog: openSales } = useSales();
-  const { unseen } = useIncoming();
   // ليستة «حساباتي» بتبدأ مقفولة كل ما المنيو تفتح
   const [accountsOpen, setAccountsOpen] = useState(false);
   const accountsButton = useRef<HTMLButtonElement>(null);
@@ -330,11 +316,6 @@ export function IdentityMenu() {
                   </Link>
                   <Link role="menuitem" to={`/business/${selectedBusiness.accountId}/store-items`} onClick={close} className={itemClass}>
                     إدارة أصناف المتاجر
-                  </Link>
-                  {/* بطلب العميل (٢٧ سبتمبر): الأوردرات المؤكدة المطلوبة من النشاط، بعداد أحمر للجديد */}
-                  <Link role="menuitem" to={`/business/${selectedBusiness.accountId}/incoming`} onClick={close} className={itemClass}>
-                    <span className="flex-1">الطلبات الواردة</span>
-                    <CountBadge count={unseen} />
                   </Link>
                   {/* Business Profile — الاسم اللي العميل اختاره بالعربي */}
                   <Link role="menuitem" to={`/business/${selectedBusiness.accountId}`} onClick={close} className={itemClass}>

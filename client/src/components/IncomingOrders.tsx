@@ -1,12 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { OrderRowButton } from '../components/OrderRowButton';
-import { useAuth } from '../context/AuthContext';
+import { Link } from 'react-router-dom';
+import type { Business } from '../context/AuthContext';
 import { useIncoming } from '../context/IncomingContext';
 import { egp } from '../data/catalog';
 import type { Order } from '../lib/aswaqApi';
 import { useOrderRows } from '../lib/orderRows';
 import { itemsLabel } from '../lib/quantity';
+import { OrderRowButton } from './OrderRowButton';
 
 const timeFormat = new Intl.DateTimeFormat('ar-EG', { dateStyle: 'medium', timeStyle: 'short' });
 
@@ -19,16 +19,17 @@ const timeFormat = new Intl.DateTimeFormat('ar-EG', { dateStyle: 'medium', timeS
  * متأكدتش (كانت في «طلباتي» ومتلخبطة مع اللي أنا طالبه)، والدوسة بترجّعك جوّاها.
  * المؤكدة منها بتنزل مع باقي الطلبات الواردة.
  *
+ * مكالمة ٣٠ سبتمبر: مبقتش سلة ولا صفحة لوحدها — جوه «مهامي» (TasksPage)،
+ * للنشاط المختار. العداد الأحمر على أيقونة «مهامي» اللي تحت.
+ *
  * بتتحدّث لوحدها (الـsocket.io في IncomingContext). والطلب اللي بيوصل وانت
  * نازل تحت في الليستة مبيزقّش الصفحة: بيطلع زرار «طلبات جديدة ↑» زي
  * Thunderbird، والدوسة عليه بتطلعك فوق.
  */
-export function IncomingOrdersPage() {
-  const { accountId = '' } = useParams<{ accountId: string }>();
-  const { businesses, selectedBusiness } = useAuth();
+export function IncomingOrders({ business }: { business: Business }) {
+  const { accountId } = business;
   const { orders, markSeen, live } = useIncoming();
   const { rows, open } = useOrderRows();
-  const business = businesses.find((b) => b.accountId === accountId);
   const openSales = rows.filter((row) => row.sale?.accountId === accountId && row.state !== 'order');
 
   // الصفحة مفتوحة = اللي فيها اتشاف، والعداد يتصفّر (ومع كل طلب بيوصل وهي مفتوحة)
@@ -55,14 +56,10 @@ export function IncomingOrdersPage() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  if (!business || selectedBusiness?.accountId !== accountId) {
-    return <p className="mx-auto max-w-md px-4 py-20 text-center text-sm text-stone-500 dark:text-stone-400">بنجيب الطلبات…</p>;
-  }
-
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8">
-      <h1 className="font-display text-2xl font-bold sm:text-3xl">الطلبات الواردة</h1>
-      <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
+    <section aria-labelledby="incoming-title" className="mt-6">
+      <h2 id="incoming-title" className="font-display text-lg font-bold">الطلبات الواردة</h2>
+      <p className="mt-0.5 text-sm text-stone-500 dark:text-stone-400">
         الطلبات المطلوبة من {business.name}، وفواتير «مبيعات».
         {live && <span className="ms-1.5 inline-block h-2 w-2 rounded-full bg-accent-500 align-middle" title="بتتحدّث لوحدها" />}
       </p>
@@ -82,7 +79,7 @@ export function IncomingOrdersPage() {
 
       {openSales.length > 0 && (
         <section className="mt-5">
-          <h2 className="text-sm font-semibold text-stone-600 dark:text-stone-300">فواتير بيع لسه متأكدتش</h2>
+          <h3 className="text-sm font-semibold text-stone-600 dark:text-stone-300">فواتير بيع لسه متأكدتش</h3>
           <ul aria-label="فواتير البيع المفتوحة" className="mt-2 grid grid-cols-1 gap-2.5">
             {openSales.map((row) => (
               <OrderRowButton key={row.key} row={row} title={row.buyer ?? row.store} onOpen={() => open(row)} />
@@ -105,7 +102,7 @@ export function IncomingOrdersPage() {
           ))}
         </ul>
       )}
-    </div>
+    </section>
   );
 }
 
