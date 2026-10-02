@@ -271,7 +271,8 @@ export function IdentityMenu() {
                         onSelect={() => choose(b.accountId, b.name)}
                         avatar={<Avatar kind="business" picture={b.picture} fallback={b.abbreviation} size={32} />}
                         title={b.name}
-                        subtitle={b.abbreviation}
+                        // موظف فيها (مش صاحبها): وظيفته جنب الاختصار — مكالمة ١ أكتوبر
+                        subtitle={b.job && b.job !== 'owner' ? `${b.abbreviation} · ${b.job}` : b.abbreviation}
                       />
                     ))}
                     {businessesLoading && businesses.length === 0 && (
@@ -316,6 +317,10 @@ export function IdentityMenu() {
                   </Link>
                   <Link role="menuitem" to={`/business/${selectedBusiness.accountId}/store-items`} onClick={close} className={itemClass}>
                     إدارة أصناف المتاجر
+                  </Link>
+                  {/* بطلب العميل (١ أكتوبر): كل موظف بيدخل بحسابه هو */}
+                  <Link role="menuitem" to={`/business/${selectedBusiness.accountId}/employees`} onClick={close} className={itemClass}>
+                    الموظفين
                   </Link>
                   {/* Business Profile — الاسم اللي العميل اختاره بالعربي */}
                   <Link role="menuitem" to={`/business/${selectedBusiness.accountId}`} onClick={close} className={itemClass}>

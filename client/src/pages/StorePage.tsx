@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Avatar } from '../components/Avatar';
 import { LocationBar } from '../components/LocationBar';
+import { SalesPanel } from '../components/SalesPanel';
 import { StoreItemCard } from '../components/StoreItemCard';
 import { useAuth } from '../context/AuthContext';
 import { useBuyerLocation } from '../context/LocationContext';
@@ -27,13 +28,16 @@ const METHODS: { key: ReceivingMethod; label: string }[] = [
  * المتجر نفسه (اسمه ونشاطه ومكانه) من وصلة، ونطاقه وأصنافه من أسواق.
  *
  * في «مبيعات» الأسعار أسعار المحل بتاعة المشتري (شركة = جملة، مستخدم = قطاعي) وطريقة
- * الاستلام اللي اتختارت في نافذة «مبيعات» — مكتوبة بس، من غير اختيار ولا نطاق.
+ * الاستلام اللي اتختارت في رأس الفاتورة — مكتوبة بس، من غير اختيار ولا نطاق.
  * متجر نشاط تاني مش جزء من البيعة، فدخوله خروج منها.
+ *
+ * رأس الفاتورة نفسه فوق الأصناف (SalesPanel، مكالمة ١ أكتوبر): بيعة جديدة =
+ * الأكورديون مفتوح والأصناف مستخبية لحد «ابدأ البيع».
  */
 export function StorePage() {
   const { storeId = '' } = useParams<{ storeId: string }>();
   const { accountType: myAccountType } = useAuth();
-  const { session, leave } = useSales();
+  const { session, leave, dialog } = useSales();
   const { location: myLocation } = useBuyerLocation();
   const location = session ? null : myLocation;
   const accountType = session ? (session.buyer.kind === 'business' ? 'COMPANY' : 'INDIVIDUAL') : myAccountType;
@@ -177,6 +181,9 @@ export function StorePage() {
     return <p className="mx-auto max-w-6xl px-4 py-8 text-sm text-stone-500 dark:text-stone-400">بنجيب المتجر…</p>;
   }
 
+  /** رأس فاتورة جديدة مفتوح هنا — من غير مشتري لسه، فالأصناف مستخبية */
+  const newSale = !session && dialog !== null && dialog.business.accountId === store.business.accountId;
+
   /** ليه التوصيل مقفول — بيظهر تحت الاختيار */
   const noDeliveryReason =
     radius === null
@@ -199,13 +206,10 @@ export function StorePage() {
         </div>
       </div>
 
-      {/* في «مبيعات» طريقة الاستلام مكتوبة بس. وإلا: مش grid — عنصر الـgrid بيكبر على قد النص، فالعنوان الطويل في شريط المكان كان بيوسّع الصفحة بدل ما يتقص */}
-      {session ? (
-        <p className="mt-3 rounded-lg bg-stone-100 px-3 py-1.5 text-xs leading-relaxed dark:bg-white/5 sm:max-w-xl">
-          <span className="font-semibold">{session.method === 'delivery' ? 'توصيل' : 'استلام من المتجر'}</span>
-          {session.method === 'delivery' && <span className="break-words"> — {session.address}</span>}
-        </p>
-      ) : (
+      <SalesPanel storeId={store.id} businessId={store.business.accountId} />
+
+      {/* في «مبيعات» طريقة الاستلام في الأكورديون. وإلا: مش grid — عنصر الـgrid بيكبر على قد النص، فالعنوان الطويل في شريط المكان كان بيوسّع الصفحة بدل ما يتقص */}
+      {session || newSale ? null : (
         <div className="mt-4 space-y-3 sm:max-w-xl">
           <LocationBar prompt="حدد مكانك عشان نعرف المتجر بعيد عنك قد إيه" />
 
@@ -254,7 +258,7 @@ export function StorePage() {
       )}
 
       <div className="mt-4">
-        {details.items.length === 0 ? (
+        {newSale ? null : details.items.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-stone-300 p-8 text-center text-sm text-stone-500 dark:border-white/15 dark:text-stone-400">
             لسه مفيش أصناف في المتجر ده.
           </p>

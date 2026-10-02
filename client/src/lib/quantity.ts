@@ -34,6 +34,9 @@ export const toPounds = (piastres: number) => (piastres / 100).toFixed(2).replac
 /** بين واحد و99,999 — والكسور بتتقطع */
 export const clampQty = (n: number) => Math.min(MAX_QTY, Math.max(1, Math.trunc(n) || 1));
 
+/** زي clampQty بس الصفر مسموح — صفر في نافذة الكمية = الصنف يتشال (١ أكتوبر) */
+export const clampQtyOrZero = (n: number) => Math.min(MAX_QTY, Math.max(0, Math.trunc(n) || 0));
+
 /** «صنف» و«صنفين» و«٣ أصناف» — عدد أصناف السلة تحت الأيقونة */
 export function itemsLabel(count: number) {
   if (count === 1) return 'صنف';

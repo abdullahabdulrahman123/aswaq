@@ -143,7 +143,9 @@ export function StoreItemCard({
           initialPrice={askingLine?.price}
           editPrice={sellerPrices}
           onDone={(qty, price) => {
-            put(askingUnit, qty, price);
+            // صفر = يتشال (والوحدة اللي لسه متطلبتش مبتتضافش)
+            if (qty > 0) put(askingUnit, qty, price);
+            else if (askingLine) removeLine(askingLine);
             setAsking(null);
           }}
           onClose={() => setAsking(null)}

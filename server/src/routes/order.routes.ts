@@ -12,5 +12,6 @@ router.put('/draft', orderController.putDraft);
 router.put('/:orderId/lines', orderController.putLine);
 router.get('/:orderId', orderController.get);
 router.post('/:orderId/checkout', orderController.checkout);
+router.post('/:orderId/advance', orderController.advance);
 
 export default router;

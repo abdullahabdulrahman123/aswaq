@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { InvoiceSheet, type InvoiceView } from '../components/InvoiceSheet';
 import { PriceDialogFor } from '../components/PriceDialog';
 import { useAuth } from '../context/AuthContext';
@@ -22,15 +22,18 @@ import { ApiError, fetchStore, type ShowroomStore } from '../lib/waslaApi';
  * سلته من الجهاز، ومحتاج يسجّل دخول عشان يأكد.
  *
  * مكالمة ٢٨ سبتمبر: «تأكيد وطباعة» على أقصى اليمين — بيحفظ ويفتح الطباعة على طول
- * من غير المرور على صفحة الفاتورة كل مرة. وفي «مبيعات» «تأكيد وجديد» — بيأكد ويفتح
- * نافذة «مبيعات» فاضية للفاتورة اللي بعدها.
+ * من غير المرور على صفحة الفاتورة كل مرة.
+ *
+ * مكالمة ١ أكتوبر: في «مبيعات» زرارين بس — «تأكيد» و«طباعة» (نفسهم اللي في
+ * الأكورديون فوق الأصناف، وبيوصلوا هنا بـstate.then ويشتغلوا لوحدهم أول ما
+ * المسودة تبقى جاهزة). «تأكيد» بيفتح الفاتورة المؤكدة بمرحلتها («إتمام» بعدها).
  *
  * مكالمة ٣٠ سبتمبر: اسم العميل في الناڤبار بقى بيفتح الفاتورة دي (سلة البيع
  * اتشالت)، فتعديل بياناته من زرار «تعديل العميل» هنا. وفي «مبيعات» اسم الصنف
  * بيفتح «التسعير» — الفاتورة دي لسه متأكدتش فبتاخد السعر الجديد على طول، إلا
  * الصنف اللي البائع كتبله سعر خاص للعميل ده.
  */
-type AfterCheckout = 'view' | 'print' | 'next';
+type AfterCheckout = 'view' | 'print';
 
 const outlineAccent =
   'rounded-xl border border-accent-600 px-5 py-3 text-sm font-semibold text-accent-700 transition hover:bg-accent-50 disabled:opacity-60 dark:text-accent-300 dark:hover:bg-accent-500/10';
@@ -38,9 +41,13 @@ const outlineAccent =
 export function InvoicePage() {
   const { shopId = '' } = useParams<{ shopId: string }>();
   const { linesOf, totalOf, clearShop, repriceStore } = useStoreCart();
-  const { session, next, openDialog } = useSales();
+  const { session, openDialog } = useSales();
   const { user, businesses, sessionExpired, selectedBusiness, withToken, signIn } = useAuth();
   const navigate = useNavigate();
+  const { pathname, state: navState } = useLocation();
+  /** جاي من زرار الأكورديون: يأكد أو يطبع لوحده أول ما المسودة تجهز */
+  const autoAction = (navState as { then?: 'confirm' | 'print' } | null)?.then ?? null;
+  const autoDone = useRef(false);
   const [store, setStore] = useState<ShowroomStore | null>(null);
   const [draft, setDraft] = useState<Order | null>(null);
   const [error, setError] = useState('');
@@ -97,11 +104,6 @@ export function InvoicePage() {
       const done = await withToken((token) => checkoutOrder(token, draft.id));
       clearShop(session?.id ?? null, shopId);
       rememberDraftId(draftRef(shopId, session), null);
-      if (then === 'next') {
-        navigate(`/store/${shopId}`, { replace: true });
-        next(`اتأكدت فاتورة رقم ${done.number}`);
-        return;
-      }
       navigate(`/invoice/${done.id}`, { replace: true, state: then === 'print' ? { print: true } : null });
     } catch (err) {
       setError(
@@ -114,6 +116,22 @@ export function InvoicePage() {
       setBusy(null);
     }
   }
+
+  // «تأكيد» / «طباعة» من الأكورديون: مرة واحدة، بعد ما المسودة اتحسبت على السيرفر.
+  // الطلب بيتشال من التاريخ عشان الـrefresh ميعيدهوش
+  const draftReady = Boolean(draft) && !busy;
+  useEffect(() => {
+    if (!autoAction || autoDone.current || !draftReady || !draft) return;
+    autoDone.current = true;
+    navigate(pathname, { replace: true, state: null });
+    if (autoAction === 'print') {
+      requestAnimationFrame(() => window.print());
+      return;
+    }
+    if (draft.details.some((d) => d.unpriced)) return;
+    void handleCheckout('view');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoAction, draftReady]);
 
   if (lines.length === 0) {
     return (
@@ -151,6 +169,7 @@ export function InvoicePage() {
         <div className="mb-3 flex justify-end print:hidden">
           <button
             type="button"
+            // رأس الفاتورة بيتفتح فوق أصناف المتجر ده (FollowSalesPanel) — مش المتجر اللي البيعة بدأت منه
             onClick={() => openDialog(saleBusiness, session)}
             className="rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium transition hover:border-stone-400 dark:border-white/15"
           >
@@ -181,7 +200,25 @@ export function InvoicePage() {
       )}
 
       <div className="mt-5 flex flex-wrap gap-3 print:hidden">
-        {signedIn ? (
+        {signedIn && session ? (
+          <>
+            <button
+              type="button"
+              onClick={() => handleCheckout('view')}
+              disabled={!draft || Boolean(busy) || unpriced}
+              className="rounded-xl bg-accent-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-accent-700 disabled:opacity-60"
+            >
+              {busy ? 'بنأكد…' : 'تأكيد'}
+            </button>
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="rounded-xl border border-stone-300 px-5 py-3 text-sm font-medium transition hover:border-stone-400 dark:border-white/15"
+            >
+              طباعة
+            </button>
+          </>
+        ) : signedIn ? (
           <>
             <button
               type="button"
@@ -199,16 +236,6 @@ export function InvoicePage() {
             >
               {busy === 'view' ? 'بنأكد…' : 'تأكيد الطلب'}
             </button>
-            {session && (
-              <button
-                type="button"
-                onClick={() => handleCheckout('next')}
-                disabled={!draft || Boolean(busy) || unpriced}
-                className={outlineAccent}
-              >
-                {busy === 'next' ? 'بنأكد…' : 'تأكيد وجديد'}
-              </button>
-            )}
           </>
         ) : (
           <button
@@ -219,13 +246,15 @@ export function InvoicePage() {
             سجّل دخول عشان تأكد الطلب
           </button>
         )}
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className="rounded-xl border border-stone-300 px-5 py-3 text-sm font-medium transition hover:border-stone-400 dark:border-white/15"
-        >
-          اطبع / PDF
-        </button>
+        {!session && (
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="rounded-xl border border-stone-300 px-5 py-3 text-sm font-medium transition hover:border-stone-400 dark:border-white/15"
+          >
+            طباعة
+          </button>
+        )}
         <Link
           to={`/store/${shopId}`}
           className="rounded-xl border border-stone-300 px-5 py-3 text-sm font-medium transition hover:border-stone-400 dark:border-white/15"

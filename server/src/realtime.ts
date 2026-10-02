@@ -57,6 +57,14 @@ export function attachRealtime(server: HttpServer) {
  * أوردر اتأكد: لكل اللي بيتابعوا النشاط البائع. own = هو اللي أكّده (بيعة
  * «مبيعات» من البائع نفسه) — الواجهة بتعدّه من غير ما تنبّه صاحبه.
  */
+/**
+ * أوردر اتنقل مرحلة («إتمام»): «مهامي» عند كل اللي بيتابعوا النشاط البائع
+ * بتتحدّث — المكتمل بيخرج منها من غير refresh.
+ */
+export async function announceState(order: Order) {
+  io?.to(room(order.from.acc)).emit('order:state', { order });
+}
+
 export async function announceIncoming(order: Order) {
   if (!io) return;
   for (const socket of await io.in(room(order.from.acc)).fetchSockets()) {

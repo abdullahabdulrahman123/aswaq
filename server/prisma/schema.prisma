@@ -97,7 +97,11 @@ model Order {
   id           String      @id @default(auto()) @map("_id") @db.ObjectId
   /** رقم الفاتورة — مسلسل لكل نشاط بائع، بيتاخد ساعة التأكيد. فاضي في المسودة */
   number       Int?
-  /** draft | order — والباقي بعدين، وكل نشاط هيحدد حالاته */
+  /**
+   * مراحل الأوردر (مكالمة ١ أكتوبر): draft (مسودة) ← «تأكيد» ← order (مؤكد) ←
+   * «إتمام» ← done (مكتمل). المكتمل بيخرج من «مهامي» وبيفضل محفوظ. المراحل
+   * اللي في النص بتتضاف هنا لما العميل يحددها (src/services/orderFlow.ts)
+   */
   state        String
   /**
    * مفتاح المسودة عند اللي عاملها: me:<shopId> لنفسه، <saleId>:<shopId> لبيعة.
@@ -107,6 +111,13 @@ model Order {
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
   checkedOutAt DateTime?
+  /** ساعة «إتمام» */
+  completedAt  DateTime?
+  /**
+   * الفاتورة جاية منين (مكالمة ١ أكتوبر): onsite = «مبيعات» (الشباك)، online =
+   * المشتري من المعرض. الأوردرات اللي قبلها بتتملي ساعة ما السيرفر يقوم
+   */
+  source       String?
   /** المحرّر: المستخدم اللي عامل الأوردر (id حسابه في وصلة) */
   creator      OrderPerson
   /** آخر واحد عدّل الأوردر — «Creator or editor» في سكيمة العميل */

@@ -2,9 +2,11 @@ import type { Request, Response } from 'express';
 import type { Order, Prisma } from '@prisma/client';
 import { currentUser, fetchWaslaStore, findManagedBusiness } from '../middleware/auth.js';
 import { isObjectId } from '../schemas/common.js';
-import { announceIncoming } from '../realtime.js';
+import { announceIncoming, announceState } from '../realtime.js';
 import { draftSchema, lineSchema } from '../schemas/order.schema.js';
+import { nextState } from '../services/orderFlow.js';
 import {
+  advanceState,
   buildDetails,
   checkOut,
   deleteOrder,
@@ -105,10 +107,16 @@ export async function putDraft(req: Request, res: Response) {
     method,
     address: method === 'delivery' ? (input.sale?.address ?? '') : '',
     sale: input.sale ? (input.sale as Prisma.InputJsonValue) : undefined,
+    // «مبيعات» = الشباك، والمشتري من المعرض = أونلاين
+    source: input.sale ? 'onsite' : 'online',
     ...totalsOf(details),
     details,
   };
   const order = await saveDraft(existing?.id ?? null, data);
+  if (!order) {
+    res.status(409).json({ message: 'Order already checked out' });
+    return;
+  }
   res.json({ order: toOrderView(order) });
 }
 
@@ -212,6 +220,30 @@ export async function checkout(req: Request, res: Response) {
   const done = await checkOut(order.id, await nextNumber(order.from.acc));
   // «الطلبات الواردة» عند النشاط البائع — لحظة بلحظة
   await announceIncoming(done).catch(() => undefined);
+  res.json({ order: toOrderView(done) });
+}
+
+/**
+ * POST /api/orders/:orderId/advance — المرحلة اللي بعدها، بطلب العميل (١ أكتوبر):
+ * مؤكد ← مكتمل («إتمام»). للنشاط البائع بس — المشتري مبيقفلش طلب البائع.
+ * المسودة بتتأكد بـcheckout مش من هنا (رقم الفاتورة). 409 = اتنقل من مكان تاني
+ * أو آخر مرحلة.
+ */
+export async function advance(req: Request, res: Response) {
+  const id = String(req.params.orderId);
+  const order = isObjectId(id) ? await findById(id) : null;
+  if (!order || order.state === 'draft' || !(await findManagedBusiness(req, order.from.acc))) {
+    res.status(404).json({ message: 'Order not found' });
+    return;
+  }
+  const to = nextState(order.state);
+  const done = to ? await advanceState(order, to) : null;
+  if (!done) {
+    res.status(409).json({ message: 'Order already moved on' });
+    return;
+  }
+  // «مهامي» عند الباقيين بتتحدّث — المكتمل بيخرج منها
+  await announceState(done).catch(() => undefined);
   res.json({ order: toOrderView(done) });
 }
 

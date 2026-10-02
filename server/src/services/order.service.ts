@@ -1,6 +1,7 @@
 import type { Item, Order, OrderDetail, Prisma } from '@prisma/client';
 import { prisma } from '../config/db.js';
 import type { DraftInput, LineInput } from '../schemas/order.schema.js';
+import { OPEN_STATES, type OrderState } from './orderFlow.js';
 
 type PriceField = 'onSWP' | 'onSRP' | 'onLWP' | 'onLRP';
 
@@ -128,9 +129,15 @@ export function findDraft(creatorAcc: string, ref: string) {
   return prisma.order.findFirst({ where: { creator: { is: { acc: creatorAcc } }, ref, state: 'draft' } });
 }
 
-export function saveDraft(existingId: string | null, data: Prisma.OrderCreateInput) {
-  if (existingId) return prisma.order.update({ where: { id: existingId }, data });
-  return prisma.order.create({ data });
+/**
+ * المسودة كلها. القديمة بتتحدّث بشرط إنها لسه مسودة: حفظ متأخر كان بيوصل بعد
+ * «تأكيد» ويرجّع الأوردر المؤكد مسودة (state: 'draft') — ظهر مع «تأكيد» من
+ * أكورديون «مبيعات» (١ أكتوبر). null = اتأكدت في النص.
+ */
+export async function saveDraft(existingId: string | null, data: Prisma.OrderCreateInput) {
+  if (!existingId) return prisma.order.create({ data });
+  const { count } = await prisma.order.updateMany({ where: { id: existingId, state: 'draft' }, data: data as Prisma.OrderUpdateManyMutationInput });
+  return count === 1 ? prisma.order.findUnique({ where: { id: existingId } }) : null;
 }
 
 /**
@@ -154,10 +161,10 @@ export function listMine(creatorAcc: string) {
   return prisma.order.findMany({ where: { creator: { is: { acc: creatorAcc } } }, orderBy: { updatedAt: 'desc' }, take: 200 });
 }
 
-/** الأوردرات المؤكدة اللي النشاط ده بائعها — الأحدث تأكيداً الأول */
+/** الأوردرات المفتوحة (اتأكدت ولسه متمتش) اللي النشاط ده بائعها — الأحدث تأكيداً الأول */
 export function listIncoming(sellerAcc: string) {
   return prisma.order.findMany({
-    where: { from: { is: { acc: sellerAcc } }, state: 'order' },
+    where: { from: { is: { acc: sellerAcc } }, state: { in: OPEN_STATES } },
     orderBy: { checkedOutAt: 'desc' },
     take: 200,
   });
@@ -185,4 +192,32 @@ export async function nextNumber(sellerAcc: string): Promise<number> {
 
 export function checkOut(id: string, number: number) {
   return prisma.order.update({ where: { id }, data: { state: 'order', number, checkedOutAt: new Date() } });
+}
+
+/**
+ * المرحلة اللي بعدها — بشرط إن الأوردر لسه في المرحلة اللي الواجهة شافتها،
+ * فدوستين في نفس اللحظة مبينقلوش مرحلتين. null = اتغيّر من مكان تاني.
+ */
+export async function advanceState(order: Order, to: OrderState) {
+  const { count } = await prisma.order.updateMany({
+    where: { id: order.id, state: order.state },
+    data: { state: to, ...(to === 'done' ? { completedAt: new Date() } : {}) },
+  });
+  return count === 1 ? prisma.order.findUnique({ where: { id: order.id } }) : null;
+}
+
+/**
+ * الأوردرات اللي قبل عمود source (١ أكتوبر): «مبيعات» = onsite والباقي online.
+ * مرة واحدة فعلياً ساعة ما السيرفر يقوم.
+ */
+export async function backfillOrderSources(): Promise<number> {
+  let n = 0;
+  for (const [filter, source] of [
+    [{ source: { $exists: false }, sale: null }, 'online'],
+    [{ source: { $exists: false }, sale: { $ne: null } }, 'onsite'],
+  ] as const) {
+    const res = (await prisma.$runCommandRaw({ update: 'orders', updates: [{ q: filter, u: { $set: { source } }, multi: true }] })) as { nModified?: number };
+    n += res.nModified ?? 0;
+  }
+  return n;
 }

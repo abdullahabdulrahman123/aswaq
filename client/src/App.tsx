@@ -1,14 +1,14 @@
 import { useEffect, useRef, type ComponentType } from 'react';
-import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { businessInPath } from './lib/businessRoutes';
 import { Navbar } from './components/Navbar';
 import { VendorSwitchDialog } from './components/VendorSwitchDialog';
 import { InstallPrompt } from './components/InstallPrompt';
-import { SalesDialog } from './components/SalesDialog';
 import { BottomNav } from './components/BottomNav';
 import { IncomingToast } from './components/IncomingToast';
 import { FollowOrderWorld } from './context/StoreCartContext';
+import { lastSalesShop, useSales } from './context/SalesContext';
 import { HomePage } from './pages/HomePage';
 import { ProductPage } from './pages/ProductPage';
 import { VendorPage } from './pages/VendorPage';
@@ -23,6 +23,7 @@ import { BusinessPage } from './pages/BusinessPage';
 import { ItemFormPage } from './pages/ItemFormPage';
 import { ItemsPage } from './pages/ItemsPage';
 import { StoreItemsPage } from './pages/StoreItemsPage';
+import { EmployeesPage } from './pages/EmployeesPage';
 import { StorePage } from './pages/StorePage';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 
@@ -61,6 +62,46 @@ function FollowBusinessInUrl() {
 }
 
 /**
+ * «مبيعات» بقت أكورديون فوق أصناف المتجر (مكالمة ١ أكتوبر): لما رأس الفاتورة
+ * يتفتح (المنيو، «تعديل العميل»، «فاتورة جديدة») والصفحة مش على متجر من متاجر
+ * النشاط، بنروح لمتجر البيعة أو آخر متجر اتباع منه. على فاتورة متجر من متاجره
+ * (/orders/:shopId) بنروح لأصناف المتجر ده نفسه. نشاط من غير متاجر ميبيعش —
+ * بنوديه على بياناته يضيف متجر.
+ *
+ * التنقل كله من هنا: navigate قبل openDialog في نفس الدوسة كان بيوصل بعد ما
+ * الأثر ده يشتغل (React Router بيعمله في transition)، فكان بيودّي على متجر تاني.
+ */
+function FollowSalesPanel() {
+  const { dialog, closeDialog } = useSales();
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const here = useRef(pathname);
+  here.current = pathname;
+
+  useEffect(() => {
+    if (!dialog) return;
+    const { business, editing } = dialog;
+    const stores = business.premises.filter((p) => p.isStore).map((p) => p.id);
+    const match = /^\/(store|orders)\/([^/]+)/.exec(here.current);
+    const current = match ? decodeURIComponent(match[2]) : null;
+    if (current && stores.includes(current)) {
+      if (match![1] === 'orders') navigate(`/store/${current}`);
+      return;
+    }
+    const target = [editing?.shopId, lastSalesShop(business.accountId)].find((id) => id && stores.includes(id)) ?? stores[0];
+    if (target) {
+      navigate(`/store/${target}`);
+    } else {
+      closeDialog();
+      navigate(`/business/${business.accountId}`);
+    }
+    // بنحكم لما الأكورديون يتفتح بس — التنقل جوّاه (تغيير المتجر) مبيرجّعش
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dialog]);
+  return null;
+}
+
+/**
  * صفحة نشاط بتبدأ من جديد لما النشاط اللي في اللينك يتغيّر (تغيير الحساب من
  * المنيو) — من غير كده كانت هتفضل شايلة حاجات القديم: أصنافه، أو صنف بيتكتب.
  */
@@ -76,6 +117,7 @@ export function App() {
       <ScrollToTop />
       <FollowBusinessInUrl />
       <FollowOrderWorld />
+      <FollowSalesPanel />
       <Navbar />
       {/* pb-12: الشريط اللي تحت ميغطّيش آخر الصفحة (للي داخل بحسابه بس) */}
       <main className={`flex-1 ${user ? 'pb-12' : ''} print:pb-0`}>
@@ -97,6 +139,7 @@ export function App() {
           <Route path="/business/:accountId/items/new" element={<PerBusiness page={ItemFormPage} />} />
           <Route path="/business/:accountId/items/:itemId/edit" element={<PerBusiness page={ItemFormPage} />} />
           <Route path="/business/:accountId/store-items" element={<PerBusiness page={StoreItemsPage} />} />
+          <Route path="/business/:accountId/employees" element={<PerBusiness page={EmployeesPage} />} />
           {/* الطلبات الواردة بقت في «مهامي» (مكالمة ٣٠ سبتمبر) — اللينك القديم بيوديها */}
           <Route path="/business/:accountId/incoming" element={<Navigate to="/tasks" replace />} />
           <Route path="/auth/wasla/callback" element={<AuthCallbackPage />} />
@@ -105,7 +148,6 @@ export function App() {
       </main>
       <VendorSwitchDialog />
       <InstallPrompt />
-      <SalesDialog />
       <IncomingToast />
       <BottomNav />
     </div>

@@ -129,6 +129,11 @@ export interface Business {
   /** مركبات النشاط — وصلة القديمة من غيرها، فبتبقى ليستة فاضية */
   vehicles: Vehicle[];
   createdAt: string;
+  /**
+   * وظيفة المستخدم في النشاط (مكالمة ١ أكتوبر): owner لصاحبه، وغيره «محاسب»
+   * وهكذا. وصلة القديمة من غيرها = صاحبه
+   */
+  job?: string;
 }
 
 interface AuthContextValue {

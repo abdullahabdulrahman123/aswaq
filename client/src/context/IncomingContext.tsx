@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useLocation } from 'react-router-dom';
 import { io, type Socket } from 'socket.io-client';
 import { aswaqApiConfigured, aswaqApiOrigin, fetchIncoming, type Order } from '../lib/aswaqApi';
+import { isOpenState } from '../lib/orderFlow';
 import { useAuth } from './AuthContext';
 
 /**
@@ -97,6 +98,11 @@ export function IncomingProvider({ children }: { children: ReactNode }) {
       if (order.from.acc !== accountId) return;
       setOrders((prev) => [order, ...(prev ?? []).filter((o) => o.id !== order.id)]);
       if (!own && !onIncomingPage(here.current)) setToast(order);
+    });
+    // اتنقل مرحلة («إتمام» من أي جهاز): المكتمل بيخرج من «مهامي»
+    socket.on('order:state', ({ order }: { order: Order }) => {
+      if (order.from.acc !== accountId) return;
+      setOrders((prev) => (prev ? (isOpenState(order.state) ? prev.map((o) => (o.id === order.id ? order : o)) : prev.filter((o) => o.id !== order.id)) : prev));
     });
     return () => {
       socket.disconnect();

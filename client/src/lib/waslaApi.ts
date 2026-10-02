@@ -250,6 +250,49 @@ function vehicleBody({ plateNumber, maxWeightKg, maxVolumeM3, startCost, costPer
   return JSON.stringify({ plateNumber, maxWeightKg, maxVolumeM3, startCost, costPerKm, homePremisesId });
 }
 
+/** موظف في النشاط (مكالمة ١ أكتوبر) — owner = صاحب النشاط */
+export interface Employee {
+  accountId: string;
+  name: string;
+  picture: string | null;
+  job: string;
+  owner: boolean;
+}
+
+/** مستخدم لقيناه في البحث — الاسم والصورة بس */
+export interface UserMatch {
+  accountId: string;
+  name: string;
+  picture: string | null;
+}
+
+export async function fetchEmployees(token: string, accountId: string): Promise<Employee[]> {
+  const { employees } = await request<{ employees: Employee[] }>(`${businessPath(accountId)}/employees`, token);
+  return employees;
+}
+
+/** بالاسم (٣ حروف على الأقل) أو الإيميل أو الرقم كامل — لصاحب النشاط بس (403 لغيره) */
+export async function searchUsers(token: string, accountId: string, q: string): Promise<UserMatch[]> {
+  const { users } = await request<{ users: UserMatch[] }>(`${businessPath(accountId)}/employees/search?q=${encodeURIComponent(q)}`, token);
+  return users;
+}
+
+/** 409 = موظف بالفعل. بيرجّع الليستة كلها بعد الإضافة */
+export async function postEmployee(token: string, accountId: string, employeeId: string, job: string): Promise<Employee[]> {
+  const { employees } = await request<{ employees: Employee[] }>(`${businessPath(accountId)}/employees`, token, {
+    method: 'POST',
+    body: JSON.stringify({ accountId: employeeId, job }),
+  });
+  return employees;
+}
+
+export async function deleteEmployee(token: string, accountId: string, employeeId: string): Promise<Employee[]> {
+  const { employees } = await request<{ employees: Employee[] }>(`${businessPath(accountId)}/employees/${encodeURIComponent(employeeId)}`, token, {
+    method: 'DELETE',
+  });
+  return employees;
+}
+
 /** المركبة وحسابها الفرعي بيتعملوا مع بعض. 400 = الجراج مش من مقرات النشاط */
 export async function postVehicle(token: string, accountId: string, vehicle: Vehicle): Promise<Vehicle> {
   const { vehicle: saved } = await request<{ vehicle: Vehicle }>(`${businessPath(accountId)}/vehicles`, token, {

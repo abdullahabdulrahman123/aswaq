@@ -292,12 +292,17 @@ export interface Order {
   id: string;
   /** رقم الفاتورة — null في المسودة */
   number: number | null;
-  state: 'draft' | 'order' | string;
+  /** draft | order | done — lib/orderFlow */
+  state: 'draft' | 'order' | 'done' | string;
   /** me:<shopId> أو <saleId>:<shopId> — نفس مفتاح الأوردر على الجهاز */
   ref: string;
   createdAt: string;
   updatedAt: string;
   checkedOutAt: string | null;
+  /** ساعة «إتمام» */
+  completedAt?: string | null;
+  /** onsite = «مبيعات» (الشباك)، online = المعرض */
+  source?: 'onsite' | 'online' | null;
   creator: { acc: string; name: string };
   /** آخر واحد عدّل الأوردر */
   editor?: { acc: string; name: string } | null;
@@ -387,6 +392,12 @@ export async function fetchOrder(token: string, orderId: string): Promise<Order>
 }
 
 /** 422 = فيه وحدة من غير سعر، 409 = اتأكد قبل كده */
+/** المرحلة اللي بعدها («إتمام») — للنشاط البائع. 409 = اتنقل من مكان تاني */
+export async function advanceOrder(token: string, orderId: string): Promise<Order> {
+  const { order } = await request<{ order: Order }>(`/api/orders/${encodeURIComponent(orderId)}/advance`, token, { method: 'POST' });
+  return order;
+}
+
 export async function checkoutOrder(token: string, orderId: string): Promise<Order> {
   const { order } = await request<{ order: Order }>(`/api/orders/${encodeURIComponent(orderId)}/checkout`, token, {
     method: 'POST',

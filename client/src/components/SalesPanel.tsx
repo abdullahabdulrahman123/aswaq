@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { lastSalesShop, rememberSalesShop, useSales } from '../context/SalesContext';
+import { useAuth, type Business } from '../context/AuthContext';
+import { buyerLabel, lastSalesShop, rememberSalesShop, useSales, type SalesSession } from '../context/SalesContext';
+import { useStoreCart } from '../context/StoreCartContext';
 import type { ReceivingMethod } from '../lib/itemUnits';
 import { latinDigits } from '../lib/quantity';
 import { ApiError, searchCustomers, type Customer } from '../lib/waslaApi';
 import { Avatar, personInitial } from './Avatar';
-import { DialogCloseButton, useBackdropClose } from './DialogClose';
 import { Notch, fieldClass } from './OutlinedField';
 
 const METHODS: { key: ReceivingMethod; label: string }[] = [
@@ -38,29 +38,87 @@ function CustomerAvatar({ customer, size }: { customer: Customer; size: number }
 }
 
 /**
- * نافذة «مبيعات» بطلب العميل — رأس الفاتورة، قبل المعرض:
- *   - المتجر اللي البائع بيبيع منه — عميل الشباك بيشتري من متجر واحد، فالنافذة
- *     بتفتح على آخر متجر اتباع منه، و«ابدأ البيع» بيدخل على أصنافه على طول
+ * «مبيعات» على صفحة أصناف المتجر نفسها، بطلب العميل (مكالمة ١ أكتوبر) — كانت
+ * نافذة لوحدها. جزء بيتفتح ويتقفل (أكورديون) فوق الأصناف:
+ *   - مفتوح: رأس الفاتورة (SalesForm). في بيعة جديدة الأصناف مستخبية لحد «ابدأ
+ *     البيع» — من غير مشتري مفيش أسعار، والصنف كان هيروح سلة البائع نفسه
+ *   - مقفول (البيعة شغالة): اسم العميل والاستلام، وجنبهم زرارين الفاتورة —
+ *     «تأكيد» و«طباعة» — عشان البائع ميلفّش على صفحة الفاتورة
+ *
+ * «تأكيد» و«طباعة» بيفتحوا الفاتورة وهي بتأكد أو بتطبع لوحدها (InvoicePage):
+ * المسودة لازم تتبعت كاملة للسيرفر الأول، والفاتورة المؤكدة بتفتح بمرحلتها.
+ */
+export function SalesPanel({ storeId, businessId }: { storeId: string; businessId: string }) {
+  const { dialog, session, openDialog } = useSales();
+  const { businesses } = useAuth();
+  const { linesOf } = useStoreCart();
+  const navigate = useNavigate();
+
+  if (dialog && dialog.business.accountId === businessId) {
+    return (
+      <section aria-label="مبيعات" data-expanded="true" className="mt-3 rounded-2xl border border-brand-300 bg-white dark:border-brand-500/40 dark:bg-surface-card sm:max-w-xl">
+        <SalesForm key={`${dialog.editing?.id ?? 'new'}-${storeId}`} business={dialog.business} editing={dialog.editing} currentShopId={storeId} />
+      </section>
+    );
+  }
+  if (!session || session.accountId !== businessId) return null;
+
+  const business = businesses.find((b) => b.accountId === session.accountId);
+  const empty = linesOf(storeId).length === 0;
+  const go = (then: 'confirm' | 'print') => navigate(`/orders/${storeId}`, { state: { then } });
+
+  return (
+    <section aria-label="مبيعات" data-expanded="false" className="mt-3 flex items-center gap-2 rounded-2xl border border-brand-300 bg-brand-50/60 p-1.5 dark:border-brand-500/40 dark:bg-brand-500/10 sm:max-w-xl">
+      <button
+        type="button"
+        aria-expanded={false}
+        aria-label={`بيانات البيعة: ${buyerLabel(session)} — فتح`}
+        onClick={() => business && openDialog(business, session)}
+        className="flex min-w-0 flex-1 items-center gap-1.5 rounded-xl px-2 py-1 text-start transition hover:bg-brand-100/70 dark:hover:bg-brand-500/15"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-bold leading-tight">{buyerLabel(session)}</span>
+          <span className="block truncate text-[11px] leading-tight text-stone-500 dark:text-stone-400">
+            {session.method === 'delivery' ? `توصيل — ${session.address}` : 'استلام من المتجر'}
+          </span>
+        </span>
+        <Chevron />
+      </button>
+      <button type="button" onClick={() => go('confirm')} disabled={empty} className="shrink-0 rounded-xl bg-accent-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-700 disabled:opacity-50">
+        تأكيد
+      </button>
+      <button type="button" onClick={() => go('print')} disabled={empty} className="shrink-0 rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-semibold transition hover:border-stone-400 disabled:opacity-50 dark:border-white/15 dark:bg-transparent">
+        طباعة
+      </button>
+    </section>
+  );
+}
+
+function Chevron({ up = false }: { up?: boolean }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-stone-500" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d={up ? 'm6 15 6-6 6 6' : 'm6 9 6 6 6-6'} />
+    </svg>
+  );
+}
+
+/**
+ * رأس الفاتورة — نفس اللي كان في نافذة «مبيعات»:
+ *   - المتجر اللي البائع بيبيع منه — بيبدأ بالمتجر اللي الصفحة عليه، أو آخر متجر
+ *     اتباع منه، و«ابدأ البيع» بيدخل على أصنافه
  *   - العميل: حساب في وصلة. أوله حسابين لغير المسجلين (مستخدم = قطاعي المحل،
  *     شركة = جملة المحل)، والمسجّل بيتلاقي بإيميله أو رقمه كامل — مش بحث جزئي،
  *     عشان محدش يتصفّح أسامي الناس — وبيظهر بصورته
  *   - البائع: دلوقتي اللي فاتح بس
  *   - الاسم الأدبي والموبايل، واستلام ولا توصيل — والتوصيل عنوان كتابة
- *
- * من اسم المشتري في الناڤبار نفس النافذة بتعدّل البيعة الشغالة.
  */
-export function SalesDialog() {
-  const { dialog, closeDialog, start, update } = useSales();
+function SalesForm({ business, editing, currentShopId }: { business: Business; editing: SalesSession | null; currentShopId: string }) {
+  const { closeDialog, start, update } = useSales();
   const { user, withToken } = useAuth();
   const navigate = useNavigate();
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const backdropClose = useBackdropClose();
   const searchRef = useRef<HTMLInputElement>(null);
-  const business = dialog?.business ?? null;
-  const editing = dialog?.editing ?? null;
-  const open = dialog !== null;
   const sellerName = user?.name ?? user?.email ?? 'أنا';
-  const stores = business?.premises.filter((p) => p.isStore) ?? [];
+  const stores = business.premises.filter((p) => p.isStore);
 
   /** null = لسه بنجيب */
   const [walkIn, setWalkIn] = useState<Customer[] | null>(null);
@@ -77,24 +135,16 @@ export function SalesDialog() {
   const [shopId, setShopId] = useState('');
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    const d = dialogRef.current;
-    if (!d) return;
-    if (open && !d.open) d.showModal();
-    if (!open && d.open) d.close();
-  }, [open]);
-
   // كل فتحة: البيعة اللي بتتعدّل، وإلا فورم فاضي على «مستخدم غير مسجل»
   useEffect(() => {
-    if (!dialog) return;
     setBuyer(editing?.buyer ?? null);
     setName(editing?.buyerName ?? '');
     setPhone(editing?.phone ?? '');
     setMethod(editing?.method ?? 'pickup');
     setAddress(editing?.address ?? '');
-    const remembered = business ? lastSalesShop(business.accountId) : null;
     const choices = stores.map((p) => p.id);
-    setShopId([editing?.shopId, remembered].find((id) => id && choices.includes(id)) ?? choices[0] ?? '');
+    // الصفحة دايماً على متجر من متاجر النشاط (FollowSalesPanel) — هو اللي البائع واقف فيه
+    setShopId([currentShopId, editing?.shopId, lastSalesShop(business.accountId)].find((id) => id && choices.includes(id)) ?? choices[0] ?? '');
     setPickerOpen(false);
     setSearch('');
     setMatches(null);
@@ -118,7 +168,7 @@ export function SalesDialog() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dialog]);
+  }, []);
 
   useEffect(() => {
     if (pickerOpen) searchRef.current?.focus();
@@ -164,7 +214,7 @@ export function SalesDialog() {
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!business || !buyer) return;
+    if (!buyer) return;
     const cleanedPhone = cleanPhone(phone);
     if (!/^\+?\d{0,15}$/.test(cleanedPhone)) {
       setError('رقم الموبايل أرقام بس.');
@@ -188,36 +238,28 @@ export function SalesDialog() {
       shopId: shopId || undefined,
     };
     if (shopId) rememberSalesShop(business.accountId, shopId);
-    const moved = shopId && shopId !== editing?.shopId;
     if (editing) update(draft);
     else start(draft);
     closeDialog();
-    // على أصناف المتجر على طول — من غير صفحة المتاجر
-    if (!editing || moved) navigate(shopId ? `/store/${shopId}` : '/');
+    // على أصناف المتجر اللي اتختار — الأكورديون بيتقفل والأصناف تحته
+    if (shopId && shopId !== currentShopId) navigate(`/store/${shopId}`);
   }
 
   const optionClass =
     'flex w-full items-center gap-2.5 px-3 py-2.5 text-start text-sm transition hover:bg-stone-50 dark:hover:bg-white/5';
 
   return (
-    <dialog
-      ref={dialogRef}
-      {...backdropClose}
-      onClose={closeDialog}
-      aria-label="مبيعات"
-      // العرض في style مش كلاس — نفس سبب باقي النوافذ
-      style={{ width: 'min(30rem, 92vw)' }}
-      className="rounded-2xl bg-white p-0 text-stone-900 shadow-card backdrop:bg-black/50 dark:bg-surface-card dark:text-stone-100"
-    >
-      {business && (
-        <form onSubmit={handleSubmit} className="p-5 sm:p-6">
-          {dialog?.notice && (
-            <p role="status" className="mb-4 me-6 rounded-lg bg-accent-50 px-3 py-2.5 text-sm font-medium text-accent-700 dark:bg-accent-500/10 dark:text-accent-300">
-              {dialog.notice}
-            </p>
-          )}
-          <h2 className="font-display text-xl font-bold">مبيعات</h2>
-          <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">{business.name}</p>
+    <form onSubmit={handleSubmit} className="p-4 sm:p-5">
+          <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <h2 className="font-display text-lg font-bold">مبيعات</h2>
+              <p className="text-sm text-stone-500 dark:text-stone-400">{business.name}</p>
+            </div>
+            {/* بيقفل الأكورديون — زي «إلغاء» */}
+            <button type="button" aria-expanded={true} aria-label="اقفل بيانات البيعة" onClick={closeDialog} className="grid h-8 w-8 shrink-0 place-items-center rounded-full transition hover:bg-stone-100 dark:hover:bg-white/10">
+              <Chevron up />
+            </button>
+          </div>
 
           <div className="mt-6 space-y-5">
             {stores.length > 0 && (
@@ -402,9 +444,6 @@ export function SalesDialog() {
               إلغاء
             </button>
           </div>
-        </form>
-      )}
-      <DialogCloseButton />
-    </dialog>
+    </form>
   );
 }

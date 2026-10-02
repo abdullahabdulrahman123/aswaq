@@ -5,7 +5,8 @@ import type { Customer } from '../lib/waslaApi';
 
 /**
  * «مبيعات» بطلب العميل: فاتورة بيحررها البائع لمشتري، على نفس المعرض. البيعة
- * بتبدأ من نافذة «مبيعات» في المنيو، وبعدها:
+ * بتبدأ من «مبيعات» في المنيو — رأس الفاتورة بيتفتح فوق أصناف المتجر نفسه
+ * (SalesPanel، مكالمة ١ أكتوبر)، وبعدها:
  *   - بتفتح على المتجر اللي البائع بيبيع منه (بيختاره في النافذة)، والرئيسية
  *     بتعرض متاجر النشاط البائع بس
  *   - الأسعار أسعار المحل حسب المشتري: شركة = جملة، مستخدم = قطاعي
@@ -68,15 +69,13 @@ interface Sales {
   leave: () => void;
   /** يمسح بيعة وسلتها */
   drop: (id: string) => void;
-  /** نافذة «مبيعات» — لنشاط، ومعاها البيعة اللي بتتعدّل لو فيه، ورسالة فوقها (اتأكدت فاتورة كذا) */
-  dialog: { business: Business; editing: SalesSession | null; notice?: string } | null;
+  /**
+   * رأس الفاتورة مفتوح (الأكورديون في صفحة المتجر) — لنشاط، ومعاه البيعة اللي
+   * بتتعدّل لو فيه. FollowSalesPanel بيودّي على متجر النشاط لو الصفحة مش عليه.
+   */
+  dialog: { business: Business; editing: SalesSession | null } | null;
   openDialog: (business: Business, editing?: SalesSession | null) => void;
   closeDialog: () => void;
-  /**
-   * فاتورة جديدة بعد ما دي اتأكدت — «تأكيد وجديد»، بطلب العميل: اللي بيحرر فواتير
-   * ورا بعض مبيلفّش على المنيو. بيخرج من البيعة ويفتح النافذة فاضية لنفس النشاط.
-   */
-  next: (notice?: string) => void;
 }
 
 const KEY = 'aswaq_sales_sessions';
@@ -118,7 +117,7 @@ function readSessions(): SalesSession[] {
 const SalesContext = createContext<Sales | null>(null);
 
 export function SalesProvider({ children }: { children: ReactNode }) {
-  const { user, businesses } = useAuth();
+  const { user } = useAuth();
   const [sessions, setSessions] = useState<SalesSession[]>(readSessions);
   const [activeId, setActiveId] = useState<string | null>(() => read<string | null>(ACTIVE_KEY, null));
   const [dialog, setDialog] = useState<Sales['dialog']>(null);
@@ -169,13 +168,8 @@ export function SalesProvider({ children }: { children: ReactNode }) {
       dialog,
       openDialog: (business, editing = null) => setDialog({ business, editing }),
       closeDialog: () => setDialog(null),
-      next: (notice) => {
-        const business = session && businesses.find((b) => b.accountId === session.accountId);
-        setActiveId(null);
-        if (business) setDialog({ business, editing: null, notice });
-      },
     }),
-    [session, sessions, start, update, drop, dialog, businesses],
+    [session, sessions, start, update, drop, dialog],
   );
 
   return <SalesContext.Provider value={value}>{children}</SalesContext.Provider>;

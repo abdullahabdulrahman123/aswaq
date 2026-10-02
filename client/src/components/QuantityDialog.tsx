@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { egp } from '../data/catalog';
-import { MAX_QTY, clampQty, moneyInput, qtyInput, toPiastres, toPounds } from '../lib/quantity';
+import { MAX_QTY, clampQtyOrZero, moneyInput, qtyInput, toPiastres, toPounds } from '../lib/quantity';
 import { DialogCloseButton, useBackdropClose } from './DialogClose';
 import { Notch, compactFieldClass } from './OutlinedField';
 
@@ -14,6 +14,9 @@ import { Notch, compactFieldClass } from './OutlinedField';
  *   - في «مبيعات» (editPrice) خانة السعر مكتوب فيها سعر الوحدة والبائع يقدر
  *     يغيّره — مؤقتاً، المصنع بيبيع لكل عميل بسعر حسب الكمية. السعر زي سعر
  *     المتجر = مفيش سعر خاص.
+ *
+ * مكالمة ١ أكتوبر: الصفر مسموح — صفر و«تم» بيشيل الصنف (كان بيرجع ١ ومحدش
+ * يعرف يتراجع عن صنف). (−) بينزل لحد الصفر.
  */
 export function QuantityDialog({
   open,
@@ -36,7 +39,7 @@ export function QuantityDialog({
   /** السعر اللي البائع كتبه قبل كده على السطر */
   initialPrice?: number;
   editPrice?: boolean;
-  /** price: اللي البائع كتبه لو غير سعر المتجر */
+  /** price: اللي البائع كتبه لو غير سعر المتجر. qty صفر = يتشال */
   onDone: (qty: number, price?: number) => void;
   onClose: () => void;
 }) {
@@ -64,7 +67,7 @@ export function QuantityDialog({
   }, [open]);
 
   const qty = Number(text) || 0;
-  const step = (n: number) => setText(String(clampQty(n)));
+  const step = (n: number) => setText(String(clampQtyOrZero(n)));
   const typedPrice = editPrice ? toPiastres(priceText) : null;
   const price = typedPrice ?? initialPrice ?? unitPrice;
 
@@ -84,7 +87,7 @@ export function QuantityDialog({
           className="p-3"
           onSubmit={(e) => {
             e.preventDefault();
-            onDone(clampQty(qty), editPrice && price !== unitPrice ? price : undefined);
+            onDone(clampQtyOrZero(qty), editPrice && price !== unitPrice ? price : undefined);
           }}
         >
           <h2 className="truncate pe-8 text-sm font-bold leading-snug">
@@ -108,10 +111,10 @@ export function QuantityDialog({
               onChange={(e) => setText(qtyInput(e.target.value))}
               onFocus={(e) => e.currentTarget.select()}
               onClick={(e) => e.currentTarget.select()}
-              onBlur={() => setText(String(clampQty(qty)))}
+              onBlur={() => setText(String(clampQtyOrZero(qty)))}
               className="h-10 w-14 shrink-0 rounded-xl border border-brand-500 bg-transparent px-1 text-center text-base font-bold tabular-nums outline-none ring-1 ring-inset ring-brand-500"
             />
-            <button type="button" aria-label="قلّل" onClick={() => step(qty - 1)} disabled={qty <= 1} className={stepClass}>
+            <button type="button" aria-label="قلّل" onClick={() => step(qty - 1)} disabled={qty <= 0} className={stepClass}>
               −
             </button>
 
@@ -139,7 +142,7 @@ export function QuantityDialog({
           </div>
 
           <p className="mt-2 text-center text-xs text-stone-500 dark:text-stone-400">
-            الإجمالي <span className="font-bold tabular-nums text-stone-800 dark:text-stone-100">{egp(price * clampQty(qty))}</span>
+            الإجمالي <span className="font-bold tabular-nums text-stone-800 dark:text-stone-100">{egp(price * clampQtyOrZero(qty))}</span>
             {/* غير «التسعير» اللي بيغيّر سعر المتجر لكل العملاء (٣٠ سبتمبر) */}
             {editPrice && <span className="ms-1.5">· السعر ده للفاتورة دي بس</span>}
           </p>
