@@ -7,6 +7,7 @@ import { errorHandler } from './middleware/errorHandler.js';
 import businessRoutes from './routes/business.routes.js';
 import showroomRoutes from './routes/showroom.routes.js';
 import orderRoutes from './routes/order.routes.js';
+import * as settingsController from './controllers/settings.controller.js';
 
 export function createApp() {
   const app = express();
@@ -21,6 +22,7 @@ export function createApp() {
   app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
   app.use('/api/businesses', requireWaslaUser, businessRoutes);
   app.use('/api/orders', requireWaslaUser, orderRoutes);
+  app.get('/api/permissions', requireWaslaUser, settingsController.permissions);
   // من غير توكن: الزائر بيشوف المعرض كمان
   app.use('/api/showroom', showroomRoutes);
 

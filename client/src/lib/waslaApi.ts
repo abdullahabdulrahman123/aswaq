@@ -257,6 +257,8 @@ export interface Employee {
   picture: string | null;
   job: string;
   owner: boolean;
+  /** الصلاحيات المفتوحة له (مكالمة ٢ أكتوبر) — صاحب النشاط فاضية: معاه كله */
+  permissions: string[];
 }
 
 /** مستخدم لقيناه في البحث — الاسم والصورة بس */
@@ -278,10 +280,19 @@ export async function searchUsers(token: string, accountId: string, q: string): 
 }
 
 /** 409 = موظف بالفعل. بيرجّع الليستة كلها بعد الإضافة */
-export async function postEmployee(token: string, accountId: string, employeeId: string, job: string): Promise<Employee[]> {
+export async function postEmployee(token: string, accountId: string, employeeId: string, job: string, permissions: string[]): Promise<Employee[]> {
   const { employees } = await request<{ employees: Employee[] }>(`${businessPath(accountId)}/employees`, token, {
     method: 'POST',
-    body: JSON.stringify({ accountId: employeeId, job }),
+    body: JSON.stringify({ accountId: employeeId, job, permissions }),
+  });
+  return employees;
+}
+
+/** صلاحيات موظف — الليستة كلها بتحل محل القديمة. لصاحب النشاط بس */
+export async function putEmployeePermissions(token: string, accountId: string, employeeId: string, permissions: string[]): Promise<Employee[]> {
+  const { employees } = await request<{ employees: Employee[] }>(`${businessPath(accountId)}/employees/${encodeURIComponent(employeeId)}/permissions`, token, {
+    method: 'PUT',
+    body: JSON.stringify({ permissions }),
   });
   return employees;
 }

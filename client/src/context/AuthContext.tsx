@@ -134,6 +134,8 @@ export interface Business {
    * وهكذا. وصلة القديمة من غيرها = صاحبه
    */
   job?: string;
+  /** الصلاحيات المفتوحة له (مكالمة ٢ أكتوبر) — صاحبه معاه كله (lib/permissions) */
+  permissions?: string[];
 }
 
 interface AuthContextValue {

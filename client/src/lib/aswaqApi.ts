@@ -292,8 +292,12 @@ export interface Order {
   id: string;
   /** رقم الفاتورة — null في المسودة */
   number: number | null;
-  /** draft | order | done — lib/orderFlow */
+  /** draft | order | [مراحل النشاط] | done — lib/orderFlow */
   state: 'draft' | 'order' | 'done' | string;
+  /** اسم المرحلة من السيرفر (مكالمة ٢ أكتوبر: المراحل من إعدادات النشاط البائع) */
+  stateLabel?: string;
+  /** زرار المرحلة اللي بعدها — null = آخر مرحلة */
+  nextAction?: string | null;
   /** me:<shopId> أو <saleId>:<shopId> — نفس مفتاح الأوردر على الجهاز */
   ref: string;
   createdAt: string;
@@ -370,6 +374,58 @@ export async function putLine(token: string, orderId: string, line: LineInput): 
     body: JSON.stringify(line),
   });
   return order;
+}
+
+/**
+ * صنف واحد في فاتورة اتأكدت (مكالمة ٢ أكتوبر) — للنشاط البائع بالصلاحيات. 403 =
+ * الصلاحية مش معاه، 409 = الفاتورة خلصت أو لسه مسودة.
+ */
+export async function putConfirmedLine(token: string, orderId: string, line: LineInput): Promise<Order> {
+  const { order } = await request<{ order: Order }>(`/api/orders/${encodeURIComponent(orderId)}/confirmed-lines`, token, {
+    method: 'PUT',
+    body: JSON.stringify(line),
+  });
+  return order;
+}
+
+/** مرحلة من قالب مراحل البيع — label اللي المشتري بيشوفه، وaction الزرار */
+export interface StageTemplate {
+  key: string;
+  label: string;
+  action: string;
+}
+
+export interface BusinessSettings {
+  /** المراحل اللي بين «مؤكد» و«مكتمل» بالترتيب */
+  salesStages: string[];
+}
+
+const businessSettingsPath = (accountId: string) => `/api/businesses/${encodeURIComponent(accountId)}/settings`;
+
+/** إعدادات النشاط والقالب اللي بيختار منه (مكالمة ٢ أكتوبر) */
+export function fetchSettings(token: string, accountId: string) {
+  return request<{ settings: BusinessSettings; stageTemplate: StageTemplate[] }>(businessSettingsPath(accountId), token);
+}
+
+/** لصاحب الشركة بس — 403 لغيره */
+export function saveSettings(token: string, accountId: string, settings: BusinessSettings) {
+  return request<{ settings: BusinessSettings; stageTemplate: StageTemplate[] }>(businessSettingsPath(accountId), token, {
+    method: 'PUT',
+    body: JSON.stringify(settings),
+  });
+}
+
+/** صلاحية من رصيد أسواق — categories مفاتيح أقسام (sales…) */
+export interface PermissionInfo {
+  key: string;
+  name: string;
+  categories: string[];
+  /** بتتفتح للموظف الجديد لوحدها */
+  defaultOn: boolean;
+}
+
+export function fetchPermissions(token: string) {
+  return request<{ permissions: PermissionInfo[]; categories: Record<string, string> }>('/api/permissions', token);
 }
 
 /** المتجر اللي الأوردر منه — الأوردرات الأولى كانت شايلاه في from.subAcc */

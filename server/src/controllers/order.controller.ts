@@ -1,10 +1,11 @@
 import type { Request, Response } from 'express';
-import type { Order, Prisma } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 import { currentUser, fetchWaslaStore, findManagedBusiness } from '../middleware/auth.js';
 import { isObjectId } from '../schemas/common.js';
 import { announceIncoming, announceState } from '../realtime.js';
 import { draftSchema, lineSchema } from '../schemas/order.schema.js';
-import { nextState } from '../services/orderFlow.js';
+import { flowOf, nextIn, salesStagesOf, viewOf, withFlow } from '../services/orderFlow.js';
+import { PERMISSIONS, can } from '../services/permissions.js';
 import {
   advanceState,
   buildDetails,
@@ -17,15 +18,19 @@ import {
   listMine,
   nextNumber,
   priceFieldFor,
+  replaceConfirmedDetails,
   replaceDetails,
   saveDraft,
   storeItems,
   totalsOf,
+  withConfirmedLine,
   withLine,
 } from '../services/order.service.js';
 
-/** الأوردر زي ما هو — كل حقول السكيمة، مفيش حاجة سرية على المحرّر نفسه */
-const toOrderView = (order: Order) => order;
+/*
+ * الأوردر زي ما هو — كل حقول السكيمة، مفيش حاجة سرية على المحرّر نفسه — ومعاه
+ * اسم مرحلته وزرار اللي بعدها حسب مراحل النشاط البائع (viewOf / withFlow).
+ */
 
 /**
  * PUT /api/orders/draft — المسودة كلها: الهيدر والسطور. بطلب العميل السلة
@@ -64,11 +69,15 @@ export async function putDraft(req: Request, res: Response) {
   let buyerName: string;
   let buyerPhone = '';
   let seller = { acc: me.accountId, name: me.name };
+  /** «مبيعات»: السعر اللي البائع كتبه بيتاخد لو معاه الصلاحية — من غيرها سعر المتجر */
+  let pricedBySeller = false;
   if (input.sale) {
-    if (input.sale.accountId !== store.business.accountId || !(await findManagedBusiness(req, store.business.accountId))) {
+    const selling = input.sale.accountId === store.business.accountId ? await findManagedBusiness(req, store.business.accountId) : undefined;
+    if (!selling) {
       res.status(404).json({ message: 'Store not found in this business' });
       return;
     }
+    pricedBySeller = can(selling, PERMISSIONS.invoicePrice);
     to = input.sale.buyer.accountId;
     buyerKind = input.sale.buyer.kind;
     buyerName = input.sale.buyerName || input.sale.buyer.name;
@@ -86,8 +95,8 @@ export async function putDraft(req: Request, res: Response) {
   }
 
   const method = input.sale?.method ?? input.method;
-  // السعر اللي في السطر بيتاخد في «مبيعات» بس — البائع اتأكد فوق إنه بيدير النشاط
-  const details = buildDetails(await storeItems(input.shopId), input.lines, priceFieldFor(Boolean(input.sale), buyerKind), Boolean(input.sale));
+  // السعر اللي في السطر بيتاخد في «مبيعات» بس، وبصلاحية «تغيير سعر صنف في فاتورة البيع» (٢ أكتوبر)
+  const details = buildDetails(await storeItems(input.shopId), input.lines, priceFieldFor(Boolean(input.sale), buyerKind), pricedBySeller);
   if (typeof details === 'string') {
     res.status(400).json({ message: details });
     return;
@@ -117,7 +126,7 @@ export async function putDraft(req: Request, res: Response) {
     res.status(409).json({ message: 'Order already checked out' });
     return;
   }
-  res.json({ order: toOrderView(order) });
+  res.json({ order: await viewOf(order) });
 }
 
 /** كام مرة الصنف بيحاول تاني لو صنف تاني اتحفظ في نفس اللحظة */
@@ -139,7 +148,7 @@ export async function putLine(req: Request, res: Response) {
     return;
   }
   const me = await currentUser(req);
-  /** سعر البائع: في مسودة «مبيعات» بس، ولسه بيدير النشاط البائع */
+  /** سعر البائع: في مسودة «مبيعات» بس، ولسه بيدير النشاط البائع ومعاه الصلاحية */
   let pricedBySeller: boolean | null = null;
 
   for (let attempt = 0; attempt < LINE_RETRIES; attempt++) {
@@ -156,7 +165,7 @@ export async function putLine(req: Request, res: Response) {
     const shopId = order.shopId ?? order.from.subAcc ?? '';
     const field = priceFieldFor(Boolean(order.sale), order.names.buyerKind as 'user' | 'business');
     if (pricedBySeller === null) {
-      pricedBySeller = parsed.data.price !== undefined && order.sale != null && Boolean(await findManagedBusiness(req, order.from.acc));
+      pricedBySeller = parsed.data.price !== undefined && order.sale != null && can(await findManagedBusiness(req, order.from.acc), PERMISSIONS.invoicePrice);
     }
     const details = withLine(order.details, await storeItems(shopId), parsed.data, field, pricedBySeller);
     if (typeof details === 'string') {
@@ -169,7 +178,72 @@ export async function putLine(req: Request, res: Response) {
       return;
     }
     if (await replaceDetails(order, details, { acc: me.accountId, name: me.name })) {
-      res.json({ order: toOrderView((await findMine(me.accountId, id))!) });
+      res.json({ order: await viewOf((await findMine(me.accountId, id))!) });
+      return;
+    }
+  }
+  res.status(409).json({ message: 'Order changed while saving, try again' });
+}
+
+/**
+ * PUT /api/orders/:orderId/confirmed-lines — صنف واحد في فاتورة اتأكدت ولسه
+ * مخلصتش، بطلب العميل (مكالمة ٢ أكتوبر): بالصلاحيات، للنشاط البائع.
+ *   - كمية صنف موجود (أو شيله بصفر): «تغيير كمية صنف في فاتورة البيع»
+ *   - صنف مكانش فيها: «إضافة صنف مش موجود في فاتورة البيع»
+ *   - سعر غير اللي اتباع بيه: «تغيير سعر صنف في فاتورة البيع»
+ * 403 = الصلاحية مش معاه (والرد فيه اسمها)، و409 = المسودة لسه متأكدتش أو
+ * الفاتورة خلصت. مسار لوحده عن /lines بتاع المسودة: حفظ متأخر من سلة المسودة
+ * ميعدّلش فاتورة اتأكدت أبداً.
+ */
+export async function putConfirmedLine(req: Request, res: Response) {
+  const id = String(req.params.orderId);
+  const parsed = lineSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ message: 'Invalid input', issues: parsed.error.issues });
+    return;
+  }
+  const line = parsed.data;
+  const me = await currentUser(req);
+
+  for (let attempt = 0; attempt < LINE_RETRIES; attempt++) {
+    const order = isObjectId(id) ? await findById(id) : null;
+    const seller = order && order.state !== 'draft' ? await findManagedBusiness(req, order.from.acc) : undefined;
+    if (!order || !seller) {
+      res.status(order?.state === 'draft' ? 409 : 404).json({ message: order?.state === 'draft' ? 'Order is not confirmed yet' : 'Order not found' });
+      return;
+    }
+    if (order.state === 'done') {
+      res.status(409).json({ message: 'Order is already completed' });
+      return;
+    }
+
+    const current = order.details.find((d) => d.itemId === line.itemId && d.unit === line.unitName);
+    const needed = [
+      current ? (line.quantity !== current.quantity ? PERMISSIONS.invoiceQuantity : null) : line.quantity > 0 ? PERMISSIONS.invoiceAddItem : null,
+      line.price !== undefined && line.price !== (current?.price ?? null) && (current || line.quantity > 0) ? PERMISSIONS.invoicePrice : null,
+    ].filter((k): k is NonNullable<typeof k> => k !== null);
+    const missing = needed.find((key) => !can(seller, key));
+    if (missing) {
+      res.status(403).json({ message: 'Permission required', permission: missing });
+      return;
+    }
+
+    const shopId = order.shopId ?? order.from.subAcc ?? '';
+    const field = priceFieldFor(Boolean(order.sale), order.names.buyerKind as 'user' | 'business');
+    const details = withConfirmedLine(order.details, await storeItems(shopId), line, field, line.price);
+    if (typeof details === 'string') {
+      res.status(400).json({ message: details });
+      return;
+    }
+    if (details.length === 0) {
+      res.status(422).json({ message: 'A confirmed invoice keeps at least one item' });
+      return;
+    }
+    if (await replaceConfirmedDetails(order, details, { acc: me.accountId, name: me.name })) {
+      const view = await viewOf((await findById(id))!);
+      // «مهامي» عند الباقيين بالإجمالي الجديد
+      await announceState(view).catch(() => undefined);
+      res.json({ order: view });
       return;
     }
   }
@@ -178,7 +252,7 @@ export async function putLine(req: Request, res: Response) {
 
 export async function list(req: Request, res: Response) {
   const me = await currentUser(req);
-  res.json({ orders: (await listMine(me.accountId)).map(toOrderView) });
+  res.json({ orders: await withFlow(await listMine(me.accountId)) });
 }
 
 /**
@@ -197,7 +271,7 @@ export async function get(req: Request, res: Response) {
     res.status(404).json({ message: 'Order not found' });
     return;
   }
-  res.json({ order: toOrderView(order) });
+  res.json({ order: await viewOf(order) });
 }
 
 /** POST /api/orders/:orderId/checkout — المسودة بتبقى أوردر برقم فاتورة من عدّاد النشاط البائع */
@@ -217,17 +291,17 @@ export async function checkout(req: Request, res: Response) {
     res.status(422).json({ message: 'Some units have no price yet' });
     return;
   }
-  const done = await checkOut(order.id, await nextNumber(order.from.acc));
+  const done = await viewOf(await checkOut(order.id, await nextNumber(order.from.acc)));
   // «الطلبات الواردة» عند النشاط البائع — لحظة بلحظة
   await announceIncoming(done).catch(() => undefined);
-  res.json({ order: toOrderView(done) });
+  res.json({ order: done });
 }
 
 /**
  * POST /api/orders/:orderId/advance — المرحلة اللي بعدها، بطلب العميل (١ أكتوبر):
- * مؤكد ← مكتمل («إتمام»). للنشاط البائع بس — المشتري مبيقفلش طلب البائع.
- * المسودة بتتأكد بـcheckout مش من هنا (رقم الفاتورة). 409 = اتنقل من مكان تاني
- * أو آخر مرحلة.
+ * مؤكد ← [مراحل النشاط من إعداداته، ٢ أكتوبر] ← مكتمل («إتمام»). للنشاط البائع
+ * بس — المشتري مبيقفلش طلب البائع. المسودة بتتأكد بـcheckout مش من هنا (رقم
+ * الفاتورة). 409 = اتنقل من مكان تاني أو آخر مرحلة.
  */
 export async function advance(req: Request, res: Response) {
   const id = String(req.params.orderId);
@@ -236,15 +310,16 @@ export async function advance(req: Request, res: Response) {
     res.status(404).json({ message: 'Order not found' });
     return;
   }
-  const to = nextState(order.state);
-  const done = to ? await advanceState(order, to) : null;
-  if (!done) {
+  const to = nextIn(flowOf(await salesStagesOf(order.from.acc)), order.state);
+  const moved = to ? await advanceState(order, to) : null;
+  if (!moved) {
     res.status(409).json({ message: 'Order already moved on' });
     return;
   }
+  const view = await viewOf(moved);
   // «مهامي» عند الباقيين بتتحدّث — المكتمل بيخرج منها
-  await announceState(done).catch(() => undefined);
-  res.json({ order: toOrderView(done) });
+  await announceState(view).catch(() => undefined);
+  res.json({ order: view });
 }
 
 /**
@@ -254,5 +329,5 @@ export async function advance(req: Request, res: Response) {
  * مش هنا — دي للتسويق وليها تقارير لوحدها.
  */
 export async function incoming(req: Request, res: Response) {
-  res.json({ orders: (await listIncoming(req.business!.accountId)).map(toOrderView) });
+  res.json({ orders: await withFlow(await listIncoming(req.business!.accountId)) });
 }

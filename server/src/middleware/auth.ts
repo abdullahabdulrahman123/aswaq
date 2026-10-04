@@ -12,6 +12,10 @@ export interface WaslaBusiness {
    * بتيجي بـaddresses بدلها — ساعتها بنسأل وصلة من جديد.
    */
   premises?: { id: string; isStore: boolean }[];
+  /** وظيفة المستخدم في النشاط (مكالمة ١ أكتوبر) — owner لصاحبه */
+  job?: string;
+  /** الصلاحيات المفتوحة له (مكالمة ٢ أكتوبر) — صاحب الشركة معاه كله (services/permissions.ts) */
+  permissions?: string[];
 }
 
 declare global {

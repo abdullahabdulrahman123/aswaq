@@ -4,6 +4,7 @@ import { env } from './config/env.js';
 import { attachRealtime } from './realtime.js';
 import { linkStoreCopiesToSources } from './services/item.service.js';
 import { backfillOrderSources } from './services/order.service.js';
+import { syncPermissions } from './services/permissions.js';
 
 // سيرفر http واحد للـAPI والـsocket.io (الطلبات الواردة لحظة بلحظة) على نفس البورت
 const server = createServer(createApp());
@@ -16,6 +17,9 @@ linkStoreCopiesToSources()
 backfillOrderSources()
   .then((n) => n > 0 && console.log(`Set the source of ${n} older orders`))
   .catch((err) => console.error('Order source backfill failed', err));
+
+// رصيد الصلاحيات في الداتابيز زي الكود (مكالمة ٢ أكتوبر)
+syncPermissions().catch((err) => console.error('Permissions sync failed', err));
 
 server.listen(env.port, () => {
   console.log(`Aswaq API listening on http://localhost:${env.port}`);

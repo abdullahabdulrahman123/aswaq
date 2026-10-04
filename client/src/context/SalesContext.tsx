@@ -76,10 +76,19 @@ interface Sales {
   dialog: { business: Business; editing: SalesSession | null } | null;
   openDialog: (business: Business, editing?: SalesSession | null) => void;
   closeDialog: () => void;
+  /**
+   * الفاتورة اللي اتأكدت من صفحة المتجر وفاضلة قدام البائع (مكالمة ٢ أكتوبر:
+   * «تأكيد» ميوديش صفحة تانية — الأكورديون بيعرضها بمرحلتها وزرار اللي بعدها).
+   * للبيعة الشغالة بس. null = لسه بيبيع (مسودة)
+   */
+  confirmedOrderId: string | null;
+  markConfirmed: (orderId: string) => void;
 }
 
 const KEY = 'aswaq_sales_sessions';
 const ACTIVE_KEY = 'aswaq_sales_active';
+/** الفاتورة المؤكدة لكل بيعة: id البيعة → id الأوردر */
+const CONFIRMED_KEY = 'aswaq_sales_confirmed';
 /** آخر متجر البائع باع منه في كل نشاط — النافذة بتفتح عليه، عشان عميل الشباك في نفس المتجر */
 const lastShopKey = (accountId: string) => `aswaq_sales_shop_${accountId}`;
 export const lastSalesShop = (accountId: string) => read<string | null>(lastShopKey(accountId), null);
@@ -121,9 +130,11 @@ export function SalesProvider({ children }: { children: ReactNode }) {
   const [sessions, setSessions] = useState<SalesSession[]>(readSessions);
   const [activeId, setActiveId] = useState<string | null>(() => read<string | null>(ACTIVE_KEY, null));
   const [dialog, setDialog] = useState<Sales['dialog']>(null);
+  const [confirmed, setConfirmed] = useState<Record<string, string>>(() => read<Record<string, string>>(CONFIRMED_KEY, {}));
 
   useEffect(() => write(KEY, sessions), [sessions]);
   useEffect(() => write(ACTIVE_KEY, activeId), [activeId]);
+  useEffect(() => write(CONFIRMED_KEY, Object.keys(confirmed).length ? confirmed : null), [confirmed]);
 
   const start = useCallback((draft: SalesDraft) => {
     const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -140,6 +151,11 @@ export function SalesProvider({ children }: { children: ReactNode }) {
     write(salesCartKey({ id }), null);
     setSessions((prev) => prev.filter((s) => s.id !== id));
     setActiveId((prev) => (prev === id ? null : prev));
+    setConfirmed((prev) => {
+      if (!(id in prev)) return prev;
+      const { [id]: _gone, ...rest } = prev;
+      return rest;
+    });
   }, []);
 
   // الخروج من الحساب بيمسح البيعات — الجهاز ممكن يكون مشترك
@@ -148,6 +164,7 @@ export function SalesProvider({ children }: { children: ReactNode }) {
     for (const s of sessions) write(salesCartKey(s), null);
     setSessions([]);
     setActiveId(null);
+    setConfirmed({});
   }, [user, sessions]);
 
   const session = sessions.find((s) => s.id === activeId) ?? null;
@@ -168,8 +185,12 @@ export function SalesProvider({ children }: { children: ReactNode }) {
       dialog,
       openDialog: (business, editing = null) => setDialog({ business, editing }),
       closeDialog: () => setDialog(null),
+      confirmedOrderId: session ? (confirmed[session.id] ?? null) : null,
+      markConfirmed: (orderId) => {
+        if (session) setConfirmed((prev) => ({ ...prev, [session.id]: orderId }));
+      },
     }),
-    [session, sessions, start, update, drop, dialog],
+    [session, sessions, start, update, drop, dialog, confirmed],
   );
 
   return <SalesContext.Provider value={value}>{children}</SalesContext.Provider>;

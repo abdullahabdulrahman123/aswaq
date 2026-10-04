@@ -1,7 +1,7 @@
 import type { Item, Order, OrderDetail, Prisma } from '@prisma/client';
 import { prisma } from '../config/db.js';
 import type { DraftInput, LineInput } from '../schemas/order.schema.js';
-import { OPEN_STATES, type OrderState } from './orderFlow.js';
+import { CLOSED_STATES } from './orderFlow.js';
 
 type PriceField = 'onSWP' | 'onSRP' | 'onLWP' | 'onLRP';
 
@@ -100,6 +100,54 @@ export function withLine(details: OrderDetail[], items: Item[], line: LineInput,
   return details.some(same) ? details.map((d) => (same(d) ? detail : d)) : [...details, detail];
 }
 
+/**
+ * صنف اتغيّر في فاتورة اتأكدت — بالصلاحيات (مكالمة ٢ أكتوبر). الكمية المطلوبة
+ * (demanded) بتفضل اللي العميل وافق عليه، والفرق بيتكتب في deviation: زي سكيمة
+ * العميل لما المخزن يعدّل كميات الفاتورة. سعر السطر بيفضل اللي اتباع بيه، إلا
+ * لو البائع كتب سعر تاني (soldPrice). الصنف الجديد مطلوب منه صفر، فكله انحراف.
+ * الكمية صفر بتشيل السطر.
+ */
+export function withConfirmedLine(details: OrderDetail[], items: Item[], line: LineInput, field: PriceField, soldPrice?: number): OrderDetail[] | string {
+  const same = (d: OrderDetail) => d.itemId === line.itemId && d.unit === line.unitName;
+  if (line.quantity === 0) return details.filter((d) => !same(d));
+  const existing = details.find(same);
+  if (existing) return details.map((d) => (same(d) ? rescaled(d, line.quantity, soldPrice ?? d.price) : d));
+  const found = unitOf(items, line);
+  if (typeof found === 'string') return found;
+  const detail = detailOf(found.item, found.unit, line.quantity, field, soldPrice);
+  if (detail.unpriced) return `Item ${line.itemId} / ${line.unitName} has no price yet`;
+  return [...details, withDeviation({ ...detail, demanded: { ...detail.demanded, quantity: 0, totalItems: 0 } })];
+}
+
+/** نفس السطر بكمية (وسعر) تانيين — الإجماليات من جديد، والمطلوب زي ما هو */
+function rescaled(d: OrderDetail, quantity: number, price: number): OrderDetail {
+  const totalQuantity = quantity + d.bonusQuantity;
+  const totalItems = quantity * price;
+  const totalDiscount = quantity * d.discount;
+  const totalTax = totalQuantity * d.tax;
+  return withDeviation({
+    ...d,
+    quantity,
+    totalQuantity,
+    price,
+    profit: price - d.avg,
+    totalItems,
+    totalDiscount,
+    totalTax,
+    netTotal: totalItems - totalDiscount + totalTax,
+    totalWeight: (d.weight ?? 0) * totalQuantity,
+    totalVolume: (d.volume ?? 0) * totalQuantity,
+  });
+}
+
+/** الانحراف = اللي في الفاتورة دلوقتي ناقص المطلوب */
+function withDeviation(d: OrderDetail): OrderDetail {
+  return {
+    ...d,
+    deviation: { quantity: d.quantity - d.demanded.quantity, unit: d.unit, price: d.price, tax: d.tax, avg: d.avg, totalItems: d.totalItems - d.demanded.totalItems },
+  };
+}
+
 export function totalsOf(details: OrderDetail[]) {
   const sum = (f: (d: OrderDetail) => number) => details.reduce((n, d) => n + f(d), 0);
   const totalItems = sum((d) => d.totalItems);
@@ -152,6 +200,15 @@ export async function replaceDetails(order: Order, details: OrderDetail[], edito
   return count === 1;
 }
 
+/** زي replaceDetails، لفاتورة اتأكدت: بشرط إنها لسه في نفس المرحلة ومتغيّرتش */
+export async function replaceConfirmedDetails(order: Order, details: OrderDetail[], editor: { acc: string; name: string }) {
+  const { count } = await prisma.order.updateMany({
+    where: { id: order.id, state: order.state, updatedAt: order.updatedAt },
+    data: { details, ...totalsOf(details), editor, updatedAt: new Date() },
+  });
+  return count === 1;
+}
+
 export function deleteOrder(id: string) {
   return prisma.order.delete({ where: { id } });
 }
@@ -161,10 +218,13 @@ export function listMine(creatorAcc: string) {
   return prisma.order.findMany({ where: { creator: { is: { acc: creatorAcc } } }, orderBy: { updatedAt: 'desc' }, take: 200 });
 }
 
-/** الأوردرات المفتوحة (اتأكدت ولسه متمتش) اللي النشاط ده بائعها — الأحدث تأكيداً الأول */
+/**
+ * الأوردرات المفتوحة (اتأكدت ولسه متمتش — في أي مرحلة من مراحل النشاط) اللي
+ * النشاط ده بائعها، الأحدث تأكيداً الأول
+ */
 export function listIncoming(sellerAcc: string) {
   return prisma.order.findMany({
-    where: { from: { is: { acc: sellerAcc } }, state: { in: OPEN_STATES } },
+    where: { from: { is: { acc: sellerAcc } }, state: { notIn: CLOSED_STATES } },
     orderBy: { checkedOutAt: 'desc' },
     take: 200,
   });
@@ -198,7 +258,7 @@ export function checkOut(id: string, number: number) {
  * المرحلة اللي بعدها — بشرط إن الأوردر لسه في المرحلة اللي الواجهة شافتها،
  * فدوستين في نفس اللحظة مبينقلوش مرحلتين. null = اتغيّر من مكان تاني.
  */
-export async function advanceState(order: Order, to: OrderState) {
+export async function advanceState(order: Order, to: string) {
   const { count } = await prisma.order.updateMany({
     where: { id: order.id, state: order.state },
     data: { state: to, ...(to === 'done' ? { completedAt: new Date() } : {}) },

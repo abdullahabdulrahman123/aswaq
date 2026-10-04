@@ -24,6 +24,7 @@ import { ItemFormPage } from './pages/ItemFormPage';
 import { ItemsPage } from './pages/ItemsPage';
 import { StoreItemsPage } from './pages/StoreItemsPage';
 import { EmployeesPage } from './pages/EmployeesPage';
+import { SettingsPage } from './pages/SettingsPage';
 import { StorePage } from './pages/StorePage';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 
@@ -140,6 +141,7 @@ export function App() {
           <Route path="/business/:accountId/items/:itemId/edit" element={<PerBusiness page={ItemFormPage} />} />
           <Route path="/business/:accountId/store-items" element={<PerBusiness page={StoreItemsPage} />} />
           <Route path="/business/:accountId/employees" element={<PerBusiness page={EmployeesPage} />} />
+          <Route path="/business/:accountId/settings" element={<PerBusiness page={SettingsPage} />} />
           {/* الطلبات الواردة بقت في «مهامي» (مكالمة ٣٠ سبتمبر) — اللينك القديم بيوديها */}
           <Route path="/business/:accountId/incoming" element={<Navigate to="/tasks" replace />} />
           <Route path="/auth/wasla/callback" element={<AuthCallbackPage />} />

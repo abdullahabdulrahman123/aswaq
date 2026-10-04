@@ -58,8 +58,8 @@ export function attachRealtime(server: HttpServer) {
  * «مبيعات» من البائع نفسه) — الواجهة بتعدّه من غير ما تنبّه صاحبه.
  */
 /**
- * أوردر اتنقل مرحلة («إتمام»): «مهامي» عند كل اللي بيتابعوا النشاط البائع
- * بتتحدّث — المكتمل بيخرج منها من غير refresh.
+ * أوردر اتنقل مرحلة، أو فاتورته المؤكدة اتعدّلت (٢ أكتوبر): «مهامي» عند كل اللي
+ * بيتابعوا النشاط البائع بتتحدّث — المكتمل بيخرج منها من غير refresh.
  */
 export async function announceState(order: Order) {
   io?.to(room(order.from.acc)).emit('order:state', { order });

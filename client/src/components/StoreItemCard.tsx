@@ -38,6 +38,11 @@ type Unit = ShowroomItem['units'][number];
  * البائع يكتب سعر للعميل ده — مؤقتاً، بطلب العميل. السعر الخاص بيبان بلون تاني.
  *
  * أنهي سعر من الأربعة (priceField) بتحدده الصفحة: نوع الحساب، و«مبيعات» ولا المعرض.
+ *
+ * confirmed: فاتورة «مبيعات» اتأكدت والبائع لسه قدامها (مكالمة ٢ أكتوبر) — الكارت
+ * بيعرض سطورها بدل السلة، والتعديل بيروح للسيرفر على طول بالصلاحيات: كمية صنف
+ * موجود، أو صنف جديد. اللي الصلاحية بتاعته مقفولة بيبان باهت، والدوسة عليه
+ * بتقول يطلبها (onDenied). وخانة السعر في النافذة بصلاحيتها (priceLocked).
  */
 export function StoreItemCard({
   item,
@@ -45,28 +50,48 @@ export function StoreItemCard({
   shopId,
   storeName,
   sellerPrices = false,
+  confirmed,
+  priceLocked = null,
+  onDenied,
 }: {
   item: ShowroomItem;
   priceField: PriceField;
   shopId: string;
   storeName: string;
   sellerPrices?: boolean;
+  confirmed?: {
+    lines: CartLine[];
+    /** رسالة القفل لو الصلاحية مش معاه — null = مسموح */
+    lockQty: string | null;
+    lockAdd: string | null;
+    /** الكمية الجديدة (صفر = يتشال) والسعر اللي اتكتب */
+    onSet: (unitName: string, qty: number, price?: number) => void;
+  };
+  priceLocked?: string | null;
+  onDenied?: (message: string) => void;
 }) {
-  const { linesOf, putLine, setQty, removeLine } = useStoreCart();
+  const cart = useStoreCart();
   /** الوحدة اللي نافذتها مفتوحة */
   const [asking, setAsking] = useState<string | null>(null);
   const wheel = useRef<HTMLUListElement>(null);
   /** أول وحدة ظاهرة في العجلة */
   const [first, setFirst] = useState(0);
 
-  const mine = new Map(linesOf(shopId).filter((l) => l.itemId === item.id).map((l) => [l.unitName, l]));
+  const mine = new Map((confirmed?.lines ?? cart.linesOf(shopId)).filter((l) => l.itemId === item.id).map((l) => [l.unitName, l]));
   const hiddenBelow = Math.max(0, item.units.length - first - VISIBLE);
   const askingUnit = item.units.find((u) => u.name === asking) ?? null;
   const askingLine = askingUnit ? mine.get(askingUnit.name) : undefined;
   const storePrice = (u: Unit) => u[priceField] ?? null;
 
+  /** سطر جديد أو كمية جديدة — في السلة، أو في الفاتورة المؤكدة على السيرفر */
   const put = (u: Unit, qty: number, price?: number) =>
-    putLine({ shopId, storeName, itemId: item.id, itemName: item.name, unitName: u.name, qty, unitPrice: storePrice(u), ...(price !== undefined ? { price } : {}) });
+    confirmed
+      ? confirmed.onSet(u.name, qty, price)
+      : cart.putLine({ shopId, storeName, itemId: item.id, itemName: item.name, unitName: u.name, qty, unitPrice: storePrice(u), ...(price !== undefined ? { price } : {}) });
+  const setQty = (line: CartLine, qty: number) => (confirmed ? confirmed.onSet(line.unitName, qty, line.price) : cart.setQty(line, qty));
+  const removeLine = (line: CartLine) => (confirmed ? confirmed.onSet(line.unitName, 0) : cart.removeLine(line));
+  /** القفل على الوحدة دي: سطر موجود = الكمية، وحدة جديدة = إضافة صنف */
+  const lockOf = (u: Unit) => (confirmed ? (mine.has(u.name) ? confirmed.lockQty : confirmed.lockAdd) : null);
 
   return (
     <li className="flex gap-2 rounded-xl border border-stone-200 bg-white p-1.5 dark:border-white/10 dark:bg-surface-card">
@@ -100,6 +125,8 @@ export function StoreItemCard({
                 storePrice={storePrice(u)}
                 line={mine.get(u.name)}
                 sellerPrices={sellerPrices}
+                lock={lockOf(u)}
+                onDenied={(message) => onDenied?.(message)}
                 onAsk={() => setAsking(u.name)}
                 onPut={(qty) => put(u, qty, mine.get(u.name)?.price)}
                 onQty={(line, qty) => setQty(line, qty)}
@@ -142,6 +169,7 @@ export function StoreItemCard({
           initialQty={askingLine?.qty ?? 1}
           initialPrice={askingLine?.price}
           editPrice={sellerPrices}
+          priceLocked={priceLocked}
           onDone={(qty, price) => {
             // صفر = يتشال (والوحدة اللي لسه متطلبتش مبتتضافش)
             if (qty > 0) put(askingUnit, qty, price);
@@ -166,6 +194,7 @@ function Chevron({ down = false }: { down?: boolean }) {
 /**
  * سطر وحدة: اسمها وسعرها، و(+) والكمية و(−)، والإجمالي. (−) وهي واحد بتشيل
  * السطر. الوحدة اللي ملهاش سعر في الشريحة دي مبتتطلبش. الكمية زرار بيفتح النافذة.
+ * lock: الصلاحية مقفولة — الأزرار باهتة، والدوسة بتقول يطلبها (onDenied).
  */
 function UnitRow({
   itemName,
@@ -173,6 +202,8 @@ function UnitRow({
   storePrice,
   line,
   sellerPrices,
+  lock,
+  onDenied,
   onAsk,
   onPut,
   onQty,
@@ -183,6 +214,8 @@ function UnitRow({
   storePrice: number | null;
   line: CartLine | undefined;
   sellerPrices: boolean;
+  lock: string | null;
+  onDenied: (message: string) => void;
   onAsk: () => void;
   onPut: (qty: number) => void;
   onQty: (line: CartLine, qty: number) => void;
@@ -219,6 +252,9 @@ function UnitRow({
   }
 
   const priceText = priced ? egp(price) : 'السعر لسه متحددش';
+  /** الدوسة: الفعل نفسه، أو رسالة القفل */
+  const guarded = (action: () => void) => () => (lock ? onDenied(lock) : action());
+  const lockedClass = lock ? 'opacity-40' : '';
 
   return (
     <li className="flex h-5 snap-start items-center gap-1">
@@ -226,7 +262,7 @@ function UnitRow({
         <button
           type="button"
           aria-label={`سعر ${unit.name}: ${priceText} — تغيير`}
-          onClick={onAsk}
+          onClick={guarded(onAsk)}
           className="min-w-0 flex-1 truncate text-start text-[11.5px] leading-5"
         >
           <span className="font-semibold">{unit.name}</span>{' '}
@@ -246,23 +282,32 @@ function UnitRow({
       <button
         type="button"
         aria-label={line ? `زوّد ${unit.name}` : `ضيف ${itemName} — ${unit.name}`}
-        onClick={() => (line ? onQty(line, clampQty(line.qty + 1)) : onAsk())}
+        aria-disabled={lock ? true : undefined}
+        onClick={guarded(() => (line ? onQty(line, clampQty(line.qty + 1)) : onAsk()))}
         disabled={!priced || (line ? line.qty >= MAX_QTY : false)}
-        className={stepClass}
+        className={`${stepClass} ${lockedClass}`}
       >
         +
       </button>
 
-      <button type="button" aria-label={`كمية ${unit.name}`} onClick={onAsk} disabled={!priced} className={`${boxClass} w-7`}>
+      <button
+        type="button"
+        aria-label={`كمية ${unit.name}`}
+        aria-disabled={lock ? true : undefined}
+        onClick={guarded(onAsk)}
+        disabled={!priced}
+        className={`${boxClass} w-7 ${lock ? 'text-stone-500 dark:text-stone-400' : ''}`}
+      >
         {typedQty ?? line?.qty ?? ''}
       </button>
 
       <button
         type="button"
         aria-label={line && line.qty > 1 ? `قلّل ${unit.name}` : `شيل ${unit.name}`}
-        onClick={() => line && (line.qty <= 1 ? onRemove(line) : onQty(line, line.qty - 1))}
+        aria-disabled={lock ? true : undefined}
+        onClick={guarded(() => line && (line.qty <= 1 ? onRemove(line) : onQty(line, line.qty - 1)))}
         disabled={!line}
-        className={stepClass}
+        className={`${stepClass} ${line ? lockedClass : ''}`}
       >
         −
       </button>
@@ -271,9 +316,16 @@ function UnitRow({
         aria-label={`إجمالي ${unit.name}`}
         inputMode="decimal"
         disabled={!priced}
+        readOnly={lock !== null}
+        aria-disabled={lock ? true : undefined}
         value={totalText ?? (total !== null ? egp(total).replace(' ج.م', '') : '')}
         onChange={(e) => setTotalText(moneyInput(e.target.value))}
         onFocus={(e) => {
+          if (lock) {
+            e.currentTarget.blur();
+            onDenied(lock);
+            return;
+          }
           if (total === null) return;
           const el = e.currentTarget;
           setTotalText(toPounds(total));

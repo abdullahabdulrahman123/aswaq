@@ -3,10 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth, type Business } from '../context/AuthContext';
 import { buyerLabel, lastSalesShop, rememberSalesShop, useSales, type SalesSession } from '../context/SalesContext';
 import { useStoreCart } from '../context/StoreCartContext';
+import { advanceOrder, checkoutOrder, fetchOrder, putDraft, type Order } from '../lib/aswaqApi';
+import { draftInput, draftRef, rememberDraftId } from '../lib/draftSync';
+import { orderToView } from '../lib/invoiceView';
 import type { ReceivingMethod } from '../lib/itemUnits';
+import { CONFIRM_ACTION, nextActionOf, stageLabel } from '../lib/orderFlow';
 import { latinDigits } from '../lib/quantity';
 import { ApiError, searchCustomers, type Customer } from '../lib/waslaApi';
 import { Avatar, personInitial } from './Avatar';
+import { InvoiceSheet, type InvoiceView } from './InvoiceSheet';
 import { Notch, fieldClass } from './OutlinedField';
 
 const METHODS: { key: ReceivingMethod; label: string }[] = [
@@ -41,56 +46,234 @@ function CustomerAvatar({ customer, size }: { customer: Customer; size: number }
  * «مبيعات» على صفحة أصناف المتجر نفسها، بطلب العميل (مكالمة ١ أكتوبر) — كانت
  * نافذة لوحدها. جزء بيتفتح ويتقفل (أكورديون) فوق الأصناف:
  *   - مفتوح: رأس الفاتورة (SalesForm). في بيعة جديدة الأصناف مستخبية لحد «ابدأ
- *     البيع» — من غير مشتري مفيش أسعار، والصنف كان هيروح سلة البائع نفسه
- *   - مقفول (البيعة شغالة): اسم العميل والاستلام، وجنبهم زرارين الفاتورة —
- *     «تأكيد» و«طباعة» — عشان البائع ميلفّش على صفحة الفاتورة
+ *     البيع» أو السهم — من غير مشتري مفيش أسعار، والصنف كان هيروح سلة البائع نفسه
+ *   - مقفول (البيعة شغالة): اسم العميل والاستلام، وجنبهم زراير الفاتورة —
+ *     عشان البائع ميلفّش على صفحة الفاتورة
  *
- * «تأكيد» و«طباعة» بيفتحوا الفاتورة وهي بتأكد أو بتطبع لوحدها (InvoicePage):
- * المسودة لازم تتبعت كاملة للسيرفر الأول، والفاتورة المؤكدة بتفتح بمرحلتها.
+ * مكالمة ٢ أكتوبر — كله من هنا، من غير ما الصفحة تتغيّر:
+ *   - زرار المرحلة: «تأكيد» بيأكد الفاتورة مكانه، وبعدها نفس الزرار بيبقى «إتمام»
+ *     (المرحلة اللي بعدها)، ولما تخلص بيختفي واسم المرحلة بيفضل مكتوب
+ *   - «طباعة» لوحدها في أي مرحلة: المسودة بتتطبع «مسودة»، والمؤكدة برقمها
+ *   - فلتر (on/off): أصناف الفاتورة بس
+ * بعد التأكيد الأصناف تحت بتتعرض بكميات الفاتورة من غير تعديل (الصفحة)، و«فاتورة
+ * جديدة» للعميل اللي بعده.
  */
-export function SalesPanel({ storeId, businessId }: { storeId: string; businessId: string }) {
-  const { dialog, session, openDialog } = useSales();
-  const { businesses } = useAuth();
-  const { linesOf } = useStoreCart();
-  const navigate = useNavigate();
+export function SalesPanel({
+  storeId,
+  businessId,
+  settle,
+  order,
+  onOrder,
+  onlyInvoice,
+  onToggleOnlyInvoice,
+}: {
+  storeId: string;
+  businessId: string;
+  /** كل اللي مستني يتحفظ من سلة المتجر يتبعت الأول (useDraftSync) */
+  settle: () => Promise<void>;
+  /** الفاتورة المؤكدة اللي قدام البائع — null وهي لسه بتتجاب أو لسه مسودة */
+  order: Order | null;
+  onOrder: (order: Order) => void;
+  onlyInvoice: boolean;
+  onToggleOnlyInvoice: () => void;
+}) {
+  const { dialog, session, openDialog, confirmedOrderId, markConfirmed } = useSales();
+  const { businesses, withToken } = useAuth();
+  const { linesOf, clearShop } = useStoreCart();
+  const [busy, setBusy] = useState<'confirm' | 'advance' | 'print' | null>(null);
+  const [error, setError] = useState('');
+  /** الورقة اللي بتتطبع — مستخبية على الشاشة */
+  const [printView, setPrintView] = useState<InvoiceView | null>(null);
+
+  // الطباعة بعد ما الورقة تترسم
+  useEffect(() => {
+    if (printView) requestAnimationFrame(() => window.print());
+  }, [printView]);
 
   if (dialog && dialog.business.accountId === businessId) {
     return (
-      <section aria-label="مبيعات" data-expanded="true" className="mt-3 rounded-2xl border border-brand-300 bg-white dark:border-brand-500/40 dark:bg-surface-card sm:max-w-xl">
+      <section aria-label="مبيعات" data-expanded="true" className="mt-3 rounded-2xl border border-brand-300 bg-white dark:border-brand-500/40 dark:bg-surface-card sm:max-w-xl print:hidden">
         <SalesForm key={`${dialog.editing?.id ?? 'new'}-${storeId}`} business={dialog.business} editing={dialog.editing} currentShopId={storeId} />
       </section>
     );
   }
   if (!session || session.accountId !== businessId) return null;
+  const sale = session;
 
-  const business = businesses.find((b) => b.accountId === session.accountId);
-  const empty = linesOf(storeId).length === 0;
-  const go = (then: 'confirm' | 'print') => navigate(`/orders/${storeId}`, { state: { then } });
+  const business = businesses.find((b) => b.accountId === sale.accountId);
+  const lines = linesOf(storeId);
+  const confirmed = confirmedOrderId !== null;
+  /** الفاتورة المؤكدة لسه بتتجاب */
+  const loading = confirmed && order?.id !== confirmedOrderId;
+  const action = confirmed ? (order && !loading ? nextActionOf(order) : undefined) : CONFIRM_ACTION;
+
+  /** المسودة زي ما السيرفر حسبها — بعد ما كل صنف مستني يوصل */
+  async function savedDraft() {
+    await settle();
+    return withToken((token) => putDraft(token, draftInput(storeId, lines, sale.method, sale, null)));
+  }
+
+  async function handleAction() {
+    if (busy) return;
+    setBusy(confirmed ? 'advance' : 'confirm');
+    setError('');
+    try {
+      if (confirmed) {
+        if (!order) return;
+        try {
+          onOrder(await withToken((token) => advanceOrder(token, order.id)));
+        } catch (err) {
+          // اتنقل من جهاز تاني — بنعرض اللي عليه دلوقتي
+          if (!(err instanceof ApiError && err.status === 409)) throw err;
+          onOrder(await withToken((token) => fetchOrder(token, order.id)));
+        }
+        return;
+      }
+      const draft = await savedDraft();
+      if (!draft) return;
+      if (draft.details.some((d) => d.unpriced)) {
+        setError('شيل الأصناف اللي سعرها لسه متحددش عشان تقدر تأكد.');
+        return;
+      }
+      const done = await withToken((token) => checkoutOrder(token, draft.id));
+      markConfirmed(done.id);
+      onOrder(done);
+      clearShop(sale.id, storeId);
+      rememberDraftId(draftRef(storeId, sale), null);
+    } catch (err) {
+      setError(
+        err instanceof ApiError && err.status === 409 && !confirmed
+          ? 'الفاتورة دي اتأكدت قبل كده.'
+          : err instanceof ApiError
+            ? err.message
+            : confirmed
+              ? 'مقدرناش ننقل الفاتورة للمرحلة اللي بعدها. جرّب تاني.'
+              : 'مقدرناش نأكد الفاتورة. جرّب تاني.',
+      );
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handlePrint() {
+    if (busy) return;
+    if (confirmed) {
+      if (order) setPrintView(orderToView(order));
+      return;
+    }
+    setBusy('print');
+    setError('');
+    try {
+      const draft = await savedDraft();
+      if (draft) setPrintView(orderToView(draft));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'مقدرناش نجهّز الفاتورة للطباعة. جرّب تاني.');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const empty = !confirmed && lines.length === 0;
 
   return (
-    <section aria-label="مبيعات" data-expanded="false" className="mt-3 flex items-center gap-2 rounded-2xl border border-brand-300 bg-brand-50/60 p-1.5 dark:border-brand-500/40 dark:bg-brand-500/10 sm:max-w-xl">
-      <button
-        type="button"
-        aria-expanded={false}
-        aria-label={`بيانات البيعة: ${buyerLabel(session)} — فتح`}
-        onClick={() => business && openDialog(business, session)}
-        className="flex min-w-0 flex-1 items-center gap-1.5 rounded-xl px-2 py-1 text-start transition hover:bg-brand-100/70 dark:hover:bg-brand-500/15"
+    <>
+      <section
+        aria-label="مبيعات"
+        data-expanded="false"
+        data-state={confirmed ? (order?.state ?? '') : 'draft'}
+        className="mt-3 rounded-2xl border border-brand-300 bg-brand-50/60 p-1.5 dark:border-brand-500/40 dark:bg-brand-500/10 sm:max-w-xl print:hidden"
       >
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-bold leading-tight">{buyerLabel(session)}</span>
-          <span className="block truncate text-[11px] leading-tight text-stone-500 dark:text-stone-400">
-            {session.method === 'delivery' ? `توصيل — ${session.address}` : 'استلام من المتجر'}
-          </span>
-        </span>
-        <Chevron />
-      </button>
-      <button type="button" onClick={() => go('confirm')} disabled={empty} className="shrink-0 rounded-xl bg-accent-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-700 disabled:opacity-50">
-        تأكيد
-      </button>
-      <button type="button" onClick={() => go('print')} disabled={empty} className="shrink-0 rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-semibold transition hover:border-stone-400 disabled:opacity-50 dark:border-white/15 dark:bg-transparent">
-        طباعة
-      </button>
-    </section>
+        <div className="flex items-center gap-2">
+          {confirmed ? (
+            // الفاتورة اتأكدت — بيانات العميل اتقفلت معاها
+            <div className="min-w-0 flex-1 px-2 py-1">
+              <span className="block truncate text-sm font-bold leading-tight">{buyerLabel(sale)}</span>
+              <span role="status" className="block truncate text-[11px] font-semibold leading-tight text-accent-700 dark:text-accent-300">
+                {order && !loading ? `فاتورة رقم ${order.number} — ${stageLabel(order)}` : 'بنجيب الفاتورة…'}
+              </span>
+            </div>
+          ) : (
+            <button
+              type="button"
+              aria-expanded={false}
+              aria-label={`بيانات البيعة: ${buyerLabel(sale)} — فتح`}
+              onClick={() => business && openDialog(business, sale)}
+              className="flex min-w-0 flex-1 items-center gap-1.5 rounded-xl px-2 py-1 text-start transition hover:bg-brand-100/70 dark:hover:bg-brand-500/15"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-bold leading-tight">{buyerLabel(sale)}</span>
+                <span className="block truncate text-[11px] leading-tight text-stone-500 dark:text-stone-400">
+                  {sale.method === 'delivery' ? `توصيل — ${sale.address}` : 'استلام من المتجر'}
+                </span>
+              </span>
+              <Chevron />
+            </button>
+          )}
+          {action && (
+            <button
+              type="button"
+              data-action
+              onClick={handleAction}
+              disabled={empty || loading || busy !== null}
+              className="shrink-0 rounded-xl bg-accent-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-700 disabled:opacity-50"
+            >
+              {busy === 'confirm' ? 'بنأكد…' : busy === 'advance' ? 'لحظة…' : action}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handlePrint}
+            disabled={empty || loading || busy !== null}
+            className="shrink-0 rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-semibold transition hover:border-stone-400 disabled:opacity-50 dark:border-white/15 dark:bg-transparent"
+          >
+            {busy === 'print' ? 'لحظة…' : 'طباعة'}
+          </button>
+          <button
+            type="button"
+            aria-label="أصناف الفاتورة بس"
+            aria-pressed={onlyInvoice}
+            title="أصناف الفاتورة بس"
+            onClick={onToggleOnlyInvoice}
+            className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl border transition ${
+              onlyInvoice
+                ? 'border-brand-600 bg-brand-600 text-white'
+                : 'border-stone-300 bg-white text-stone-600 hover:border-stone-400 dark:border-white/15 dark:bg-transparent dark:text-stone-300'
+            }`}
+          >
+            <FilterIcon />
+          </button>
+        </div>
+        {error && (
+          <p role="alert" className="mt-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-500/10 dark:text-red-300">
+            {error}
+          </p>
+        )}
+        {confirmed && business && (
+          <div className="mt-1.5 flex justify-end">
+            <button
+              type="button"
+              onClick={() => openDialog(business)}
+              className="rounded-xl border border-accent-600 px-4 py-1.5 text-xs font-semibold text-accent-700 transition hover:bg-accent-50 dark:text-accent-300 dark:hover:bg-accent-500/10"
+            >
+              فاتورة جديدة
+            </button>
+          </div>
+        )}
+      </section>
+      {printView && (
+        <div className="hidden print:block">
+          <InvoiceSheet view={printView} />
+        </div>
+      )}
+    </>
+  );
+}
+
+function FilterIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 5h16l-6 7.5V19l-4-2v-4.5L4 5Z" />
+    </svg>
   );
 }
 
@@ -255,8 +438,12 @@ function SalesForm({ business, editing, currentShopId }: { business: Business; e
               <h2 className="font-display text-lg font-bold">مبيعات</h2>
               <p className="text-sm text-stone-500 dark:text-stone-400">{business.name}</p>
             </div>
-            {/* بيقفل الأكورديون — زي «إلغاء» */}
-            <button type="button" aria-expanded={true} aria-label="اقفل بيانات البيعة" onClick={closeDialog} className="grid h-8 w-8 shrink-0 place-items-center rounded-full transition hover:bg-stone-100 dark:hover:bg-white/10">
+            {/*
+              بيقفل الأكورديون زي «ابدأ البيع» (أو «حفظ») بطلب العميل (مكالمة ٢ أكتوبر):
+              المتجر والعميل متحددين لوحدهم، فلمّ الجزء من غير كتابة بيبدأ البيعة بيهم.
+              «إلغاء» بس اللي بيقفل من غير بيعة
+            */}
+            <button type="submit" disabled={!buyer} aria-expanded={true} aria-label="اقفل بيانات البيعة" className="grid h-8 w-8 shrink-0 place-items-center rounded-full transition hover:bg-stone-100 disabled:opacity-50 dark:hover:bg-white/10">
               <Chevron up />
             </button>
           </div>

@@ -94,7 +94,7 @@ export function PriceDialog({ item, note, onSaved, onClose }: { item: Item; note
           </p>
         )}
 
-        {/* عمود الوحدة وأربع أسعار — عنوان المجموعة (المحل / أونلاين) فوق جملة وقطاعي، زي فورم الصنف */}
+        {/* عمود الوحدة وأربع أسعار — عنوان المجموعة (جملة / قطاعي) فوق المحل والأونلاين، زي فورم الصنف (٢ أكتوبر) */}
         <table className="mt-4 w-full table-fixed border-separate border-spacing-x-1 border-spacing-y-1.5 text-center">
           <colgroup>
             <col className="w-[22%]" />

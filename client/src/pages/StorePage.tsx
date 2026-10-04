@@ -8,12 +8,13 @@ import { useAuth } from '../context/AuthContext';
 import { useBuyerLocation } from '../context/LocationContext';
 import { useSales } from '../context/SalesContext';
 import { useCurrentSeller } from '../context/SellerContext';
-import { useCartFocus, useStoreCart } from '../context/StoreCartContext';
-import { fetchShowroomStore, type ShowroomStoreDetails } from '../lib/aswaqApi';
+import { useCartFocus, useStoreCart, type CartLine } from '../context/StoreCartContext';
+import { fetchOrder, fetchShowroomStore, putConfirmedLine, type Order, type ShowroomStoreDetails } from '../lib/aswaqApi';
 import { deliversTo, distanceKm, formatDistance } from '../lib/buyerLocation';
 import { buyerPriceField, type ReceivingMethod } from '../lib/itemUnits';
 import { useDraftSync } from '../lib/draftSync';
-import { ApiError, fetchStore, type ShowroomStore } from '../lib/waslaApi';
+import { PERMISSIONS, can, deniedMessage } from '../lib/permissions';
+import { ApiError, SessionExpiredError, fetchStore, type ShowroomStore } from '../lib/waslaApi';
 
 const METHODS: { key: ReceivingMethod; label: string }[] = [
   { key: 'pickup', label: 'استلام من المتجر' },
@@ -33,11 +34,16 @@ const METHODS: { key: ReceivingMethod; label: string }[] = [
  *
  * رأس الفاتورة نفسه فوق الأصناف (SalesPanel، مكالمة ١ أكتوبر): بيعة جديدة =
  * الأكورديون مفتوح والأصناف مستخبية لحد «ابدأ البيع».
+ *
+ * مكالمة ٢ أكتوبر: «تأكيد» بيأكد هنا من غير ما الصفحة تتغيّر — بعدها الأصناف بتتعرض
+ * بكميات الفاتورة المؤكدة، والتعديل عليها بالصلاحيات (كمية صنف، أو صنف جديد)
+ * بيروح للسيرفر على طول. وخانة السعر بصلاحيتها في المسودة كمان. فلتر
+ * الأكورديون بيعرض أصناف الفاتورة بس.
  */
 export function StorePage() {
   const { storeId = '' } = useParams<{ storeId: string }>();
-  const { accountType: myAccountType } = useAuth();
-  const { session, leave, dialog } = useSales();
+  const { accountType: myAccountType, businesses, withToken } = useAuth();
+  const { session, leave, dialog, confirmedOrderId } = useSales();
   const { location: myLocation } = useBuyerLocation();
   const location = session ? null : myLocation;
   const accountType = session ? (session.buyer.kind === 'business' ? 'COMPANY' : 'INDIVIDUAL') : myAccountType;
@@ -53,6 +59,14 @@ export function StorePage() {
   const [chosen, setChosen] = useState<ReceivingMethod | null>(null);
   /** داس «توصيل» ومكانه مش متحدد — بنقوله يحدده الأول */
   const [askedForLocation, setAskedForLocation] = useState(false);
+  /** «مبيعات»: الفاتورة اللي اتأكدت هنا وفاضلة قدام البائع */
+  const [saleOrder, setSaleOrder] = useState<Order | null>(null);
+  /** فلتر «مبيعات»: أصناف الفاتورة بس */
+  const [onlyInvoice, setOnlyInvoice] = useState(false);
+  /** رسالة تحت الأكورديون: صلاحية مقفولة، أو تعديل الفاتورة المؤكدة ما نفعش */
+  const [denied, setDenied] = useState('');
+  /** تعديلات الفاتورة المؤكدة واحد ورا التاني — دوستين (+) ورا بعض متتلخبطش */
+  const edits = useRef<Promise<unknown>>(Promise.resolve());
 
   useEffect(() => {
     let cancelled = false;
@@ -96,6 +110,26 @@ export function StorePage() {
     if (storeBusiness && active && active.accountId !== storeBusiness) leaveSale();
   }, [storeBusiness]);
 
+  // الفاتورة المؤكدة اللي قدام البائع — بعد refresh مثلاً بتتجاب من السيرفر
+  useEffect(() => {
+    if (!confirmedOrderId || saleOrder?.id === confirmedOrderId) return;
+    let cancelled = false;
+    withToken((token) => fetchOrder(token, confirmedOrderId))
+      .then((order) => {
+        if (!cancelled) setSaleOrder(order);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [confirmedOrderId, saleOrder?.id, withToken]);
+
+  useEffect(() => {
+    if (!denied) return;
+    const timer = setTimeout(() => setDenied(''), 6000);
+    return () => clearTimeout(timer);
+  }, [denied]);
+
   // صورة النشاط على شمال الناڤبار — «البائع» قصاد المشتري
   useCurrentSeller(
     store && {
@@ -129,7 +163,7 @@ export function StorePage() {
   useCartFocus(store?.id ?? null, minimum);
 
   // المسودة على السيرفر مع كل تغيير في سلة المتجر ده
-  useDraftSync(store?.id ?? null, store ? linesOf(store.id) : [], method);
+  const { settle } = useDraftSync(store?.id ?? null, store ? linesOf(store.id) : [], method);
 
   // الأسعار بتتغيّر مع نوع الحساب ولما البيعة تبدأ — سطور السلة بتمشي معاها
   useEffect(() => {
@@ -182,7 +216,55 @@ export function StorePage() {
   }
 
   /** رأس فاتورة جديدة مفتوح هنا — من غير مشتري لسه، فالأصناف مستخبية */
-  const newSale = !session && dialog !== null && dialog.business.accountId === store.business.accountId;
+  const newSale = dialog !== null && dialog.editing === null && dialog.business.accountId === store.business.accountId;
+
+  /** الفاتورة المؤكدة في «مبيعات»: الكروت بتعرض سطورها، والتعديل بالصلاحيات */
+  const confirmedOrder = session && confirmedOrderId && saleOrder?.id === confirmedOrderId ? saleOrder : null;
+  const selling = session ? businesses.find((b) => b.accountId === session.accountId) : undefined;
+  const editable = confirmedOrder !== null && confirmedOrder.state !== 'done';
+  const lockQty = !editable ? 'الفاتورة دي خلصت ومبقتش بتتعدّل.' : can(selling, PERMISSIONS.invoiceQuantity) ? null : deniedMessage(PERMISSIONS.invoiceQuantity);
+  const lockAdd = !editable ? 'الفاتورة دي خلصت ومبقتش بتتعدّل.' : can(selling, PERMISSIONS.invoiceAddItem) ? null : deniedMessage(PERMISSIONS.invoiceAddItem);
+  const priceLocked = session && !can(selling, PERMISSIONS.invoicePrice) ? deniedMessage(PERMISSIONS.invoicePrice) : null;
+
+  /** صنف في الفاتورة المؤكدة: الكمية الجديدة (صفر = يتشال) — السيرفر بيتأكد من الصلاحية تاني */
+  function editConfirmed(itemId: string, unitName: string, quantity: number, price?: number) {
+    const orderId = confirmedOrder?.id;
+    if (!orderId) return;
+    setDenied('');
+    edits.current = edits.current.then(async () => {
+      try {
+        setSaleOrder(await withToken((token) => putConfirmedLine(token, orderId, { itemId, unitName, quantity, ...(price !== undefined ? { price } : {}) })));
+      } catch (err) {
+        if (err instanceof SessionExpiredError) return;
+        const status = err instanceof ApiError ? err.status : 0;
+        setDenied(
+          status === 422
+            ? 'الفاتورة المؤكدة لازم يفضل فيها صنف واحد على الأقل.'
+            : status === 403
+              ? 'الصلاحية دي مش متاحة لك. اطلبها من صاحب الشركة.'
+              : status === 409
+                ? 'الفاتورة دي خلصت ومبقتش بتتعدّل.'
+                : 'مقدرناش نعدّل الفاتورة. جرّب تاني.',
+        );
+      }
+    });
+  }
+  const fixedLines: CartLine[] | undefined = confirmedOrder
+    ? confirmedOrder.details.map((d) => ({
+        shopId: store.id,
+        storeName: store.name,
+        itemId: d.itemId,
+        itemName: d.item,
+        unitName: d.unit,
+        qty: d.quantity,
+        unitPrice: d.unpriced ? null : d.originalPrice,
+        ...(d.price !== d.originalPrice ? { price: d.price } : {}),
+      }))
+    : session && confirmedOrderId
+      ? []
+      : undefined;
+  const onInvoice = new Set((fixedLines ?? linesOf(store.id)).map((l) => l.itemId));
+  const shown = session && onlyInvoice ? details.items.filter((item) => onInvoice.has(item.id)) : details.items;
 
   /** ليه التوصيل مقفول — بيظهر تحت الاختيار */
   const noDeliveryReason =
@@ -193,9 +275,9 @@ export function StorePage() {
         : `المتجر بيوصّل لحد ${formatDistance(radius)}، ومكانك على بعد ${formatDistance(km)}.`;
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-5">
+    <div className="mx-auto max-w-6xl px-4 py-5 print:max-w-none print:p-0">
       {/* سطر المتجر صغير — المشتري مهتم بالأصناف أكتر، بطلب العميل (٢٨ سبتمبر) */}
-      <div className="flex items-center gap-2.5">
+      <div className="flex items-center gap-2.5 print:hidden">
         <Avatar picture={store.business.picture} fallback={store.business.abbreviation} kind="business" size={36} tone="soft" />
         <div className="min-w-0">
           <h1 className="break-words font-display text-lg font-bold leading-tight sm:text-xl">{store.name}</h1>
@@ -206,11 +288,24 @@ export function StorePage() {
         </div>
       </div>
 
-      <SalesPanel storeId={store.id} businessId={store.business.accountId} />
+      <SalesPanel
+        storeId={store.id}
+        businessId={store.business.accountId}
+        settle={settle}
+        order={saleOrder}
+        onOrder={setSaleOrder}
+        onlyInvoice={onlyInvoice}
+        onToggleOnlyInvoice={() => setOnlyInvoice((v) => !v)}
+      />
+      {denied && session && (
+        <p role="alert" className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-300 sm:max-w-xl print:hidden">
+          {denied}
+        </p>
+      )}
 
       {/* في «مبيعات» طريقة الاستلام في الأكورديون. وإلا: مش grid — عنصر الـgrid بيكبر على قد النص، فالعنوان الطويل في شريط المكان كان بيوسّع الصفحة بدل ما يتقص */}
       {session || newSale ? null : (
-        <div className="mt-4 space-y-3 sm:max-w-xl">
+        <div className="mt-4 space-y-3 sm:max-w-xl print:hidden">
           <LocationBar prompt="حدد مكانك عشان نعرف المتجر بعيد عنك قد إيه" />
 
           <div>
@@ -257,15 +352,29 @@ export function StorePage() {
       </div>
       )}
 
-      <div className="mt-4">
-        {newSale ? null : details.items.length === 0 ? (
+      <div className="mt-4 print:hidden">
+        {newSale ? null : shown.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-stone-300 p-8 text-center text-sm text-stone-500 dark:border-white/15 dark:text-stone-400">
-            لسه مفيش أصناف في المتجر ده.
+            {details.items.length === 0 ? 'لسه مفيش أصناف في المتجر ده.' : 'لسه مفيش أصناف في الفاتورة.'}
           </p>
         ) : (
           <ul aria-label="أصناف المتجر" className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
-            {details.items.map((item) => (
-              <StoreItemCard key={item.id} item={item} priceField={priceField} shopId={store.id} storeName={store.name} sellerPrices={Boolean(session)} />
+            {shown.map((item) => (
+              <StoreItemCard
+                key={item.id}
+                item={item}
+                priceField={priceField}
+                shopId={store.id}
+                storeName={store.name}
+                sellerPrices={Boolean(session)}
+                confirmed={
+                  fixedLines
+                    ? { lines: fixedLines, lockQty, lockAdd, onSet: (unitName, qty, price) => editConfirmed(item.id, unitName, qty, price) }
+                    : undefined
+                }
+                priceLocked={priceLocked}
+                onDenied={setDenied}
+              />
             ))}
           </ul>
         )}

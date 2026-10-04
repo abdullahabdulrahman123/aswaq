@@ -1,19 +1,97 @@
+import type { Order } from '@prisma/client';
+import { prisma } from '../config/db.js';
+
 /**
  * مراحل الأوردر — مكالمة ١ أكتوبر: زرار واحد («تأكيد») بينقل الأوردر مرحلة
- * مرحلة واسمه بيتغيّر، وآخرها «إتمام». دلوقتي مرحلتين بعد المسودة؛ المراحل
- * اللي في النص (تجهيز، توصيل…) بتتضاف هنا لما العميل يحددها — ونفس الليستة
- * في الواجهة (client/src/lib/orderFlow.ts).
+ * مرحلة واسمه بيتغيّر، وآخرها «إتمام».
  *
- * draft ← order بيحصل بـcheckout (رقم الفاتورة)، والباقي بـadvance.
+ * مكالمة ٢ أكتوبر: المراحل اللي في النص كل نشاط بيختارها من قالب عام ويرتّبها
+ * (إعدادات النشاط، BusinessSettings) — «أنا مش هحط states من عندي… صاحب البيزنس
+ * هو اللي يحدد». المشتري بيشوف اسم المرحلة على طلبه عشان يتابعه.
+ *
+ *   draft ← (checkout، رقم الفاتورة) ← order ← [مراحل النشاط] ← done
+ *
+ * الثابت: المسودة والمؤكد في الأول والمكتمل في الآخر. والزرار بيقول المرحلة
+ * اللي جاية (action)، واسم المرحلة اللي الأوردر فيها بيتكتب (label).
  */
-export const ORDER_STATES = ['draft', 'order', 'done'] as const;
-export type OrderState = (typeof ORDER_STATES)[number];
-
-/** المرحلة اللي بعد دي — null = آخر مرحلة (مكتمل) */
-export function nextState(state: string): OrderState | null {
-  const i = ORDER_STATES.indexOf(state as OrderState);
-  return i >= 0 && i < ORDER_STATES.length - 1 ? ORDER_STATES[i + 1] : null;
+export interface StageTemplate {
+  key: string;
+  /** اسم المرحلة اللي الأوردر فيها — المشتري بيشوفه */
+  label: string;
+  /** الزرار اللي بينقل الأوردر للمرحلة دي */
+  action: string;
 }
 
-/** «مهامي»: الأوردرات المفتوحة — اتأكدت ولسه متمتش */
-export const OPEN_STATES: OrderState[] = ['order'];
+/** القالب العام — كل نشاط بياخد منه. بيزيد هنا لما نحتاج مرحلة جديدة */
+export const STAGE_TEMPLATE: StageTemplate[] = [
+  { key: 'preparing', label: 'بيتجهّز', action: 'تجهيز' },
+  { key: 'packing', label: 'بيتغلّف', action: 'تغليف' },
+  { key: 'loading', label: 'بيتحمّل', action: 'تحميل' },
+  { key: 'on_the_way', label: 'في الطريق', action: 'توصيل' },
+  { key: 'delivered', label: 'اتسلّم', action: 'تسليم' },
+];
+
+const FIXED: Record<string, StageTemplate> = {
+  draft: { key: 'draft', label: 'مسودة', action: '' },
+  order: { key: 'order', label: 'مؤكد', action: 'تأكيد' },
+  done: { key: 'done', label: 'مكتمل', action: 'إتمام' },
+};
+
+const byKey = new Map([...STAGE_TEMPLATE, ...Object.values(FIXED)].map((s) => [s.key, s]));
+
+/** المسودة والمكتمل — كل اللي بينهم مفتوح («مهامي») */
+export const CLOSED_STATES = ['draft', 'done'];
+
+/** مراحل النشاط كاملة بالترتيب، من المسودة للمكتمل */
+export function flowOf(salesStages: string[]): string[] {
+  return ['draft', 'order', ...salesStages.filter((k) => STAGE_TEMPLATE.some((s) => s.key === k)), 'done'];
+}
+
+/**
+ * المرحلة اللي بعد دي — null = آخر مرحلة. مرحلة صاحب الشركة شالها من إعداداته
+ * والأوردر لسه فيها: اللي بعدها مكتمل.
+ */
+export function nextIn(flow: string[], state: string): string | null {
+  if (state === 'done') return null;
+  const i = flow.indexOf(state);
+  return i >= 0 ? flow[i + 1] ?? null : 'done';
+}
+
+export function labelOf(state: string): string {
+  return byKey.get(state)?.label ?? state;
+}
+
+/** مراحل البيع اللي النشاط ده اختارها — فاضي = مؤكد ← مكتمل */
+export async function salesStagesOf(businessId: string): Promise<string[]> {
+  const row = await prisma.businessSettings.findUnique({ where: { businessId } });
+  return row?.salesStages ?? [];
+}
+
+export type OrderView = Order & {
+  /** اسم المرحلة — للمشتري والبائع */
+  stateLabel: string;
+  /** زرار المرحلة اللي بعدها، للبائع. فاضي = آخر مرحلة */
+  nextAction: string | null;
+};
+
+/**
+ * الأوردرات زي ما الواجهة بتعرضها: اسم المرحلة وزرار اللي بعدها حسب مراحل
+ * النشاط البائع. استعلام واحد لإعدادات كل الأنشطة البائعة اللي في الليستة.
+ */
+export async function withFlow(orders: Order[]): Promise<OrderView[]> {
+  const sellers = [...new Set(orders.map((o) => o.from.acc))];
+  const rows = sellers.length ? await prisma.businessSettings.findMany({ where: { businessId: { in: sellers } } }) : [];
+  const flows = new Map(rows.map((r) => [r.businessId, flowOf(r.salesStages)]));
+  return orders.map((order) => {
+    const next = nextIn(flows.get(order.from.acc) ?? flowOf([]), order.state);
+    return { ...order, stateLabel: labelOf(order.state), nextAction: next ? labelOfAction(next) : null };
+  });
+}
+
+function labelOfAction(state: string): string {
+  return byKey.get(state)?.action ?? state;
+}
+
+export async function viewOf(order: Order): Promise<OrderView> {
+  return (await withFlow([order]))[0];
+}

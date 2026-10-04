@@ -1,6 +1,6 @@
 import { egp } from '../data/catalog';
 import type { OrderRow } from '../lib/orderRows';
-import { STATE_LABELS } from '../lib/orderFlow';
+import { stageLabel } from '../lib/orderFlow';
 import { itemsLabel } from '../lib/quantity';
 
 /**
@@ -20,7 +20,7 @@ export function OrderRowButton({ row, onOpen, title }: { row: OrderRow; onOpen: 
             <span className="truncate font-display font-bold">{title}</span>
             {row.state && row.state !== 'draft' ? (
               <span className="shrink-0 rounded-md bg-accent-50 px-1.5 py-0.5 text-[11px] font-medium text-accent-700 dark:bg-accent-500/15 dark:text-accent-300">
-                فاتورة {row.number} · {STATE_LABELS[row.state] ?? row.state}
+                فاتورة {row.number} · {row.order ? stageLabel(row.order) : stageLabel({ state: row.state })}
               </span>
             ) : (
               <span className="shrink-0 rounded-md bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">

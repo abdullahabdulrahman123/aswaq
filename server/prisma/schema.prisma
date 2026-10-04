@@ -99,8 +99,9 @@ model Order {
   number       Int?
   /**
    * مراحل الأوردر (مكالمة ١ أكتوبر): draft (مسودة) ← «تأكيد» ← order (مؤكد) ←
-   * «إتمام» ← done (مكتمل). المكتمل بيخرج من «مهامي» وبيفضل محفوظ. المراحل
-   * اللي في النص بتتضاف هنا لما العميل يحددها (src/services/orderFlow.ts)
+   * … ← «إتمام» ← done (مكتمل). المكتمل بيخرج من «مهامي» وبيفضل محفوظ. اللي في
+   * النص (تجهيز، تحميل…) كل نشاط بيختارها في إعداداته (BusinessSettings،
+   * مكالمة ٢ أكتوبر) — والقالب في src/services/orderFlow.ts
    */
   state        String
   /**
@@ -227,6 +228,44 @@ type OrderAmount {
   tax        Int
   avg        Int
   totalItems Int
+}
+
+/**
+ * إعدادات النشاط — بطلب العميل (مكالمة ٢ أكتوبر): الإعداد على المؤسسة كلها،
+ * والصلاحية لفرد بعينه (دي في وصلة، business_employees). الإعدادات بتزيد مع كل
+ * موضوع ندخل فيه. صف واحد لكل نشاط، بيتعمل أول ما صاحبه يحفظ.
+ *
+ * أول إعداد: مراحل البيع — من قالب أسواق (src/services/orderFlow.ts)، بالترتيب
+ * اللي صاحب الشركة اختاره. فاضي = مؤكد ← مكتمل على طول.
+ */
+model BusinessSettings {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  /** id حساب النشاط في وصلة */
+  businessId  String   @unique @db.ObjectId
+  /** مفاتيح المراحل اللي بين «مؤكد» و«مكتمل»، بالترتيب */
+  salesStages String[]
+  updatedAt   DateTime @updatedAt
+
+  @@map("business_settings")
+}
+
+/**
+ * الصلاحيات — جدول system بتاع أسواق نفسه، مش بتاع نشاط (مكالمة ٢ أكتوبر):
+ * «الرصيد» اللي كل الشركات بتاخد منه، وبيزيد كل ما نحتاج صلاحية جديدة. كل
+ * صلاحية ليها قسم أو أكتر (مبيعات، حسابات…) عشان صاحب الشركة يفتح صلاحيات قسم
+ * كامل لموظف. الموظف نفسه بيتسجل له المفتوح بس، في وصلة (business_employees).
+ * بيتملى من الكود ساعة ما السيرفر يقوم (src/services/permissions.ts).
+ */
+model Permission {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  key        String   @unique
+  name       String
+  categories String[]
+  /** بتتفتح للموظف الجديد لوحدها — «الحاجات اللي تعطل الشغل اعملها true» */
+  defaultOn  Boolean
+  sort       Int
+
+  @@map("permissions")
 }
 
 /** عدّادات أرقام الفواتير — صف لكل نشاط بائع */

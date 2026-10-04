@@ -236,4 +236,15 @@ export function useDraftSync(shopId: string | null, lines: CartLine[], method: R
       flush();
     };
   }, [flush]);
+
+  /**
+   * اللي مستني يتبعت على طول، ويستنى لحد ما السيرفر يرد على كله — قبل «تأكيد»
+   * و«طباعة» من صفحة المتجر نفسها، عشان صنف متأخر ميتبعتش على أوردر اتأكد
+   */
+  const settle = useCallback(async () => {
+    flush();
+    await queue.current;
+  }, [flush]);
+
+  return { settle };
 }

@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { InvoiceSheet, type InvoiceView } from '../components/InvoiceSheet';
 import { PriceDialogFor } from '../components/PriceDialog';
 import { useAuth } from '../context/AuthContext';
@@ -24,9 +24,9 @@ import { ApiError, fetchStore, type ShowroomStore } from '../lib/waslaApi';
  * مكالمة ٢٨ سبتمبر: «تأكيد وطباعة» على أقصى اليمين — بيحفظ ويفتح الطباعة على طول
  * من غير المرور على صفحة الفاتورة كل مرة.
  *
- * مكالمة ١ أكتوبر: في «مبيعات» زرارين بس — «تأكيد» و«طباعة» (نفسهم اللي في
- * الأكورديون فوق الأصناف، وبيوصلوا هنا بـstate.then ويشتغلوا لوحدهم أول ما
- * المسودة تبقى جاهزة). «تأكيد» بيفتح الفاتورة المؤكدة بمرحلتها («إتمام» بعدها).
+ * مكالمة ١ أكتوبر: في «مبيعات» زرارين بس — «تأكيد» و«طباعة». «تأكيد» بيفتح
+ * الفاتورة المؤكدة بمرحلتها («إتمام» بعدها). من ٢ أكتوبر الأكورديون فوق الأصناف
+ * بيأكد ويطبع مكانه (SalesPanel) — الصفحة دي بتتفتح من اسم العميل بس.
  *
  * مكالمة ٣٠ سبتمبر: اسم العميل في الناڤبار بقى بيفتح الفاتورة دي (سلة البيع
  * اتشالت)، فتعديل بياناته من زرار «تعديل العميل» هنا. وفي «مبيعات» اسم الصنف
@@ -44,10 +44,6 @@ export function InvoicePage() {
   const { session, openDialog } = useSales();
   const { user, businesses, sessionExpired, selectedBusiness, withToken, signIn } = useAuth();
   const navigate = useNavigate();
-  const { pathname, state: navState } = useLocation();
-  /** جاي من زرار الأكورديون: يأكد أو يطبع لوحده أول ما المسودة تجهز */
-  const autoAction = (navState as { then?: 'confirm' | 'print' } | null)?.then ?? null;
-  const autoDone = useRef(false);
   const [store, setStore] = useState<ShowroomStore | null>(null);
   const [draft, setDraft] = useState<Order | null>(null);
   const [error, setError] = useState('');
@@ -116,22 +112,6 @@ export function InvoicePage() {
       setBusy(null);
     }
   }
-
-  // «تأكيد» / «طباعة» من الأكورديون: مرة واحدة، بعد ما المسودة اتحسبت على السيرفر.
-  // الطلب بيتشال من التاريخ عشان الـrefresh ميعيدهوش
-  const draftReady = Boolean(draft) && !busy;
-  useEffect(() => {
-    if (!autoAction || autoDone.current || !draftReady || !draft) return;
-    autoDone.current = true;
-    navigate(pathname, { replace: true, state: null });
-    if (autoAction === 'print') {
-      requestAnimationFrame(() => window.print());
-      return;
-    }
-    if (draft.details.some((d) => d.unpriced)) return;
-    void handleCheckout('view');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoAction, draftReady]);
 
   if (lines.length === 0) {
     return (

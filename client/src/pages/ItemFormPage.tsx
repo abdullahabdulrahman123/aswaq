@@ -500,7 +500,7 @@ export function ItemFormPage() {
                   </label>
                 </div>
 
-                {/* الأسعار الأربعة في صف واحد: المحل (جملة، قطاعي) والأونلاين (جملة، قطاعي) */}
+                {/* الأسعار الأربعة في صف واحد: الجملة (محل، أونلاين) والقطاعي (محل، أونلاين) — مكالمة ٢ أكتوبر */}
                 <div className="mt-3 grid grid-cols-2 gap-3">
                   {PRICE_GROUPS.map((group) => (
                     <div key={group.label}>

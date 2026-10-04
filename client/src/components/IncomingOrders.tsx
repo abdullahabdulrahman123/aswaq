@@ -5,7 +5,7 @@ import { useIncoming } from '../context/IncomingContext';
 import { egp } from '../data/catalog';
 import type { Order } from '../lib/aswaqApi';
 import { useOrderRows } from '../lib/orderRows';
-import { STATE_LABELS } from '../lib/orderFlow';
+import { stageLabel } from '../lib/orderFlow';
 import { itemsLabel } from '../lib/quantity';
 import { OrderRowButton } from './OrderRowButton';
 
@@ -119,7 +119,7 @@ function IncomingRow({ order }: { order: Order }) {
           <span className="flex min-w-0 items-center gap-2">
             <span className="truncate font-display font-bold">{order.names.buyer}</span>
             <span className="shrink-0 rounded-md bg-accent-50 px-1.5 py-0.5 text-[11px] font-medium text-accent-700 dark:bg-accent-500/15 dark:text-accent-300">
-              فاتورة {order.number} · {STATE_LABELS[order.state] ?? order.state}
+              فاتورة {order.number} · {stageLabel(order)}
             </span>
           </span>
           <span className="mt-0.5 block truncate text-sm text-stone-500 dark:text-stone-400">

@@ -4,8 +4,11 @@ import type { AccountType } from './pricing';
  * أسماء أسعار الصنف زي ما بتظهر للمستخدم — فورم الصنف وصفحة الأصناف.
  */
 
-/** الأسعار الأربعة — S في المحل و L أونلاين، W جملة و R قطاعي */
-export const PRICE_FIELDS = ['onSWP', 'onSRP', 'onLWP', 'onLRP'] as const;
+/**
+ * الأسعار الأربعة — S في المحل و L أونلاين، W جملة و R قطاعي. الجملة الأول
+ * وبعدها القطاعي، كل واحد محل وأونلاين جنب بعض (مكالمة ٢ أكتوبر)
+ */
+export const PRICE_FIELDS = ['onSWP', 'onLWP', 'onSRP', 'onLRP'] as const;
 export type PriceField = (typeof PRICE_FIELDS)[number];
 
 export const PRICE_LABELS: Record<PriceField, string> = {
@@ -16,22 +19,24 @@ export const PRICE_LABELS: Record<PriceField, string> = {
 };
 
 /**
- * الأسعار متجمّعة زي الفورم: المحل لوحده والأونلاين لوحده. الأربعة في صف واحد
- * على الموبايل، فالاسم جوه الخانة «جملة» أو «قطاعي» بس وفوقهم اسم المجموعة.
+ * الأسعار متجمّعة في فورم الصنف و«التسعير»: الجملة لوحدها والقطاعي لوحده،
+ * بطلب العميل (مكالمة ٢ أكتوبر) — «الأولوية عندي جملة وقطاعي»، وأسهل للي بيحط
+ * الأسعار. المحل والأونلاين ملهمش علاقة بالاستلام والتوصيل. الأربعة في صف
+ * واحد على الموبايل، فالاسم جوه الخانة «محل» أو «أونلاين» بس وفوقهم اسم المجموعة.
  */
 export const PRICE_GROUPS: { label: string; fields: { field: PriceField; label: string }[] }[] = [
   {
-    label: 'في المحل',
+    label: 'جملة',
     fields: [
-      { field: 'onSWP', label: 'جملة' },
-      { field: 'onSRP', label: 'قطاعي' },
+      { field: 'onSWP', label: 'محل' },
+      { field: 'onLWP', label: 'أونلاين' },
     ],
   },
   {
-    label: 'أونلاين',
+    label: 'قطاعي',
     fields: [
-      { field: 'onLWP', label: 'جملة' },
-      { field: 'onLRP', label: 'قطاعي' },
+      { field: 'onSRP', label: 'محل' },
+      { field: 'onLRP', label: 'أونلاين' },
     ],
   },
 ];

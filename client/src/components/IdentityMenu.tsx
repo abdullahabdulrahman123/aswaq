@@ -322,6 +322,10 @@ export function IdentityMenu() {
                   <Link role="menuitem" to={`/business/${selectedBusiness.accountId}/employees`} onClick={close} className={itemClass}>
                     الموظفين
                   </Link>
+                  {/* مكالمة ٢ أكتوبر: إعدادات على الشركة كلها — أولها مراحل البيع */}
+                  <Link role="menuitem" to={`/business/${selectedBusiness.accountId}/settings`} onClick={close} className={itemClass}>
+                    الإعدادات
+                  </Link>
                   {/* Business Profile — الاسم اللي العميل اختاره بالعربي */}
                   <Link role="menuitem" to={`/business/${selectedBusiness.accountId}`} onClick={close} className={itemClass}>
                     بيانات الشركة

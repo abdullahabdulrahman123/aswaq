@@ -99,7 +99,7 @@ export function IncomingProvider({ children }: { children: ReactNode }) {
       setOrders((prev) => [order, ...(prev ?? []).filter((o) => o.id !== order.id)]);
       if (!own && !onIncomingPage(here.current)) setToast(order);
     });
-    // اتنقل مرحلة («إتمام» من أي جهاز): المكتمل بيخرج من «مهامي»
+    // اتنقل مرحلة («إتمام» من أي جهاز) أو الفاتورة اتعدّلت: المكتمل بيخرج من «مهامي»
     socket.on('order:state', ({ order }: { order: Order }) => {
       if (order.from.acc !== accountId) return;
       setOrders((prev) => (prev ? (isOpenState(order.state) ? prev.map((o) => (o.id === order.id ? order : o)) : prev.filter((o) => o.id !== order.id)) : prev));

@@ -17,6 +17,9 @@ import { Notch, compactFieldClass } from './OutlinedField';
  *
  * مكالمة ١ أكتوبر: الصفر مسموح — صفر و«تم» بيشيل الصنف (كان بيرجع ١ ومحدش
  * يعرف يتراجع عن صنف). (−) بينزل لحد الصفر.
+ *
+ * مكالمة ٢ أكتوبر: خانة السعر بصلاحية «تغيير سعر صنف في فاتورة البيع» — من غيرها
+ * (priceLocked) السعر بيبان ومبيتغيّرش، والدوسة عليها بتقول يطلبها.
  */
 export function QuantityDialog({
   open,
@@ -26,6 +29,7 @@ export function QuantityDialog({
   initialQty = 1,
   initialPrice,
   editPrice = false,
+  priceLocked = null,
   onDone,
   onClose,
 }: {
@@ -39,6 +43,8 @@ export function QuantityDialog({
   /** السعر اللي البائع كتبه قبل كده على السطر */
   initialPrice?: number;
   editPrice?: boolean;
+  /** رسالة لو تغيير السعر مش متاح له — null = متاح */
+  priceLocked?: string | null;
   /** price: اللي البائع كتبه لو غير سعر المتجر. qty صفر = يتشال */
   onDone: (qty: number, price?: number) => void;
   onClose: () => void;
@@ -48,6 +54,8 @@ export function QuantityDialog({
   const inputRef = useRef<HTMLInputElement>(null);
   const [text, setText] = useState('1');
   const [priceText, setPriceText] = useState('');
+  /** دوس على السعر وهو مقفول */
+  const [priceDenied, setPriceDenied] = useState(false);
 
   useEffect(() => {
     const d = dialogRef.current;
@@ -61,6 +69,7 @@ export function QuantityDialog({
     if (!open) return;
     setText(String(initialQty));
     setPriceText(toPounds(initialPrice ?? unitPrice));
+    setPriceDenied(false);
     const timer = setTimeout(() => inputRef.current?.select(), 30);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -124,10 +133,12 @@ export function QuantityDialog({
                   aria-label="السعر"
                   inputMode="decimal"
                   value={priceText}
+                  readOnly={priceLocked !== null}
+                  aria-disabled={priceLocked !== null}
                   onChange={(e) => setPriceText(moneyInput(e.target.value))}
-                  onFocus={(e) => e.currentTarget.select()}
-                  onClick={(e) => e.currentTarget.select()}
-                  className={`${compactFieldClass} h-10 py-0 text-center font-bold tabular-nums`}
+                  onFocus={(e) => (priceLocked ? setPriceDenied(true) : e.currentTarget.select())}
+                  onClick={(e) => (priceLocked ? setPriceDenied(true) : e.currentTarget.select())}
+                  className={`${compactFieldClass} h-10 py-0 text-center font-bold tabular-nums ${priceLocked ? 'cursor-not-allowed text-stone-400 dark:text-stone-500' : ''}`}
                 />
                 <Notch compact>السعر</Notch>
               </label>
@@ -146,6 +157,11 @@ export function QuantityDialog({
             {/* غير «التسعير» اللي بيغيّر سعر المتجر لكل العملاء (٣٠ سبتمبر) */}
             {editPrice && <span className="ms-1.5">· السعر ده للفاتورة دي بس</span>}
           </p>
+          {priceDenied && priceLocked && (
+            <p role="alert" className="mt-2 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+              {priceLocked}
+            </p>
+          )}
         </form>
       )}
       <DialogCloseButton />

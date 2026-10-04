@@ -5,7 +5,7 @@ import { PriceDialogFor } from '../components/PriceDialog';
 import { useAuth } from '../context/AuthContext';
 import { rememberSalesShop, useSales } from '../context/SalesContext';
 import { advanceOrder, fetchOrder, orderShopId, type Order } from '../lib/aswaqApi';
-import { NEXT_ACTION, STATE_LABELS } from '../lib/orderFlow';
+import { nextActionOf, stageLabel } from '../lib/orderFlow';
 import { orderToView } from '../lib/invoiceView';
 import { ApiError } from '../lib/waslaApi';
 
@@ -21,7 +21,8 @@ import { ApiError } from '../lib/waslaApi';
  * للطلبات الجاية بس.
  *
  * مراحل الأوردر (١ أكتوبر): فوق اسم المرحلة (مؤكد / مكتمل)، وللبائع زرار المرحلة
- * اللي بعدها («إتمام»). الفاتورة مبتختفيش — بتنقل مرحلة بس.
+ * اللي بعدها («إتمام»). الفاتورة مبتختفيش — بتنقل مرحلة بس. من ٢ أكتوبر المراحل
+ * اللي في النص من إعدادات النشاط البائع، والسيرفر بيبعت اسمها وزرارها.
  */
 export function SavedInvoicePage() {
   const { orderId = '' } = useParams<{ orderId: string }>();
@@ -74,7 +75,7 @@ export function SavedInvoicePage() {
   // البائع بس اللي بيسعّر: النشاط اللي الأوردر مطلوب منه
   const canPrice = order.state !== 'draft' && businesses.some((b) => b.accountId === order.from.acc);
   // زرار المرحلة اللي بعدها: للنشاط البائع، ولحد آخر مرحلة
-  const nextAction = canPrice ? NEXT_ACTION[order.state] : undefined;
+  const nextAction = canPrice ? nextActionOf(order) : undefined;
 
   async function handleAdvance() {
     if (!order || advancing) return;
@@ -96,7 +97,7 @@ export function SavedInvoicePage() {
     <div className="mx-auto max-w-2xl px-4 py-8 print:max-w-none print:p-0">
       {order.state !== 'draft' && (
         <p role="status" className="mb-4 rounded-xl bg-accent-50 px-4 py-3 text-sm font-medium text-accent-700 dark:bg-accent-500/10 dark:text-accent-300 print:hidden">
-          فاتورة رقم {order.number} — {STATE_LABELS[order.state] ?? order.state}
+          فاتورة رقم {order.number} — {stageLabel(order)}
         </p>
       )}
       <InvoiceSheet view={orderToView(order)} onPrice={canPrice ? (l) => setPricingId(l.itemId) : undefined} />

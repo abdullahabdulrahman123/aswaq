@@ -16,7 +16,7 @@ import { Avatar, personInitial } from './Avatar';
  * بتفتح الفاتورة. تعديل بيانات العميل من زرار في الفاتورة.
  */
 export function BuyerChip() {
-  const { session, openDialog } = useSales();
+  const { session, openDialog, confirmedOrderId } = useSales();
   const { businesses } = useAuth();
   const { focus, countOf, totalOf } = useStoreCart();
   if (!session) return null;
@@ -72,9 +72,10 @@ export function BuyerChip() {
       </button>
     );
   }
+  // الفاتورة اتأكدت من صفحة المتجر (٢ أكتوبر) — السلة فاضية، فالدوسة بتفتح المؤكدة
   return (
     <Link
-      to={`/orders/${focus.shopId}`}
+      to={confirmedOrderId ? `/invoice/${confirmedOrderId}` : `/orders/${focus.shopId}`}
       title="الفاتورة"
       aria-label={`المشتري: ${name} — الفاتورة${count > 0 ? `، ${itemsLabel(count)} بـ${egp(total)}` : ''}`}
       className={chipClass}
