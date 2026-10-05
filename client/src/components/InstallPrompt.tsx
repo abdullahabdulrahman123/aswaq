@@ -47,7 +47,7 @@ window.addEventListener('appinstalled', () => {
 });
 
 /** مفتوح أصلاً كتطبيق مثبّت — مفيش داعي نعرض حاجة */
-function isStandalone(): boolean {
+export function isStandalone(): boolean {
   return (
     window.matchMedia('(display-mode: standalone)').matches ||
     (navigator as Navigator & { standalone?: boolean }).standalone === true
@@ -59,7 +59,7 @@ function isStandalone(): boolean {
  * من iOS 16.4 كروم وفايرفوكس على الآيفون بيضيفوا للشاشة الرئيسية بنفس
  * الطريقة، فمش بنحصرها في سفاري.
  */
-function isIOS(): boolean {
+export function isIOS(): boolean {
   const ua = navigator.userAgent;
   return /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
 }
@@ -73,8 +73,37 @@ function recentlyDismissed(): boolean {
   }
 }
 
+/**
+ * زراير المنيو (مكالمة ٥ أكتوبر): «أضف للشاشة الرئيسية» بيستخدم نفس حدث التثبيت
+ * لو المتصفح بعته، وإلا بيعرض الخطوات. installed = مفتوح كتطبيق أو اتثبّت دلوقتي.
+ */
+export function useInstall() {
+  const [state, setState] = useState(() => ({ canPrompt: Boolean(deferredPrompt), installed: installed || isStandalone() }));
+  useEffect(() => {
+    const sync = () => setState({ canPrompt: Boolean(deferredPrompt), installed: installed || isStandalone() });
+    subscribers.add(sync);
+    sync();
+    return () => {
+      subscribers.delete(sync);
+    };
+  }, []);
+  return state;
+}
+
+/** نافذة التثبيت بتاعة المتصفح — false لو مفيش حدث محفوظ */
+export async function promptInstall(): Promise<boolean> {
+  const event = deferredPrompt;
+  if (!event) return false;
+  await event.prompt();
+  await event.userChoice;
+  // الحدث بيتستخدم مرة واحدة بس، والمتصفح بيبعت غيره لو احتاج
+  deferredPrompt = null;
+  notify();
+  return true;
+}
+
 /** أيقونة زرار المشاركة في سفاري — مربع طالع منه سهم */
-function ShareIcon() {
+export function ShareIcon() {
   return (
     <svg
       viewBox="0 0 24 24"

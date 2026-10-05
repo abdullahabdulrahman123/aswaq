@@ -56,5 +56,10 @@ export const lineSchema = z.object({
   price: sellerPrice,
 });
 
+/** إلغاء فاتورة (مكالمة ٥ أكتوبر): السبب لازم يتكتب */
+export const cancelSchema = z.object({
+  reason: z.string().trim().min(1).max(300),
+});
+
 export type DraftInput = z.infer<typeof draftSchema>;
 export type LineInput = z.infer<typeof lineSchema>;

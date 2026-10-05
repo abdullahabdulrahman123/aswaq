@@ -13,6 +13,7 @@ import { fetchOrder, fetchShowroomStore, putConfirmedLine, type Order, type Show
 import { deliversTo, distanceKm, formatDistance } from '../lib/buyerLocation';
 import { buyerPriceField, type ReceivingMethod } from '../lib/itemUnits';
 import { useDraftSync } from '../lib/draftSync';
+import { closedMessage, isOpenState } from '../lib/orderFlow';
 import { PERMISSIONS, can, deniedMessage } from '../lib/permissions';
 import { ApiError, SessionExpiredError, fetchStore, type ShowroomStore } from '../lib/waslaApi';
 
@@ -217,13 +218,16 @@ export function StorePage() {
 
   /** رأس فاتورة جديدة مفتوح هنا — من غير مشتري لسه، فالأصناف مستخبية */
   const newSale = dialog !== null && dialog.editing === null && dialog.business.accountId === store.business.accountId;
+  /** رأس الفاتورة مفتوح (جديدة أو بتتعدّل) — اسم المتجر جوّاه، فسطر المتجر فوق بيختفي عشان «ابدأ البيع» يبان من غير سكرول (٥ أكتوبر) */
+  const salesFormOpen = dialog !== null && dialog.business.accountId === store.business.accountId;
 
   /** الفاتورة المؤكدة في «مبيعات»: الكروت بتعرض سطورها، والتعديل بالصلاحيات */
   const confirmedOrder = session && confirmedOrderId && saleOrder?.id === confirmedOrderId ? saleOrder : null;
   const selling = session ? businesses.find((b) => b.accountId === session.accountId) : undefined;
-  const editable = confirmedOrder !== null && confirmedOrder.state !== 'done';
-  const lockQty = !editable ? 'الفاتورة دي خلصت ومبقتش بتتعدّل.' : can(selling, PERMISSIONS.invoiceQuantity) ? null : deniedMessage(PERMISSIONS.invoiceQuantity);
-  const lockAdd = !editable ? 'الفاتورة دي خلصت ومبقتش بتتعدّل.' : can(selling, PERMISSIONS.invoiceAddItem) ? null : deniedMessage(PERMISSIONS.invoiceAddItem);
+  const editable = confirmedOrder !== null && isOpenState(confirmedOrder.state);
+  const closed = confirmedOrder ? closedMessage(confirmedOrder.state) : '';
+  const lockQty = !editable ? closed : can(selling, PERMISSIONS.invoiceQuantity) ? null : deniedMessage(PERMISSIONS.invoiceQuantity);
+  const lockAdd = !editable ? closed : can(selling, PERMISSIONS.invoiceAddItem) ? null : deniedMessage(PERMISSIONS.invoiceAddItem);
   const priceLocked = session && !can(selling, PERMISSIONS.invoicePrice) ? deniedMessage(PERMISSIONS.invoicePrice) : null;
 
   /** صنف في الفاتورة المؤكدة: الكمية الجديدة (صفر = يتشال) — السيرفر بيتأكد من الصلاحية تاني */
@@ -277,7 +281,7 @@ export function StorePage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-5 print:max-w-none print:p-0">
       {/* سطر المتجر صغير — المشتري مهتم بالأصناف أكتر، بطلب العميل (٢٨ سبتمبر) */}
-      <div className="flex items-center gap-2.5 print:hidden">
+      <div className={`flex items-center gap-2.5 print:hidden ${salesFormOpen ? 'hidden' : ''}`}>
         <Avatar picture={store.business.picture} fallback={store.business.abbreviation} kind="business" size={36} tone="soft" />
         <div className="min-w-0">
           <h1 className="break-words font-display text-lg font-bold leading-tight sm:text-xl">{store.name}</h1>

@@ -292,8 +292,8 @@ export interface Order {
   id: string;
   /** رقم الفاتورة — null في المسودة */
   number: number | null;
-  /** draft | order | [مراحل النشاط] | done — lib/orderFlow */
-  state: 'draft' | 'order' | 'done' | string;
+  /** draft | order | [مراحل النشاط] | done | cancelled — lib/orderFlow */
+  state: 'draft' | 'order' | 'done' | 'cancelled' | string;
   /** اسم المرحلة من السيرفر (مكالمة ٢ أكتوبر: المراحل من إعدادات النشاط البائع) */
   stateLabel?: string;
   /** زرار المرحلة اللي بعدها — null = آخر مرحلة */
@@ -305,6 +305,8 @@ export interface Order {
   checkedOutAt: string | null;
   /** ساعة «إتمام» */
   completedAt?: string | null;
+  /** الإلغاء (مكالمة ٥ أكتوبر): مين لغى (البائع ولا المشتري) وليه */
+  cancellation?: { by: 'seller' | 'buyer'; person: { acc: string; name: string }; reason: string; at: string } | null;
   /** onsite = «مبيعات» (الشباك)، online = المعرض */
   source?: 'onsite' | 'online' | null;
   creator: { acc: string; name: string };
@@ -451,6 +453,15 @@ export async function fetchOrder(token: string, orderId: string): Promise<Order>
 /** المرحلة اللي بعدها («إتمام») — للنشاط البائع. 409 = اتنقل من مكان تاني */
 export async function advanceOrder(token: string, orderId: string): Promise<Order> {
   const { order } = await request<{ order: Order }>(`/api/orders/${encodeURIComponent(orderId)}/advance`, token, { method: 'POST' });
+  return order;
+}
+
+/** إلغاء فاتورة مؤكدة لسه مخلصتش، بسبب — البائع في أي مرحلة، والمشتري وهي «مؤكد» بس */
+export async function cancelOrder(token: string, orderId: string, reason: string): Promise<Order> {
+  const { order } = await request<{ order: Order }>(`/api/orders/${encodeURIComponent(orderId)}/cancel`, token, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
   return order;
 }
 

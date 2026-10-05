@@ -8,7 +8,9 @@ import { pathAfterSwitch } from '../lib/businessRoutes';
 import { hasUnsavedWork } from '../lib/unsavedWork';
 import { useDropdown } from '../lib/useDropdown';
 import { Avatar, personInitial } from './Avatar';
+import { promptInstall, useInstall } from './InstallPrompt';
 import { Notch } from './OutlinedField';
+import { ShortcutDialog, type ShortcutKind } from './ShortcutDialog';
 import { UnsavedSwitchDialog } from './UnsavedSwitchDialog';
 
 const itemClass =
@@ -90,6 +92,9 @@ export function IdentityMenu() {
   const { user, businesses, businessesLoading, selectedBusiness, selectBusiness, signIn, signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { open, setOpen, wrapRef, close } = useDropdown();
+  const { installed } = useInstall();
+  /** خطوات الاختصار مفتوحة — برا المنيو عشان المنيو بتتقفل مع الدوسة */
+  const [shortcut, setShortcut] = useState<ShortcutKind | null>(null);
   const { openDialog: openSales } = useSales();
   // ليستة «حساباتي» بتبدأ مقفولة كل ما المنيو تفتح
   const [accountsOpen, setAccountsOpen] = useState(false);
@@ -138,6 +143,40 @@ export function IdentityMenu() {
       </span>
       {theme === 'dark' ? 'الوضع النهاري' : 'الوضع الليلي'}
     </button>
+  );
+
+  // مكالمة ٥ أكتوبر: اختصار على الشاشة الرئيسية واختصار في المتصفح — دايماً في المنيو،
+  // مش بس الإشعار اللي بيظهر لوحده (InstallPrompt). بيختفوا لو التطبيق مفتوح مثبّت
+  const shortcutItems = installed ? null : (
+    <>
+      <button
+        role="menuitem"
+        onClick={async () => {
+          close();
+          // أندرويد والكمبيوتر: نافذة التثبيت على طول لو المتصفح جاهز، وإلا الخطوات
+          if (!(await promptInstall())) setShortcut('home');
+        }}
+        className={itemClass}
+      >
+        <span aria-hidden="true" className="w-4 text-center">
+          ⊕
+        </span>
+        أضف للشاشة الرئيسية
+      </button>
+      <button
+        role="menuitem"
+        onClick={() => {
+          close();
+          setShortcut('bookmark');
+        }}
+        className={itemClass}
+      >
+        <span aria-hidden="true" className="w-4 text-center">
+          ☆
+        </span>
+        اختصار في المتصفح
+      </button>
+    </>
   );
 
   return (
@@ -333,7 +372,10 @@ export function IdentityMenu() {
                 </div>
               )}
 
-              <div className={sectionClass}>{themeItem}</div>
+              <div className={sectionClass}>
+                {themeItem}
+                {shortcutItems}
+              </div>
 
               <div className={sectionClass}>
                 <button
@@ -372,11 +414,16 @@ export function IdentityMenu() {
                   إنشاء حساب
                 </button>
               </div>
-              <div className={sectionClass}>{themeItem}</div>
+              <div className={sectionClass}>
+                {themeItem}
+                {shortcutItems}
+              </div>
             </>
           )}
         </div>
       )}
+
+      {shortcut && createPortal(<ShortcutDialog kind={shortcut} onClose={() => setShortcut(null)} />, document.body)}
 
       {/* على body: الهيدر فيه backdrop-blur، وده بيحبس أي fixed جواه في مساحة الهيدر */}
       {pendingSwitch &&

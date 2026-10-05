@@ -14,5 +14,6 @@ router.put('/:orderId/confirmed-lines', orderController.putConfirmedLine);
 router.get('/:orderId', orderController.get);
 router.post('/:orderId/checkout', orderController.checkout);
 router.post('/:orderId/advance', orderController.advance);
+router.post('/:orderId/cancel', orderController.cancel);
 
 export default router;

@@ -35,12 +35,17 @@ const FIXED: Record<string, StageTemplate> = {
   draft: { key: 'draft', label: 'مسودة', action: '' },
   order: { key: 'order', label: 'مؤكد', action: 'تأكيد' },
   done: { key: 'done', label: 'مكتمل', action: 'إتمام' },
+  // مكالمة ٥ أكتوبر: من أي مرحلة مفتوحة، بزرار لوحده مش زرار المرحلة
+  cancelled: { key: 'cancelled', label: 'ملغية', action: 'إلغاء' },
 };
 
 const byKey = new Map([...STAGE_TEMPLATE, ...Object.values(FIXED)].map((s) => [s.key, s]));
 
-/** المسودة والمكتمل — كل اللي بينهم مفتوح («مهامي») */
-export const CLOSED_STATES = ['draft', 'done'];
+/** المسودة والمكتمل والملغية — كل اللي بينهم مفتوح («مهامي») */
+export const CLOSED_STATES = ['draft', 'done', 'cancelled'];
+
+/** خلصت (مكتملة أو ملغية) — مبتتعدّلش ومبتتنقلش */
+export const isFinished = (state: string) => state === 'done' || state === 'cancelled';
 
 /** مراحل النشاط كاملة بالترتيب، من المسودة للمكتمل */
 export function flowOf(salesStages: string[]): string[] {
@@ -52,7 +57,7 @@ export function flowOf(salesStages: string[]): string[] {
  * والأوردر لسه فيها: اللي بعدها مكتمل.
  */
 export function nextIn(flow: string[], state: string): string | null {
-  if (state === 'done') return null;
+  if (isFinished(state)) return null;
   const i = flow.indexOf(state);
   return i >= 0 ? flow[i + 1] ?? null : 'done';
 }

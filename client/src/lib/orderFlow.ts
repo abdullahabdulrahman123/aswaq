@@ -11,6 +11,7 @@ const FIXED_LABELS: Record<string, string> = {
   draft: 'مسودة',
   order: 'مؤكد',
   done: 'مكتمل',
+  cancelled: 'ملغية',
 };
 
 const FIXED_NEXT: Record<string, string> = {
@@ -28,5 +29,8 @@ export const nextActionOf = (order: Pick<Order, 'state' | 'nextAction'>) =>
 /** زرار «تأكيد» على المسودة */
 export const CONFIRM_ACTION = FIXED_NEXT.draft;
 
-/** «مهامي»: المفتوح — اتأكد ولسه متمش، في أي مرحلة */
-export const isOpenState = (state: string) => state !== 'draft' && state !== 'done';
+/** «مهامي»: المفتوح — اتأكد ولسه متمش ولا اتلغى، في أي مرحلة */
+export const isOpenState = (state: string) => state !== 'draft' && state !== 'done' && state !== 'cancelled';
+
+/** ليه الفاتورة المؤكدة مبقتش بتتعدّل */
+export const closedMessage = (state: string) => (state === 'cancelled' ? 'الفاتورة دي اتلغت ومبقتش بتتعدّل.' : 'الفاتورة دي خلصت ومبقتش بتتعدّل.');

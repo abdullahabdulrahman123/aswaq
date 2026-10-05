@@ -12,6 +12,8 @@ export const PERMISSIONS = {
   invoiceQuantity: 'sales.invoice.quantity',
   /** صنف مكانش في الفاتورة وهي متأكدة */
   invoiceAddItem: 'sales.invoice.add_item',
+  /** إلغاء فاتورة مؤكدة لسه مخلصتش (مكالمة ٥ أكتوبر) */
+  invoiceCancel: 'sales.invoice.cancel',
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -21,6 +23,7 @@ export const PERMISSION_NAMES: Record<PermissionKey, string> = {
   'sales.invoice.price': 'تغيير سعر صنف في فاتورة البيع',
   'sales.invoice.quantity': 'تغيير كمية صنف في فاتورة البيع',
   'sales.invoice.add_item': 'إضافة صنف مش موجود في فاتورة البيع',
+  'sales.invoice.cancel': 'إلغاء فاتورة بيع',
 };
 
 export const isOwner = (business: Pick<Business, 'job'> | undefined) => (business?.job ?? 'owner') === 'owner';

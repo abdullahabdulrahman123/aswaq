@@ -267,6 +267,18 @@ export async function advanceState(order: Order, to: string) {
 }
 
 /**
+ * الإلغاء (مكالمة ٥ أكتوبر): من المرحلة اللي الأوردر فيها لـcancelled، مع مين
+ * لغى وليه. لو اتنقل أو اتعدّل في نفس اللحظة من جهاز تاني: null
+ */
+export async function cancelState(order: Order, by: 'seller' | 'buyer', person: { acc: string; name: string }, reason: string) {
+  const { count } = await prisma.order.updateMany({
+    where: { id: order.id, state: order.state, updatedAt: order.updatedAt },
+    data: { state: 'cancelled', cancellation: { by, person, reason, at: new Date() }, editor: person, updatedAt: new Date() },
+  });
+  return count === 1 ? prisma.order.findUnique({ where: { id: order.id } }) : null;
+}
+
+/**
  * الأوردرات اللي قبل عمود source (١ أكتوبر): «مبيعات» = onsite والباقي online.
  * مرة واحدة فعلياً ساعة ما السيرفر يقوم.
  */

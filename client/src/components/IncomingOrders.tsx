@@ -31,9 +31,10 @@ export function IncomingOrders({ business }: { business: Business }) {
   const { accountId } = business;
   const { orders, markSeen, live } = useIncoming();
   const { rows, open } = useOrderRows();
-  const openSales = rows.filter((row) => row.sale?.accountId === accountId && row.state !== 'order');
+  // اللي لسه متأكدتش بس (على الجهاز أو مسودة) — المؤكدة في أي مرحلة تحت مع الواردة، والمكتملة والملغية برا «مهامي»
+  const openSales = rows.filter((row) => row.sale?.accountId === accountId && (row.state === null || row.state === 'draft'));
 
-  // الصفحة مفتوحة = اللي فيها اتشاف، والعداد يتصفّر (ومع كل طلب بيوصل وهي مفتوحة)
+  // الصفحة مفتوحة = التنبيه يختفي (ومع كل طلب بيوصل وهي مفتوحة). العداد بيفضل لحد ما الفاتورة تخلص
   useEffect(() => {
     if (orders) markSeen();
   }, [orders, markSeen]);

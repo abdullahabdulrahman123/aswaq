@@ -102,6 +102,9 @@ model Order {
    * … ← «إتمام» ← done (مكتمل). المكتمل بيخرج من «مهامي» وبيفضل محفوظ. اللي في
    * النص (تجهيز، تحميل…) كل نشاط بيختارها في إعداداته (BusinessSettings،
    * مكالمة ٢ أكتوبر) — والقالب في src/services/orderFlow.ts
+   *
+   * cancelled (ملغية، مكالمة ٥ أكتوبر): البائع أو المشتري لغاها بسبب — بتخرج من
+   * «مهامي» زي المكتمل، والسبب ومين لغى في cancellation
    */
   state        String
   /**
@@ -114,6 +117,8 @@ model Order {
   checkedOutAt DateTime?
   /** ساعة «إتمام» */
   completedAt  DateTime?
+  /** الإلغاء: مين لغى (البائع ولا المشتري) والسبب والساعة. فاضي = متلغتش */
+  cancellation OrderCancellation?
   /**
    * الفاتورة جاية منين (مكالمة ١ أكتوبر): onsite = «مبيعات» (الشباك)، online =
    * المشتري من المعرض. الأوردرات اللي قبلها بتتملي ساعة ما السيرفر يقوم
@@ -168,6 +173,16 @@ type OrderPerson {
 type OrderParty {
   acc    String  @db.ObjectId
   subAcc String? @db.ObjectId
+}
+
+/** مكالمة ٥ أكتوبر: «كانسل للفاتورة مع السبب، ومين اللي كانسل سيلر أو بايير» */
+type OrderCancellation {
+  /** seller | buyer */
+  by     String
+  /** اللي داس «إلغاء» — موظف البائع أو المشتري نفسه */
+  person OrderPerson
+  reason String
+  at     DateTime
 }
 
 type OrderNames {

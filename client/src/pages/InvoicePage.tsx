@@ -137,7 +137,6 @@ export function InvoicePage() {
     lines: lines.map((l) => ({ key: `${l.itemId}|${l.unitName}`, itemId: l.itemId, item: l.itemName, unit: l.unitName, quantity: l.qty, price: linePrice(l) })),
     total: totalOf(shopId),
     weightKg: null,
-    volumeM3: null,
   };
   const view = draft ? orderToView(draft) : local;
   const unpriced = view.lines.some((l) => l.price === null);

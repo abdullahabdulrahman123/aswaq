@@ -29,15 +29,11 @@ export interface InvoiceView {
   total: number;
   /** بالكيلو. null = الأصناف ملهاش وزن متسجّل */
   weightKg: number | null;
-  /** بالمتر المكعب. null = الأصناف ملهاش حجم متسجّل */
-  volumeM3: number | null;
-  /** فيه صنف وزنه أو حجمه مش متسجّل — الإجماليات ممكن تبقى أقل من الحقيقة */
+  /** فيه صنف وزنه مش متسجّل — الوزن ممكن يبقى أقل من الحقيقة */
   measuresMissing?: boolean;
 }
 
 const amount = (n: number) => n.toLocaleString('en-EG', { maximumFractionDigits: 2 });
-/** الحجم بالمتر المكعب لحد اللتر (٣ أرقام) — كيسين ١.٥ لتر = 0.003 م³ مش 0 */
-const volume = (n: number) => n.toLocaleString('en-EG', { maximumFractionDigits: 3 });
 
 const cell = 'border border-stone-800 px-2 py-1.5 dark:border-stone-400 print:border-black';
 const label = `${cell} bg-stone-100 font-semibold dark:bg-white/10 print:bg-stone-100`;
@@ -50,6 +46,9 @@ const label = `${cell} bg-stone-100 font-semibold dark:bg-white/10 print:bg-ston
  * مكالمة ٣٠ سبتمبر: اللي فوق الأصناف رأس الفاتورة من غير جدول ولا خطوط — اسم
  * الشركة والمتجر، ورقم الفاتورة والتاريخ، والعميل والاستلام. البائع والسائق
  * اتشالوا دلوقتي.
+ *
+ * مكالمة ٥ أكتوبر: خانة الحجم اتشالت — الوزن بس، زي الورق. الحجم لسه في الصنف
+ * عشان تحميل العربية.
  *
  * onPrice (للبائع بس): اسم الصنف بيبقى زرار بيفتح «التسعير». في الورقة شكله نص عادي.
  *
@@ -154,11 +153,7 @@ export function InvoiceSheet({ view, onPrice }: { view: InvoiceView; onPrice?: (
           </tr>
           <tr>
             <td className={`${label} text-center`}>الوزن</td>
-            {/* الحجم تحت الوزن في نفس الخانة — فاتورة الهلال الورق فيها الوزن بس */}
-            <td className={`${cell} text-center tabular-nums`}>
-              {view.weightKg === null ? '—' : `${amount(view.weightKg)} كجم`}
-              {view.volumeM3 !== null && <span className="block text-xs">{volume(view.volumeM3)} م³</span>}
-            </td>
+            <td className={`${cell} text-center tabular-nums`}>{view.weightKg === null ? '—' : `${amount(view.weightKg)} كجم`}</td>
             <td className={`${label} text-center`}>حساب سابق</td>
             <td className={cell} />
           </tr>
@@ -177,10 +172,10 @@ export function InvoiceSheet({ view, onPrice }: { view: InvoiceView; onPrice?: (
         </tbody>
       </table>
 
-      {/* نص العميل بالحرف (٢٧ سبتمبر) */}
+      {/* نص العميل (٢٧ سبتمبر)، من غير الحجم من ٥ أكتوبر */}
       {view.measuresMissing && (
         <p className="mt-2 text-xs text-amber-700 dark:text-amber-300 print:text-black">
-          ربما تكون هذه الحسابات غير دقيقة نتيجة لعدم تسجيل الحجم أو الوزن لبعض الأصناف.
+          ربما تكون هذه الحسابات غير دقيقة نتيجة لعدم تسجيل الوزن لبعض الأصناف.
         </p>
       )}
 

@@ -3,12 +3,13 @@ import type { Prisma } from '@prisma/client';
 import { currentUser, fetchWaslaStore, findManagedBusiness } from '../middleware/auth.js';
 import { isObjectId } from '../schemas/common.js';
 import { announceIncoming, announceState } from '../realtime.js';
-import { draftSchema, lineSchema } from '../schemas/order.schema.js';
-import { flowOf, nextIn, salesStagesOf, viewOf, withFlow } from '../services/orderFlow.js';
+import { cancelSchema, draftSchema, lineSchema } from '../schemas/order.schema.js';
+import { flowOf, isFinished, nextIn, salesStagesOf, viewOf, withFlow } from '../services/orderFlow.js';
 import { PERMISSIONS, can } from '../services/permissions.js';
 import {
   advanceState,
   buildDetails,
+  cancelState,
   checkOut,
   deleteOrder,
   findDraft,
@@ -212,8 +213,8 @@ export async function putConfirmedLine(req: Request, res: Response) {
       res.status(order?.state === 'draft' ? 409 : 404).json({ message: order?.state === 'draft' ? 'Order is not confirmed yet' : 'Order not found' });
       return;
     }
-    if (order.state === 'done') {
-      res.status(409).json({ message: 'Order is already completed' });
+    if (isFinished(order.state)) {
+      res.status(409).json({ message: order.state === 'cancelled' ? 'Order is cancelled' : 'Order is already completed' });
       return;
     }
 
@@ -318,6 +319,54 @@ export async function advance(req: Request, res: Response) {
   }
   const view = await viewOf(moved);
   // «مهامي» عند الباقيين بتتحدّث — المكتمل بيخرج منها
+  await announceState(view).catch(() => undefined);
+  res.json({ order: view });
+}
+
+/**
+ * POST /api/orders/:orderId/cancel — `{ reason }`، مكالمة ٥ أكتوبر: «كانسل للفاتورة
+ * مع السبب، ومين اللي كانسل سيلر أو بايير». فاتورة مؤكدة لسه مخلصتش بس — المكتملة
+ * متتلغيش (دي مرتجع مع الحسابات).
+ *   - البائع (أي حد في النشاط البائع، بصلاحية «إلغاء فاتورة بيع»): في أي مرحلة
+ *   - المشتري (اللي عامل الطلب من المعرض): وهو لسه «مؤكد» بس — قبل ما البائع
+ *     يبدأ يجهّزه. بيعة «مبيعات» المشتري فيها مش هو اللي عاملها
+ * 403 فيه `permission` الناقصة، أو `stage` لو المشتري اتأخر. 409 لو خلصت أو
+ * اتنقلت في نفس اللحظة.
+ */
+export async function cancel(req: Request, res: Response) {
+  const id = String(req.params.orderId);
+  const parsed = cancelSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ message: 'Invalid input', issues: parsed.error.issues });
+    return;
+  }
+  const me = await currentUser(req);
+  const order = isObjectId(id) ? await findById(id) : null;
+  const seller = order && order.state !== 'draft' ? await findManagedBusiness(req, order.from.acc) : undefined;
+  const buyer = Boolean(order && !seller && order.sale == null && order.creator.acc === me.accountId);
+  if (!order || order.state === 'draft' || (!seller && !buyer)) {
+    res.status(404).json({ message: 'Order not found' });
+    return;
+  }
+  if (isFinished(order.state)) {
+    res.status(409).json({ message: order.state === 'cancelled' ? 'Order is already cancelled' : 'Order is already completed' });
+    return;
+  }
+  if (seller && !can(seller, PERMISSIONS.invoiceCancel)) {
+    res.status(403).json({ message: 'Permission required', permission: PERMISSIONS.invoiceCancel });
+    return;
+  }
+  if (!seller && order.state !== 'order') {
+    res.status(403).json({ message: 'The seller already started on this order', stage: order.state });
+    return;
+  }
+  const cancelled = await cancelState(order, seller ? 'seller' : 'buyer', { acc: me.accountId, name: me.name }, parsed.data.reason);
+  if (!cancelled) {
+    res.status(409).json({ message: 'Order changed while cancelling, try again' });
+    return;
+  }
+  const view = await viewOf(cancelled);
+  // «مهامي» عند البائع — الملغية بتخرج منها
   await announceState(view).catch(() => undefined);
   res.json({ order: view });
 }

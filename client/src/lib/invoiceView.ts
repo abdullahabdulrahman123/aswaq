@@ -21,9 +21,10 @@ export function orderToView(order: Order): InvoiceView {
       price: d.unpriced ? null : d.price,
     })),
     total: order.netTotal,
-    // الوزن بالجرام والحجم بالسنتيمتر المكعب في الأوردر
+    // الوزن بالجرام في الأوردر
     weightKg: order.details.some((d) => d.weight) ? order.totalWeight / 1000 : null,
-    volumeM3: order.details.some((d) => d.volume) ? (order.totalVolume ?? 0) / 1_000_000 : null,
-    measuresMissing: order.details.some((d) => d.measuresMissing),
+    // الوزن بس على الفاتورة (٥ أكتوبر) — measuresMissing بتاع السطر فيه الحجم كمان. السيرفر
+    // بيحسب الوزن الفاضي صفر، فالصفر = متسجّلش
+    measuresMissing: order.details.some((d) => !d.weight),
   };
 }

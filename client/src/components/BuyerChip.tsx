@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { buyerLabel, useSales } from '../context/SalesContext';
+import { buyerLabel, lastSalesShop, useSales } from '../context/SalesContext';
 import { useStoreCart } from '../context/StoreCartContext';
 import { egp } from '../data/catalog';
 import { itemsLabel } from '../lib/quantity';
@@ -14,9 +14,13 @@ import { Avatar, personInitial } from './Avatar';
  * مكالمة ٣٠ سبتمبر: سلة البيع اتشالت ومكانها هنا — تحت الاسم الإجمالي (أحمر لحد
  * الحد الأدنى للأوردر وبعدين أخضر، زي السلة)، وعدد الأصناف على المستطيل، والدوسة
  * بتفتح الفاتورة. تعديل بيانات العميل من زرار في الفاتورة.
+ *
+ * مكالمة ٥ أكتوبر: «بدل الفاتورة خليه يرجعني المتجر تاني» — التحكم في البيعة كله
+ * من المتجر (رأس الفاتورة فوق الأصناف)، والفاتورة مرحلة أخيرة. فالدوسة بترجّع
+ * لمتجر البيعة، مسودة كانت أو اتأكدت.
  */
 export function BuyerChip() {
-  const { session, openDialog, confirmedOrderId } = useSales();
+  const { session, openDialog } = useSales();
   const { businesses } = useAuth();
   const { focus, countOf, totalOf } = useStoreCart();
   if (!session) return null;
@@ -64,20 +68,21 @@ export function BuyerChip() {
   const chipClass =
     'relative flex min-w-0 items-center gap-1.5 rounded-lg border border-brand-300 bg-brand-50 px-2 py-1 text-start transition hover:bg-brand-100 dark:border-brand-500/40 dark:bg-brand-500/10 dark:hover:bg-brand-500/20';
 
-  // برّه صفحة المتجر وفاتورته مفيش أوردر نفتحه — الدوسة بتعدّل البيانات زي الأول
-  if (!focus) {
+  const shopId = focus?.shopId ?? session.shopId ?? lastSalesShop(session.accountId);
+  // مفيش متجر نرجعله — الدوسة بتعدّل البيانات زي الأول (والأكورديون بيودّي على متجر)
+  if (!shopId) {
     return (
       <button type="button" onClick={() => business && openDialog(business, session)} aria-label={`المشتري: ${name} — تعديل`} className={chipClass}>
         {body}
       </button>
     );
   }
-  // الفاتورة اتأكدت من صفحة المتجر (٢ أكتوبر) — السلة فاضية، فالدوسة بتفتح المؤكدة
   return (
     <Link
-      to={confirmedOrderId ? `/invoice/${confirmedOrderId}` : `/orders/${focus.shopId}`}
-      title="الفاتورة"
-      aria-label={`المشتري: ${name} — الفاتورة${count > 0 ? `، ${itemsLabel(count)} بـ${egp(total)}` : ''}`}
+      to={`/store/${shopId}`}
+      onClick={() => window.scrollTo({ top: 0 })}
+      title="المتجر"
+      aria-label={`المشتري: ${name} — المتجر${count > 0 ? `، ${itemsLabel(count)} بـ${egp(total)}` : ''}`}
       className={chipClass}
     >
       {body}

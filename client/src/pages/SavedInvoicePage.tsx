@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { CancelOrderDialog, CancellationNote } from '../components/CancelOrderDialog';
 import { InvoiceSheet } from '../components/InvoiceSheet';
 import { PriceDialogFor } from '../components/PriceDialog';
 import { useAuth } from '../context/AuthContext';
 import { rememberSalesShop, useSales } from '../context/SalesContext';
 import { advanceOrder, fetchOrder, orderShopId, type Order } from '../lib/aswaqApi';
-import { nextActionOf, stageLabel } from '../lib/orderFlow';
+import { isOpenState, nextActionOf, stageLabel } from '../lib/orderFlow';
+import { PERMISSIONS, can, deniedMessage } from '../lib/permissions';
 import { orderToView } from '../lib/invoiceView';
 import { ApiError } from '../lib/waslaApi';
 
@@ -23,6 +25,9 @@ import { ApiError } from '../lib/waslaApi';
  * مراحل الأوردر (١ أكتوبر): فوق اسم المرحلة (مؤكد / مكتمل)، وللبائع زرار المرحلة
  * اللي بعدها («إتمام»). الفاتورة مبتختفيش — بتنقل مرحلة بس. من ٢ أكتوبر المراحل
  * اللي في النص من إعدادات النشاط البائع، والسيرفر بيبعت اسمها وزرارها.
+ *
+ * مكالمة ٥ أكتوبر: «إلغاء» بالسبب — للبائع لحد ما تخلص (بصلاحية)، وللمشتري على
+ * طلبه هو وهو لسه «مؤكد». والملغية بتقول مين لغاها وليه.
  */
 export function SavedInvoicePage() {
   const { orderId = '' } = useParams<{ orderId: string }>();
@@ -37,6 +42,7 @@ export function SavedInvoicePage() {
   const [pricingId, setPricingId] = useState<string | null>(null);
   const [advancing, setAdvancing] = useState(false);
   const [advanceError, setAdvanceError] = useState('');
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -76,6 +82,11 @@ export function SavedInvoicePage() {
   const canPrice = order.state !== 'draft' && businesses.some((b) => b.accountId === order.from.acc);
   // زرار المرحلة اللي بعدها: للنشاط البائع، ولحد آخر مرحلة
   const nextAction = canPrice ? nextActionOf(order) : undefined;
+  const selling = businesses.find((b) => b.accountId === order.from.acc);
+  // الإلغاء: البائع لحد ما تخلص، والمشتري (اللي عامل الطلب من المعرض) وهو لسه «مؤكد» بس
+  const sellerCancel = canPrice && isOpenState(order.state);
+  const buyerCancel = !canPrice && order.sale == null && order.state === 'order';
+  const cancelAllowed = buyerCancel || can(selling, PERMISSIONS.invoiceCancel);
 
   async function handleAdvance() {
     if (!order || advancing) return;
@@ -96,10 +107,16 @@ export function SavedInvoicePage() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 print:max-w-none print:p-0">
       {order.state !== 'draft' && (
-        <p role="status" className="mb-4 rounded-xl bg-accent-50 px-4 py-3 text-sm font-medium text-accent-700 dark:bg-accent-500/10 dark:text-accent-300 print:hidden">
+        <p
+          role="status"
+          className={`mb-4 rounded-xl px-4 py-3 text-sm font-medium print:hidden ${
+            order.state === 'cancelled' ? 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300' : 'bg-accent-50 text-accent-700 dark:bg-accent-500/10 dark:text-accent-300'
+          }`}
+        >
           فاتورة رقم {order.number} — {stageLabel(order)}
         </p>
       )}
+      <CancellationNote order={order} />
       <InvoiceSheet view={orderToView(order)} onPrice={canPrice ? (l) => setPricingId(l.itemId) : undefined} />
       {pricingId && (
         <PriceDialogFor
@@ -133,6 +150,19 @@ export function SavedInvoicePage() {
         >
           طباعة
         </button>
+        {(sellerCancel || buyerCancel) && (
+          <button
+            type="button"
+            aria-disabled={!cancelAllowed}
+            onClick={() => {
+              if (cancelAllowed) setCancelling(true);
+              else setAdvanceError(deniedMessage(PERMISSIONS.invoiceCancel));
+            }}
+            className={`rounded-xl border border-red-300 px-6 py-3 text-sm font-semibold text-red-700 transition hover:bg-red-50 dark:border-red-500/40 dark:text-red-300 dark:hover:bg-red-500/10 ${cancelAllowed ? '' : 'opacity-40'}`}
+          >
+            {buyerCancel ? 'إلغاء الطلب' : 'إلغاء الفاتورة'}
+          </button>
+        )}
         {saleBusiness && (
           <button
             type="button"
@@ -147,6 +177,17 @@ export function SavedInvoicePage() {
           </button>
         )}
       </div>
+      {cancelling && (
+        <CancelOrderDialog
+          order={order}
+          buyer={buyerCancel}
+          onCancelled={(cancelled) => {
+            setCancelling(false);
+            setOrder(cancelled);
+          }}
+          onClose={() => setCancelling(false)}
+        />
+      )}
     </div>
   );
 }

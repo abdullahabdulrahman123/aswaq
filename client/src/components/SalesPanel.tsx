@@ -7,19 +7,19 @@ import { advanceOrder, checkoutOrder, fetchOrder, putDraft, type Order } from '.
 import { draftInput, draftRef, rememberDraftId } from '../lib/draftSync';
 import { orderToView } from '../lib/invoiceView';
 import type { ReceivingMethod } from '../lib/itemUnits';
-import { CONFIRM_ACTION, nextActionOf, stageLabel } from '../lib/orderFlow';
+import { CONFIRM_ACTION, isOpenState, nextActionOf, stageLabel } from '../lib/orderFlow';
+import { PERMISSIONS, can, deniedMessage } from '../lib/permissions';
 import { latinDigits } from '../lib/quantity';
 import { ApiError, searchCustomers, type Customer } from '../lib/waslaApi';
 import { Avatar, personInitial } from './Avatar';
+import { CancelOrderDialog } from './CancelOrderDialog';
 import { InvoiceSheet, type InvoiceView } from './InvoiceSheet';
-import { Notch, fieldClass } from './OutlinedField';
+import { Notch, compactFieldClass } from './OutlinedField';
 
 const METHODS: { key: ReceivingMethod; label: string }[] = [
   { key: 'pickup', label: 'استلام' },
   { key: 'delivery', label: 'توصيل' },
 ];
-
-const legendClass = 'mb-2 block text-xs font-medium text-stone-500 dark:text-stone-400';
 
 /** أرقام إنجليزي من غير مسافات ولا شُرَط — والـ+ في الأول بس */
 const cleanPhone = (text: string) => latinDigits(text).replace(/[\s-]/g, '');
@@ -57,6 +57,9 @@ function CustomerAvatar({ customer, size }: { customer: Customer; size: number }
  *   - فلتر (on/off): أصناف الفاتورة بس
  * بعد التأكيد الأصناف تحت بتتعرض بكميات الفاتورة من غير تعديل (الصفحة)، و«فاتورة
  * جديدة» للعميل اللي بعده.
+ *
+ * مكالمة ٥ أكتوبر: «إلغاء الفاتورة» جنب «فاتورة جديدة» لحد ما تخلص — بالسبب، وبصلاحية
+ * «إلغاء فاتورة بيع» للموظف.
  */
 export function SalesPanel({
   storeId,
@@ -84,6 +87,7 @@ export function SalesPanel({
   const [error, setError] = useState('');
   /** الورقة اللي بتتطبع — مستخبية على الشاشة */
   const [printView, setPrintView] = useState<InvoiceView | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
   // الطباعة بعد ما الورقة تترسم
   useEffect(() => {
@@ -188,7 +192,10 @@ export function SalesPanel({
             // الفاتورة اتأكدت — بيانات العميل اتقفلت معاها
             <div className="min-w-0 flex-1 px-2 py-1">
               <span className="block truncate text-sm font-bold leading-tight">{buyerLabel(sale)}</span>
-              <span role="status" className="block truncate text-[11px] font-semibold leading-tight text-accent-700 dark:text-accent-300">
+              <span
+                role="status"
+                className={`block truncate text-[11px] font-semibold leading-tight ${order?.state === 'cancelled' ? 'text-red-700 dark:text-red-300' : 'text-accent-700 dark:text-accent-300'}`}
+              >
                 {order && !loading ? `فاتورة رقم ${order.number} — ${stageLabel(order)}` : 'بنجيب الفاتورة…'}
               </span>
             </div>
@@ -249,7 +256,19 @@ export function SalesPanel({
           </p>
         )}
         {confirmed && business && (
-          <div className="mt-1.5 flex justify-end">
+          <div className="mt-1.5 flex justify-end gap-2">
+            {order && !loading && isOpenState(order.state) && (
+              <button
+                type="button"
+                aria-disabled={!can(business, PERMISSIONS.invoiceCancel)}
+                onClick={() => (can(business, PERMISSIONS.invoiceCancel) ? setCancelling(true) : setError(deniedMessage(PERMISSIONS.invoiceCancel)))}
+                className={`rounded-xl border border-red-300 px-4 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50 dark:border-red-500/40 dark:text-red-300 dark:hover:bg-red-500/10 ${
+                  can(business, PERMISSIONS.invoiceCancel) ? '' : 'opacity-40'
+                }`}
+              >
+                إلغاء الفاتورة
+              </button>
+            )}
             <button
               type="button"
               onClick={() => openDialog(business)}
@@ -260,6 +279,16 @@ export function SalesPanel({
           </div>
         )}
       </section>
+      {cancelling && order && (
+        <CancelOrderDialog
+          order={order}
+          onCancelled={(cancelled) => {
+            setCancelling(false);
+            onOrder(cancelled);
+          }}
+          onClose={() => setCancelling(false)}
+        />
+      )}
       {printView && (
         <div className="hidden print:block">
           <InvoiceSheet view={printView} />
@@ -432,205 +461,213 @@ function SalesForm({ business, editing, currentShopId }: { business: Business; e
     'flex w-full items-center gap-2.5 px-3 py-2.5 text-start text-sm transition hover:bg-stone-50 dark:hover:bg-white/5';
 
   return (
-    <form onSubmit={handleSubmit} className="p-4 sm:p-5">
-          <div className="flex items-start gap-2">
-            <div className="min-w-0 flex-1">
-              <h2 className="font-display text-lg font-bold">مبيعات</h2>
-              <p className="text-sm text-stone-500 dark:text-stone-400">{business.name}</p>
-            </div>
-            {/*
-              بيقفل الأكورديون زي «ابدأ البيع» (أو «حفظ») بطلب العميل (مكالمة ٢ أكتوبر):
-              المتجر والعميل متحددين لوحدهم، فلمّ الجزء من غير كتابة بيبدأ البيعة بيهم.
-              «إلغاء» بس اللي بيقفل من غير بيعة
-            */}
-            <button type="submit" disabled={!buyer} aria-expanded={true} aria-label="اقفل بيانات البيعة" className="grid h-8 w-8 shrink-0 place-items-center rounded-full transition hover:bg-stone-100 disabled:opacity-50 dark:hover:bg-white/10">
-              <Chevron up />
-            </button>
-          </div>
+    // مكالمة ٥ أكتوبر: «مفيش سكرول في صفحة مبيعات» — الفورم كله و«ابدأ البيع» باينين على
+    // موبايل عادي من غير ما ينزل: الخانات أصغر، وكل خانتين جنب بعض، والاستلام في سطر
+    <form onSubmit={handleSubmit} className="p-3.5 sm:p-5">
+      <div className="flex items-center gap-2">
+        <h2 className="min-w-0 flex-1 truncate font-display text-lg font-bold">
+          مبيعات <span className="text-sm font-normal text-stone-500 dark:text-stone-400">— {business.name}</span>
+        </h2>
+        {/*
+          بيقفل الأكورديون زي «ابدأ البيع» (أو «حفظ») بطلب العميل (مكالمة ٢ أكتوبر):
+          المتجر والعميل متحددين لوحدهم، فلمّ الجزء من غير كتابة بيبدأ البيعة بيهم.
+          «إلغاء» بس اللي بيقفل من غير بيعة
+        */}
+        <button type="submit" disabled={!buyer} aria-expanded={true} aria-label="اقفل بيانات البيعة" className="grid h-8 w-8 shrink-0 place-items-center rounded-full transition hover:bg-stone-100 disabled:opacity-50 dark:hover:bg-white/10">
+          <Chevron up />
+        </button>
+      </div>
 
-          <div className="mt-6 space-y-5">
-            {stores.length > 0 && (
-              <label className="relative block">
-                <select className={fieldClass} value={shopId} onChange={(e) => setShopId(e.target.value)}>
-                  {stores.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-                <Notch>المتجر</Notch>
-              </label>
-            )}
-
-            {/* العميل: كومبو فيه حسابين غير المسجلين، وبحث بالإيميل أو الرقم */}
-            <div className="relative">
-              <button
-                type="button"
-                aria-haspopup="listbox"
-                aria-expanded={pickerOpen}
-                onClick={() => setPickerOpen((v) => !v)}
-                className={`${fieldClass} flex items-center gap-2 text-start ${pickerOpen ? 'border-brand-500 ring-1 ring-inset ring-brand-500' : ''}`}
-              >
-                {buyer && !isWalkIn(buyer) && <CustomerAvatar customer={buyer} size={24} />}
-                <span className="min-w-0 flex-1 truncate">{buyer ? buyer.name : 'بنجيب العملاء…'}</span>
-                <svg aria-hidden="true" viewBox="0 0 24 24" className={`h-4 w-4 shrink-0 text-stone-500 transition-transform ${pickerOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="m6 9 6 6 6-6" />
-                </svg>
-              </button>
-              <Notch active={pickerOpen}>العميل</Notch>
-
-              {pickerOpen && (
-                <div className="mt-1.5 overflow-hidden rounded-xl border border-stone-200 dark:border-white/10">
-                  <ul role="listbox" aria-label="العملاء" className="max-h-60 overflow-y-auto">
-                    {(walkIn ?? []).map((c) => (
-                      <li key={c.accountId}>
-                        <button type="button" role="option" aria-selected={buyer?.accountId === c.accountId} onClick={() => pick(c)} className={`${optionClass} font-medium text-brand-700 dark:text-brand-300`}>
-                          <span className="min-w-0 flex-1 truncate">{c.name}</span>
-                          <span className="shrink-0 text-xs font-normal text-stone-400">{priceHint(c)}</span>
-                        </button>
-                      </li>
-                    ))}
-                    {Array.isArray(matches) &&
-                      matches.map((c) => (
-                        <li key={c.accountId}>
-                          <button type="button" role="option" aria-selected={buyer?.accountId === c.accountId} onClick={() => pick(c)} className={optionClass}>
-                            <CustomerAvatar customer={c} size={28} />
-                            <span className="min-w-0 flex-1 truncate">{c.name}</span>
-                            <span className="shrink-0 text-xs text-stone-400">{c.kind === 'business' ? 'شركة' : 'مستخدم'}</span>
-                          </button>
-                        </li>
-                      ))}
-                  </ul>
-                  <input
-                    ref={searchRef}
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Escape') {
-                        e.preventDefault();
-                        setPickerOpen(false);
-                      }
-                    }}
-                    dir="auto"
-                    inputMode="email"
-                    placeholder="عميل مسجّل؟ اكتب إيميله أو رقمه كامل"
-                    className="w-full border-t border-stone-200 bg-transparent px-3 py-2.5 text-sm outline-none dark:border-white/10"
-                  />
-                  {search.trim() && (
-                    <p className="px-3 pb-2.5 text-xs text-stone-400">
-                      {matches === 'loading'
-                        ? 'بندوّر…'
-                        : matches === null
-                          ? 'كمّل الإيميل أو الرقم.'
-                          : matches.length === 0
-                            ? 'مفيش حساب بالإيميل أو الرقم ده.'
-                            : ''}
-                    </p>
-                  )}
-                </div>
-              )}
-              {buyer && !pickerOpen && <span className="mt-1.5 block text-xs text-stone-500 dark:text-stone-400">{priceHint(buyer)}</span>}
-              {loadError && <span className="mt-1.5 block text-xs text-red-600 dark:text-red-400">{loadError}</span>}
-            </div>
-
-            {/* البائع: دلوقتي اللي فاتح بس — الموظفين ومندوبين البيع بعدين */}
-            <label className="relative block">
-              <select className={fieldClass} value="me" onChange={() => undefined}>
-                <option value="me">{sellerName}</option>
-              </select>
-              <Notch>البائع</Notch>
-            </label>
-
-            <label className="relative block">
-              <input
-                className={fieldClass}
-                value={name}
-                onChange={(e) => {
-                  setName(e.target.value);
-                  setError('');
-                }}
-                placeholder="مثال: الحاج محمود"
-                maxLength={80}
-              />
-              <Notch>الاسم الأدبي</Notch>
-            </label>
-
-            <label className="relative block">
-              <input
-                className={`${fieldClass} text-right tabular-nums`}
-                dir="ltr"
-                inputMode="tel"
-                value={phone}
-                onChange={(e) => {
-                  setPhone(e.target.value);
-                  setError('');
-                }}
-                placeholder="01xxxxxxxxx"
-                maxLength={20}
-              />
-              <Notch>رقم الموبايل</Notch>
-            </label>
-
-            <div>
-              <span className={legendClass}>الاستلام</span>
-              <div role="radiogroup" aria-label="طريقة الاستلام" className="grid grid-cols-2 gap-1 rounded-xl bg-stone-100 p-1 dark:bg-white/5">
-                {METHODS.map((o) => (
-                  <button
-                    key={o.key}
-                    type="button"
-                    role="radio"
-                    aria-checked={method === o.key}
-                    onClick={() => setMethod(o.key)}
-                    className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
-                      method === o.key
-                        ? 'bg-white text-brand-800 shadow-sm dark:bg-surface-card dark:text-brand-200'
-                        : 'text-stone-600 hover:text-stone-900 dark:text-stone-300 dark:hover:text-white'
-                    }`}
-                  >
-                    {o.label}
-                  </button>
+      <div className="mt-4 space-y-4">
+        {/* البائع: دلوقتي اللي فاتح بس — الموظفين ومندوبين البيع بعدين */}
+        <div className={`grid gap-2.5 ${stores.length > 0 ? 'grid-cols-2' : ''}`}>
+          {stores.length > 0 && (
+            <label className="relative block min-w-0">
+              <select className={compactFieldClass} value={shopId} onChange={(e) => setShopId(e.target.value)}>
+                {stores.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
                 ))}
-              </div>
-              {method === 'delivery' && (
-                <label className="relative mt-4 block">
-                  <input
-                    className={fieldClass}
-                    value={address}
-                    onChange={(e) => {
-                      setAddress(e.target.value);
-                      setError('');
-                    }}
-                    placeholder="مثال: كفر حمودة، جنب الجامع الكبير"
-                    maxLength={200}
-                  />
-                  <Notch>عنوان التوصيل</Notch>
-                </label>
+              </select>
+              <Notch compact>المتجر</Notch>
+            </label>
+          )}
+          <label className="relative block min-w-0">
+            <select className={compactFieldClass} value="me" onChange={() => undefined}>
+              <option value="me">{sellerName}</option>
+            </select>
+            <Notch compact>البائع</Notch>
+          </label>
+        </div>
+
+        {/* العميل: كومبو فيه حسابين غير المسجلين، وبحث بالإيميل أو الرقم */}
+        <div className="relative">
+          <button
+            type="button"
+            aria-haspopup="listbox"
+            aria-expanded={pickerOpen}
+            onClick={() => setPickerOpen((v) => !v)}
+            className={`${compactFieldClass} flex items-center gap-2 text-start ${pickerOpen ? 'border-brand-500 ring-1 ring-inset ring-brand-500' : ''}`}
+          >
+            {buyer && !isWalkIn(buyer) && <CustomerAvatar customer={buyer} size={22} />}
+            <span className="min-w-0 flex-1 truncate">{buyer ? buyer.name : 'بنجيب العملاء…'}</span>
+            {buyer && !pickerOpen && <span className="shrink-0 text-[11px] text-stone-500 dark:text-stone-400">{priceHint(buyer)}</span>}
+            <svg aria-hidden="true" viewBox="0 0 24 24" className={`h-4 w-4 shrink-0 text-stone-500 transition-transform ${pickerOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+          <Notch compact active={pickerOpen}>
+            العميل
+          </Notch>
+
+          {pickerOpen && (
+            <div className="mt-1.5 overflow-hidden rounded-xl border border-stone-200 dark:border-white/10">
+              <ul role="listbox" aria-label="العملاء" className="max-h-60 overflow-y-auto">
+                {(walkIn ?? []).map((c) => (
+                  <li key={c.accountId}>
+                    <button type="button" role="option" aria-selected={buyer?.accountId === c.accountId} onClick={() => pick(c)} className={`${optionClass} font-medium text-brand-700 dark:text-brand-300`}>
+                      <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                      <span className="shrink-0 text-xs font-normal text-stone-400">{priceHint(c)}</span>
+                    </button>
+                  </li>
+                ))}
+                {Array.isArray(matches) &&
+                  matches.map((c) => (
+                    <li key={c.accountId}>
+                      <button type="button" role="option" aria-selected={buyer?.accountId === c.accountId} onClick={() => pick(c)} className={optionClass}>
+                        <CustomerAvatar customer={c} size={28} />
+                        <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                        <span className="shrink-0 text-xs text-stone-400">{c.kind === 'business' ? 'شركة' : 'مستخدم'}</span>
+                      </button>
+                    </li>
+                  ))}
+              </ul>
+              <input
+                ref={searchRef}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    e.preventDefault();
+                    setPickerOpen(false);
+                  }
+                }}
+                dir="auto"
+                inputMode="email"
+                placeholder="عميل مسجّل؟ اكتب إيميله أو رقمه كامل"
+                className="w-full border-t border-stone-200 bg-transparent px-3 py-2.5 text-sm outline-none dark:border-white/10"
+              />
+              {search.trim() && (
+                <p className="px-3 pb-2.5 text-xs text-stone-400">
+                  {matches === 'loading'
+                    ? 'بندوّر…'
+                    : matches === null
+                      ? 'كمّل الإيميل أو الرقم.'
+                      : matches.length === 0
+                        ? 'مفيش حساب بالإيميل أو الرقم ده.'
+                        : ''}
+                </p>
               )}
             </div>
-          </div>
-
-          {error && (
-            <p role="alert" className="mt-5 rounded-lg bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-300">
-              {error}
-            </p>
           )}
+          {loadError && <span className="mt-1.5 block text-xs text-red-600 dark:text-red-400">{loadError}</span>}
+        </div>
 
-          <div className="mt-6 flex flex-wrap gap-3 border-t border-stone-200 pt-5 dark:border-white/10">
-            <button
-              type="submit"
-              disabled={!buyer}
-              className="rounded-xl bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-70"
-            >
-              {editing ? 'حفظ' : 'ابدأ البيع'}
-            </button>
-            <button
-              type="button"
-              onClick={closeDialog}
-              className="rounded-xl border border-stone-300 px-6 py-3 text-sm font-medium transition hover:border-stone-400 dark:border-white/15"
-            >
-              إلغاء
-            </button>
+        <div className="grid grid-cols-2 gap-2.5">
+          <label className="relative block min-w-0">
+            <input
+              className={compactFieldClass}
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                setError('');
+              }}
+              placeholder="مثال: الحاج محمود"
+              maxLength={80}
+            />
+            <Notch compact>الاسم الأدبي</Notch>
+          </label>
+
+          <label className="relative block min-w-0">
+            <input
+              className={`${compactFieldClass} text-right tabular-nums`}
+              dir="ltr"
+              inputMode="tel"
+              value={phone}
+              onChange={(e) => {
+                setPhone(e.target.value);
+                setError('');
+              }}
+              placeholder="01xxxxxxxxx"
+              maxLength={20}
+            />
+            <Notch compact>رقم الموبايل</Notch>
+          </label>
+        </div>
+
+        <div>
+          <div className="flex items-center gap-3">
+            <span className="shrink-0 text-xs font-medium text-stone-500 dark:text-stone-400">الاستلام</span>
+            <div role="radiogroup" aria-label="طريقة الاستلام" className="grid flex-1 grid-cols-2 gap-1 rounded-xl bg-stone-100 p-1 dark:bg-white/5">
+              {METHODS.map((o) => (
+                <button
+                  key={o.key}
+                  type="button"
+                  role="radio"
+                  aria-checked={method === o.key}
+                  onClick={() => setMethod(o.key)}
+                  className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
+                    method === o.key
+                      ? 'bg-white text-brand-800 shadow-sm dark:bg-surface-card dark:text-brand-200'
+                      : 'text-stone-600 hover:text-stone-900 dark:text-stone-300 dark:hover:text-white'
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
           </div>
+          {method === 'delivery' && (
+            <label className="relative mt-4 block">
+              <input
+                className={compactFieldClass}
+                value={address}
+                onChange={(e) => {
+                  setAddress(e.target.value);
+                  setError('');
+                }}
+                placeholder="مثال: كفر حمودة، جنب الجامع الكبير"
+                maxLength={200}
+              />
+              <Notch compact>عنوان التوصيل</Notch>
+            </label>
+          )}
+        </div>
+      </div>
+
+      {error && (
+        <p role="alert" className="mt-4 rounded-lg bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-300">
+          {error}
+        </p>
+      )}
+
+      <div className="mt-4 flex flex-wrap gap-3 border-t border-stone-200 pt-3.5 dark:border-white/10">
+        <button
+          type="submit"
+          disabled={!buyer}
+          className="rounded-xl bg-brand-500 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-70"
+        >
+          {editing ? 'حفظ' : 'ابدأ البيع'}
+        </button>
+        <button
+          type="button"
+          onClick={closeDialog}
+          className="rounded-xl border border-stone-300 px-6 py-2.5 text-sm font-medium transition hover:border-stone-400 dark:border-white/15"
+        >
+          إلغاء
+        </button>
+      </div>
     </form>
   );
 }
