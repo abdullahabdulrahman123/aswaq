@@ -11,7 +11,7 @@ import { PinIcon } from './PinIcon';
 
 const optionClass =
   'flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-start text-sm transition disabled:cursor-progress disabled:opacity-60';
-const idleOption = 'border-stone-300 hover:border-brand-400 dark:border-white/15 dark:hover:border-brand-400';
+const idleOption = 'border-gray-300 hover:border-brand-400 dark:border-white/15 dark:hover:border-brand-400';
 const pickedOption = 'border-brand-500 bg-brand-50 dark:border-brand-400 dark:bg-brand-500/15';
 
 /**
@@ -83,12 +83,12 @@ export function LocationDialog({ open, onClose }: { open: boolean; onClose: () =
         aria-label="مكانك"
         // العرض في style مش كلاس — نفس سبب AddressDialog
         style={{ width: 'min(32rem, 92vw)' }}
-        className="rounded-2xl bg-white p-0 text-stone-900 shadow-card backdrop:bg-black/50 dark:bg-surface-card dark:text-stone-100"
+        className="rounded-2xl bg-white p-0 text-gray-900 shadow-card backdrop:bg-black/50 dark:bg-surface-card dark:text-gray-100"
       >
         {open && (
           <div className="max-h-[85vh] overflow-y-auto p-5">
             <h2 className="font-display text-lg font-bold">{onMap ? 'اختار مكانك على الخريطة' : 'مكانك'}</h2>
-            <p className="mt-1.5 text-xs leading-relaxed text-stone-400">
+            <p className="mt-1.5 text-xs leading-relaxed text-gray-400">
               عشان نرتّبلك المتاجر من الأقرب، ونعرف مين بيوصّلك.
             </p>
 
@@ -113,7 +113,7 @@ export function LocationDialog({ open, onClose }: { open: boolean; onClose: () =
                     hint="اسحب الدبوس أو دوس على الخريطة. المكان ده للزيارة دي بس، ومش بيتحفظ في عناوينك."
                   />
                 </div>
-                <div className="mt-5 flex flex-wrap gap-3 border-t border-stone-200 pt-5 dark:border-white/10">
+                <div className="mt-5 flex flex-wrap gap-3 border-t border-gray-200 pt-5 dark:border-white/10">
                   <button
                     type="button"
                     onClick={() => {
@@ -127,7 +127,7 @@ export function LocationDialog({ open, onClose }: { open: boolean; onClose: () =
                   <button
                     type="button"
                     onClick={() => setOnMap(false)}
-                    className="rounded-xl border border-stone-300 px-6 py-3 text-sm font-medium transition hover:border-stone-400 dark:border-white/15"
+                    className="rounded-xl border border-gray-300 px-6 py-3 text-sm font-medium transition hover:border-gray-400 dark:border-white/15"
                   >
                     رجوع
                   </button>
@@ -159,11 +159,11 @@ export function LocationDialog({ open, onClose }: { open: boolean; onClose: () =
                 </div>
 
                 <section className="mt-6">
-                  <h3 className="text-xs font-medium text-stone-500 dark:text-stone-400">عناويني</h3>
+                  <h3 className="text-xs font-medium text-gray-500 dark:text-gray-400">عناويني</h3>
                   {signedIn ? (
                     <>
                       {userAddresses === null ? (
-                        <p className="mt-2 text-sm text-stone-400">{userAddressesError || 'بنجيب عناوينك…'}</p>
+                        <p className="mt-2 text-sm text-gray-400">{userAddressesError || 'بنجيب عناوينك…'}</p>
                       ) : (
                         userAddresses.length > 0 && (
                           <ul aria-label="عناويني" className="mt-2 grid gap-2">
@@ -199,7 +199,7 @@ export function LocationDialog({ open, onClose }: { open: boolean; onClose: () =
                       </button>
                     </>
                   ) : (
-                    <p className="mt-2 text-sm leading-relaxed text-stone-500 dark:text-stone-400">
+                    <p className="mt-2 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
                       <button
                         type="button"
                         onClick={() => signIn('login')}
@@ -212,11 +212,11 @@ export function LocationDialog({ open, onClose }: { open: boolean; onClose: () =
                   )}
                 </section>
 
-                <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-stone-200 pt-5 dark:border-white/10">
+                <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-gray-200 pt-5 dark:border-white/10">
                   <button
                     type="button"
                     onClick={onClose}
-                    className="rounded-xl border border-stone-300 px-6 py-3 text-sm font-medium transition hover:border-stone-400 dark:border-white/15"
+                    className="rounded-xl border border-gray-300 px-6 py-3 text-sm font-medium transition hover:border-gray-400 dark:border-white/15"
                   >
                     رجوع
                   </button>
@@ -227,7 +227,7 @@ export function LocationDialog({ open, onClose }: { open: boolean; onClose: () =
                         setLocation(null);
                         onClose();
                       }}
-                      className="text-sm font-medium text-stone-500 transition hover:text-stone-700 dark:text-stone-400 dark:hover:text-stone-200"
+                      className="text-sm font-medium text-gray-500 transition hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                     >
                       امسح مكاني
                     </button>

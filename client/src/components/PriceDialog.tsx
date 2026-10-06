@@ -66,7 +66,7 @@ export function PriceDialog({ item, note, onSaved, onClose }: { item: Item; note
       aria-label={`تسعير ${item.name}`}
       // العرض في style مش كلاس — نفس سبب باقي النوافذ
       style={{ width: 'min(30rem, 94vw)' }}
-      className="rounded-2xl bg-white p-0 text-stone-900 shadow-card backdrop:bg-black/50 dark:bg-surface-card dark:text-stone-100"
+      className="rounded-2xl bg-white p-0 text-gray-900 shadow-card backdrop:bg-black/50 dark:bg-surface-card dark:text-gray-100"
     >
       <div className="p-4 sm:p-5">
         <div className="flex items-center gap-3 pe-8">
@@ -81,7 +81,7 @@ export function PriceDialog({ item, note, onSaved, onClose }: { item: Item; note
           </button>
         </div>
 
-        <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">سعر المتجر لكل العملاء.</p>
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">سعر المتجر لكل العملاء.</p>
         {note && (
           <p role="note" className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
             {note}
@@ -99,13 +99,13 @@ export function PriceDialog({ item, note, onSaved, onClose }: { item: Item; note
           <colgroup>
             <col className="w-[22%]" />
           </colgroup>
-          <thead className="text-[11px] leading-tight text-stone-500 dark:text-stone-400">
+          <thead className="text-[11px] leading-tight text-gray-500 dark:text-gray-400">
             <tr>
               <th rowSpan={2} className="text-start align-bottom font-medium">
                 الوحدة
               </th>
               {PRICE_GROUPS.map((group) => (
-                <th key={group.label} colSpan={2} className="border-b border-stone-200 pb-1 font-semibold text-stone-600 dark:border-white/10 dark:text-stone-300">
+                <th key={group.label} colSpan={2} className="border-b border-gray-200 pb-1 font-semibold text-gray-600 dark:border-white/10 dark:text-gray-300">
                   {group.label}
                 </th>
               ))}
@@ -132,7 +132,7 @@ export function PriceDialog({ item, note, onSaved, onClose }: { item: Item; note
                       value={texts[u.name][field]}
                       onChange={(e) => set(u.name, field, e.target.value)}
                       onFocus={(e) => e.currentTarget.select()}
-                      className="h-9 w-full rounded-lg border border-stone-300 bg-transparent px-1 text-center text-sm font-semibold tabular-nums outline-none transition focus:border-brand-500 dark:border-white/20"
+                      className="h-9 w-full rounded-lg border border-gray-300 bg-transparent px-1 text-center text-sm font-semibold tabular-nums outline-none transition focus:border-brand-500 dark:border-white/20"
                     />
                   </td>
                 ))}
@@ -140,7 +140,7 @@ export function PriceDialog({ item, note, onSaved, onClose }: { item: Item; note
             ))}
           </tbody>
         </table>
-        <p className="mt-2 text-xs text-stone-400">بالجنيه. الخانة الفاضية = الوحدة مبتتباعش بالسعر ده.</p>
+        <p className="mt-2 text-xs text-gray-400">بالجنيه. الخانة الفاضية = الوحدة مبتتباعش بالسعر ده.</p>
       </div>
       <DialogCloseButton />
     </dialog>

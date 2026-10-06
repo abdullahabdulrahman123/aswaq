@@ -3,16 +3,13 @@ import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 're
 import { useAuth } from './context/AuthContext';
 import { businessInPath } from './lib/businessRoutes';
 import { Navbar } from './components/Navbar';
-import { VendorSwitchDialog } from './components/VendorSwitchDialog';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { InstallPrompt } from './components/InstallPrompt';
 import { BottomNav } from './components/BottomNav';
 import { IncomingToast } from './components/IncomingToast';
 import { FollowOrderWorld } from './context/StoreCartContext';
 import { lastSalesShop, useSales } from './context/SalesContext';
 import { HomePage } from './pages/HomePage';
-import { ProductPage } from './pages/ProductPage';
-import { VendorPage } from './pages/VendorPage';
-import { CartPage } from './pages/CartPage';
 import { OrdersPage } from './pages/OrdersPage';
 import { InvoicePage } from './pages/InvoicePage';
 import { SavedInvoicePage } from './pages/SavedInvoicePage';
@@ -113,6 +110,7 @@ function PerBusiness({ page: Page }: { page: ComponentType }) {
 
 export function App() {
   const { user } = useAuth();
+  const { pathname } = useLocation();
   return (
     <div className="flex min-h-screen flex-col">
       <ScrollToTop />
@@ -122,33 +120,32 @@ export function App() {
       <Navbar />
       {/* pb-12: الشريط اللي تحت ميغطّيش آخر الصفحة (للي داخل بحسابه بس) */}
       <main className={`flex-1 ${user ? 'pb-12' : ''} print:pb-0`}>
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/store/:storeId" element={<StorePage />} />
-          <Route path="/product/:id" element={<ProductPage />} />
-          <Route path="/vendor/:id" element={<VendorPage />} />
-          <Route path="/cart" element={<CartPage />} />
-          <Route path="/orders" element={<OrdersPage />} />
-          <Route path="/orders/:shopId" element={<InvoicePage />} />
-          <Route path="/invoice/:orderId" element={<SavedInvoicePage />} />
-          <Route path="/tasks" element={<TasksPage />} />
-          <Route path="/account" element={<AccountPage />} />
-          {/* new قبل :id عشان متتقراش كـid لنشاط */}
-          <Route path="/business/new" element={<BusinessNewPage />} />
-          <Route path="/business/:id" element={<PerBusiness page={BusinessPage} />} />
-          <Route path="/business/:accountId/items" element={<PerBusiness page={ItemsPage} />} />
-          <Route path="/business/:accountId/items/new" element={<PerBusiness page={ItemFormPage} />} />
-          <Route path="/business/:accountId/items/:itemId/edit" element={<PerBusiness page={ItemFormPage} />} />
-          <Route path="/business/:accountId/store-items" element={<PerBusiness page={StoreItemsPage} />} />
-          <Route path="/business/:accountId/employees" element={<PerBusiness page={EmployeesPage} />} />
-          <Route path="/business/:accountId/settings" element={<PerBusiness page={SettingsPage} />} />
-          {/* الطلبات الواردة بقت في «مهامي» (مكالمة ٣٠ سبتمبر) — اللينك القديم بيوديها */}
-          <Route path="/business/:accountId/incoming" element={<Navigate to="/tasks" replace />} />
-          <Route path="/auth/wasla/callback" element={<AuthCallbackPage />} />
-          <Route path="*" element={<HomePage />} />
-        </Routes>
+        {/* صفحة «حصلت مشكلة» مكان الصفحة اللي وقعت بس — والانتقال لصفحة تانية بيرجّعها */}
+        <ErrorBoundary resetKey={pathname}>
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/store/:storeId" element={<StorePage />} />
+            <Route path="/orders" element={<OrdersPage />} />
+            <Route path="/orders/:shopId" element={<InvoicePage />} />
+            <Route path="/invoice/:orderId" element={<SavedInvoicePage />} />
+            <Route path="/tasks" element={<TasksPage />} />
+            <Route path="/account" element={<AccountPage />} />
+            {/* new قبل :id عشان متتقراش كـid لنشاط */}
+            <Route path="/business/new" element={<BusinessNewPage />} />
+            <Route path="/business/:id" element={<PerBusiness page={BusinessPage} />} />
+            <Route path="/business/:accountId/items" element={<PerBusiness page={ItemsPage} />} />
+            <Route path="/business/:accountId/items/new" element={<PerBusiness page={ItemFormPage} />} />
+            <Route path="/business/:accountId/items/:itemId/edit" element={<PerBusiness page={ItemFormPage} />} />
+            <Route path="/business/:accountId/store-items" element={<PerBusiness page={StoreItemsPage} />} />
+            <Route path="/business/:accountId/employees" element={<PerBusiness page={EmployeesPage} />} />
+            <Route path="/business/:accountId/settings" element={<PerBusiness page={SettingsPage} />} />
+            {/* الطلبات الواردة بقت في «مهامي» (مكالمة ٣٠ سبتمبر) — اللينك القديم بيوديها */}
+            <Route path="/business/:accountId/incoming" element={<Navigate to="/tasks" replace />} />
+            <Route path="/auth/wasla/callback" element={<AuthCallbackPage />} />
+            <Route path="*" element={<HomePage />} />
+          </Routes>
+        </ErrorBoundary>
       </main>
-      <VendorSwitchDialog />
       <InstallPrompt />
       <IncomingToast />
       <BottomNav />

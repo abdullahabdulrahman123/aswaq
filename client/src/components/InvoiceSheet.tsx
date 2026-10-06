@@ -1,4 +1,4 @@
-import { egp } from '../data/catalog';
+import { egp } from '../lib/money';
 
 const dateFormat = new Intl.DateTimeFormat('ar-EG', { dateStyle: 'long', timeStyle: 'short' });
 
@@ -35,8 +35,8 @@ export interface InvoiceView {
 
 const amount = (n: number) => n.toLocaleString('en-EG', { maximumFractionDigits: 2 });
 
-const cell = 'border border-stone-800 px-2 py-1.5 dark:border-stone-400 print:border-black';
-const label = `${cell} bg-stone-100 font-semibold dark:bg-white/10 print:bg-stone-100`;
+const cell = 'border border-gray-800 px-2 py-1.5 dark:border-gray-400 print:border-black';
+const label = `${cell} bg-gray-100 font-semibold dark:bg-white/10 print:bg-gray-100`;
 
 /**
  * الفاتورة بشكل فاتورة الهلال الورق اللي العميل بعتها (٢٥ سبتمبر): الصنف والكمية
@@ -62,13 +62,13 @@ export function InvoiceSheet({ view, onPrice }: { view: InvoiceView; onPrice?: (
   return (
     <article
       aria-label="الفاتورة"
-      className="bg-white text-sm text-stone-900 dark:bg-surface-card dark:text-stone-100 print:bg-white print:text-black"
+      className="bg-white text-sm text-gray-900 dark:bg-surface-card dark:text-gray-100 print:bg-white print:text-black"
     >
       <header className="pb-4">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="font-display text-xl font-bold leading-tight">{view.businessName}</p>
-            {view.storeName && <p className="mt-1 text-sm text-stone-500 dark:text-stone-400 print:text-black">{view.storeName}</p>}
+            {view.storeName && <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 print:text-black">{view.storeName}</p>}
           </div>
           <div className="shrink-0 text-end">
             <p className="font-display text-lg font-bold leading-tight">
@@ -83,12 +83,12 @@ export function InvoiceSheet({ view, onPrice }: { view: InvoiceView; onPrice?: (
                 <>فاتورة رقم {view.number}</>
               )}
             </p>
-            <p className="mt-1 text-xs tabular-nums text-stone-500 dark:text-stone-400 print:text-black">{dateFormat.format(view.date)}</p>
+            <p className="mt-1 text-xs tabular-nums text-gray-500 dark:text-gray-400 print:text-black">{dateFormat.format(view.date)}</p>
           </div>
         </div>
 
         <dl className="mt-4 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5">
-          <dt className="text-stone-500 dark:text-stone-400 print:text-black">العميل</dt>
+          <dt className="text-gray-500 dark:text-gray-400 print:text-black">العميل</dt>
           <dd className="font-semibold">
             {view.buyer}
             {view.buyerPhone && (
@@ -99,13 +99,13 @@ export function InvoiceSheet({ view, onPrice }: { view: InvoiceView; onPrice?: (
           </dd>
           {view.method && (
             <>
-              <dt className="text-stone-500 dark:text-stone-400 print:text-black">الاستلام</dt>
+              <dt className="text-gray-500 dark:text-gray-400 print:text-black">الاستلام</dt>
               <dd>{view.method === 'pickup' ? 'من المتجر' : 'توصيل'}</dd>
             </>
           )}
           {view.method === 'delivery' && view.address && (
             <>
-              <dt className="text-stone-500 dark:text-stone-400 print:text-black">العنوان</dt>
+              <dt className="text-gray-500 dark:text-gray-400 print:text-black">العنوان</dt>
               <dd className="break-words">{view.address}</dd>
             </>
           )}
@@ -130,13 +130,13 @@ export function InvoiceSheet({ view, onPrice }: { view: InvoiceView; onPrice?: (
                     type="button"
                     onClick={() => onPrice(l)}
                     aria-label={`تسعير ${l.item}`}
-                    className="text-start font-semibold underline decoration-stone-300 decoration-dotted underline-offset-4 hover:text-brand-700 dark:decoration-white/25 dark:hover:text-brand-400 print:no-underline"
+                    className="text-start font-semibold underline decoration-gray-300 decoration-dotted underline-offset-4 hover:text-brand-700 dark:decoration-white/25 dark:hover:text-brand-400 print:no-underline"
                   >
-                    {l.item} <span className="font-normal text-stone-500 dark:text-stone-400 print:text-black">({l.unit})</span>
+                    {l.item} <span className="font-normal text-gray-500 dark:text-gray-400 print:text-black">({l.unit})</span>
                   </button>
                 ) : (
                   <>
-                    {l.item} <span className="font-normal text-stone-500 dark:text-stone-400 print:text-black">({l.unit})</span>
+                    {l.item} <span className="font-normal text-gray-500 dark:text-gray-400 print:text-black">({l.unit})</span>
                   </>
                 )}
               </td>
@@ -180,7 +180,7 @@ export function InvoiceSheet({ view, onPrice }: { view: InvoiceView; onPrice?: (
       )}
 
       {unpriced && (
-        <p className="mt-2 text-xs text-stone-500 dark:text-stone-400 print:text-black">
+        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 print:text-black">
           فيه أصناف سعرها لسه متحددش (—) ومش محسوبة في الإجمالي.
         </p>
       )}

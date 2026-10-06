@@ -43,7 +43,7 @@ export function Avatar({ picture, fallback, kind, size, tone = 'solid' }: Props)
       aria-hidden="true"
       className={`inline-flex shrink-0 items-center justify-center overflow-hidden font-display font-bold leading-none ${
         kind === 'person' ? 'rounded-full' : 'rounded-[28%]'
-      } ${showImage ? 'bg-stone-100 dark:bg-white/10' : colors}`}
+      } ${showImage ? 'bg-gray-100 dark:bg-white/10' : colors}`}
       style={{
         width: size,
         height: size,

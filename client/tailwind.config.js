@@ -6,40 +6,45 @@ export default {
     extend: {
       fontFamily: {
         sans: ['"IBM Plex Sans Arabic"', '"IBM Plex Sans"', 'system-ui', 'sans-serif'],
-        display: ['"Noto Kufi Arabic"', '"IBM Plex Sans Arabic"', 'system-ui', 'sans-serif'],
+        // خط اللوجو (Alexandria) للعناوين — هوية ٦ أكتوبر
+        display: ['Alexandria', '"IBM Plex Sans Arabic"', 'system-ui', 'sans-serif'],
         mono: ['"IBM Plex Mono"', 'ui-monospace', 'monospace'],
       },
       colors: {
-        // القمح والسميد — هوية أسواق
+        // أزرق أسواق الهلال (هوية ٦ أكتوبر) — 500 للزراير، 600 لون اللوجو
         brand: {
-          50: '#fdf8ed',
-          100: '#faefd3',
-          200: '#f4dca4',
-          300: '#edc470',
-          400: '#e5ac45',
-          500: '#d9922a',
-          600: '#bc741f',
-          700: '#96571c',
-          800: '#7a461d',
-          900: '#65391b',
+          50: '#eff4ff',
+          100: '#dbe6fe',
+          200: '#bfd3fe',
+          300: '#93b4fd',
+          400: '#6090fa',
+          500: '#2f62ee',
+          600: '#1f4fd8',
+          700: '#1c3fb0',
+          800: '#1d368c',
+          900: '#1c2f6e',
         },
         // أخضر للأفعال الإيجابية والحالة
         accent: {
-          300: '#6bc4aa',
-          400: '#3da98c',
-          500: '#1f8a6d',
-          600: '#146b54',
-          700: '#0f5342',
+          50: '#ecfdf3',
+          300: '#6ce9a6',
+          400: '#32d583',
+          500: '#12b76a',
+          600: '#039855',
+          700: '#027a48',
         },
         surface: {
-          light: '#fffdf8',
-          DEFAULT: '#1c1a16',
-          dark: '#131210',
-          card: '#24211b',
+          // الشريط اللي فوق واللي تحت
+          light: '#ffffff',
+          // خلفية الصفحة — رمادي فاتح عشان الكروت البيضا تبان
+          page: '#f5f6f8',
+          DEFAULT: '#16181d',
+          dark: '#0e1013',
+          card: '#1b1e24',
         },
       },
       boxShadow: {
-        card: '0 1px 2px rgba(28,26,22,.05), 0 10px 30px -18px rgba(28,26,22,.35)',
+        card: '0 1px 2px rgba(16,24,40,.05), 0 8px 24px -16px rgba(16,24,40,.25)',
       },
     },
   },

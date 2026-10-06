@@ -180,7 +180,7 @@ export function AddressDialog({ open, value, premisesName, onDone, onClose, plac
        * فالنافذة كانت بتفضل بعرض صفر والخريطة تترسم 2px.
        */
       style={{ width: 'min(38rem, 92vw)' }}
-      className="rounded-2xl bg-white p-0 text-stone-900 shadow-card backdrop:bg-black/50 dark:bg-surface-card dark:text-stone-100"
+      className="rounded-2xl bg-white p-0 text-gray-900 shadow-card backdrop:bg-black/50 dark:bg-surface-card dark:text-gray-100"
     >
       {/* المحتوى بيتركّب بس والنافذة مفتوحة — الخريطة محتاجة مقاس حقيقي وقت الإنشاء */}
       {open && (
@@ -191,13 +191,13 @@ export function AddressDialog({ open, value, premisesName, onDone, onClose, plac
               type="button"
               onClick={handleLocate}
               disabled={locating}
-              className="rounded-lg border border-stone-300 px-3 py-2 text-xs font-medium transition hover:border-brand-400 hover:text-brand-700 disabled:opacity-60 dark:border-white/15 dark:hover:text-brand-400"
+              className="rounded-lg border border-gray-300 px-3 py-2 text-xs font-medium transition hover:border-brand-400 hover:text-brand-700 disabled:opacity-60 dark:border-white/15 dark:hover:text-brand-400"
             >
               {locating ? 'بنحدد موقعك…' : '📍 حدّد موقعي'}
             </button>
           </div>
 
-          <p className="mt-1.5 text-xs leading-relaxed text-stone-400">
+          <p className="mt-1.5 text-xs leading-relaxed text-gray-400">
             {premisesName && <>عنوان «{premisesName}». </>}
             زرار تحديد الموقع بيملا الدولة والمحافظة والمدينة. تقدر تعدّلهم بعدها،
             وتقدر تكتب العنوان كله بإيدك من غير ما تستخدمه.
@@ -324,7 +324,7 @@ export function AddressDialog({ open, value, premisesName, onDone, onClose, plac
                 className={fieldClass}
               />
               <Notch>علامة مميزة</Notch>
-              <span className="mt-1.5 block text-xs text-stone-400">
+              <span className="mt-1.5 block text-xs text-gray-400">
                 حاجة قريبة تسهّل الوصول للمكان.
               </span>
             </label>
@@ -336,7 +336,7 @@ export function AddressDialog({ open, value, premisesName, onDone, onClose, plac
             </p>
           )}
 
-          <div className="mt-6 flex flex-wrap gap-3 border-t border-stone-200 pt-5 dark:border-white/10">
+          <div className="mt-6 flex flex-wrap gap-3 border-t border-gray-200 pt-5 dark:border-white/10">
             <button
               type="button"
               onClick={handleDone}
@@ -348,7 +348,7 @@ export function AddressDialog({ open, value, premisesName, onDone, onClose, plac
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border border-stone-300 px-6 py-3 text-sm font-medium transition hover:border-stone-400 dark:border-white/15"
+              className="rounded-xl border border-gray-300 px-6 py-3 text-sm font-medium transition hover:border-gray-400 dark:border-white/15"
             >
               رجوع
             </button>

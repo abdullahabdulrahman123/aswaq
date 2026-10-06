@@ -41,7 +41,7 @@ export function ContactsField({ contacts, onAdd, onUpdate, onRemove, heading, ow
           <button
             type="button"
             onClick={() => setEditing('new')}
-            className="shrink-0 rounded-lg border border-stone-300 px-3 py-2 text-xs font-medium transition hover:border-brand-400 hover:text-brand-700 dark:border-white/15 dark:hover:text-brand-400"
+            className="shrink-0 rounded-lg border border-gray-300 px-3 py-2 text-xs font-medium transition hover:border-brand-400 hover:text-brand-700 dark:border-white/15 dark:hover:text-brand-400"
           >
             ＋ إضافة جهة اتصال
           </button>
@@ -55,11 +55,11 @@ export function ContactsField({ contacts, onAdd, onUpdate, onRemove, heading, ow
               <button
                 type="button"
                 onClick={() => setEditing(contact)}
-                className="flex w-full items-center gap-3 rounded-xl border border-stone-200 px-3 py-2.5 text-start transition hover:bg-stone-50 dark:border-white/10 dark:hover:bg-white/5"
+                className="flex w-full items-center gap-3 rounded-xl border border-gray-200 px-3 py-2.5 text-start transition hover:bg-gray-50 dark:border-white/10 dark:hover:bg-white/5"
               >
                 <ContactIcon type={contact.type} boxed />
                 <span className="min-w-0 flex-1">
-                  <span className="block text-xs text-stone-500 dark:text-stone-400">{contactTypeInfo(contact.type).label}</span>
+                  <span className="block text-xs text-gray-500 dark:text-gray-400">{contactTypeInfo(contact.type).label}</span>
                   {/* الرقم واللينك من الشمال لليمين، ومقصوص لو طويل */}
                   <span dir="ltr" className="block truncate text-right text-sm font-medium tabular-nums">
                     {displayContactValue(contact)}
@@ -69,7 +69,7 @@ export function ContactsField({ contacts, onAdd, onUpdate, onRemove, heading, ow
                 <svg
                   aria-hidden="true"
                   viewBox="0 0 24 24"
-                  className="h-4 w-4 shrink-0 text-stone-400"
+                  className="h-4 w-4 shrink-0 text-gray-400"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2.2"
@@ -83,17 +83,17 @@ export function ContactsField({ contacts, onAdd, onUpdate, onRemove, heading, ow
           ))}
         </ul>
       ) : (
-        <p className="mt-3 rounded-xl border border-dashed border-stone-300 px-4 py-4 text-center text-sm text-stone-400 dark:border-white/15">
+        <p className="mt-3 rounded-xl border border-dashed border-gray-300 px-4 py-4 text-center text-sm text-gray-400 dark:border-white/15">
           مفيش جهات اتصال لسه.
         </p>
       )}
 
       {full && (
-        <p className="mt-2.5 rounded-xl bg-stone-50 px-3 py-2.5 text-xs text-stone-500 dark:bg-white/5 dark:text-stone-400">
+        <p className="mt-2.5 rounded-xl bg-gray-50 px-3 py-2.5 text-xs text-gray-500 dark:bg-white/5 dark:text-gray-400">
           وصلت لأقصى عدد: {MAX_CONTACTS} جهة اتصال. امسح واحدة عشان تضيف غيرها.
         </p>
       )}
-      {hint && <span className="mt-1.5 block text-xs text-stone-400">{hint}</span>}
+      {hint && <span className="mt-1.5 block text-xs text-gray-400">{hint}</span>}
 
       <ContactDialog
         open={editing !== null}

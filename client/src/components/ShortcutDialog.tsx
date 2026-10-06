@@ -23,7 +23,7 @@ const isMac = () => /Macintosh|Mac OS X/.test(navigator.userAgent);
 
 /** النجمة والنقط التلاتة زي ما هي في المتصفح */
 const Key = ({ children }: { children: ReactNode }) => (
-  <kbd className="mx-0.5 inline-block rounded-md border border-stone-300 bg-stone-50 px-1.5 font-sans text-xs font-semibold not-italic dark:border-white/20 dark:bg-white/10">{children}</kbd>
+  <kbd className="mx-0.5 inline-block rounded-md border border-gray-300 bg-gray-50 px-1.5 font-sans text-xs font-semibold not-italic dark:border-white/20 dark:bg-white/10">{children}</kbd>
 );
 
 function steps(kind: ShortcutKind, device: Device): ReactNode {
@@ -42,7 +42,7 @@ function steps(kind: ShortcutKind, device: Device): ReactNode {
       );
     return (
       <>
-        من منيو المتصفح <Key>⋮</Key> فوق، اختار «تثبيت أسواق» — أو أيقونة التثبيت في آخر شريط العنوان. هيتحط على سطح المكتب ويفتح زي أي برنامج.
+        من منيو المتصفح <Key>⋮</Key> فوق، اختار «تثبيت أسواق الهلال» — أو أيقونة التثبيت في آخر شريط العنوان. هيتحط على سطح المكتب ويفتح زي أي برنامج.
       </>
     );
   }
@@ -68,7 +68,7 @@ function steps(kind: ShortcutKind, device: Device): ReactNode {
 export function ShortcutDialog({ kind, onClose }: { kind: ShortcutKind; onClose: () => void }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const backdropClose = useBackdropClose();
-  const title = kind === 'home' ? 'أضف أسواق للشاشة الرئيسية' : 'اختصار أسواق في المتصفح';
+  const title = kind === 'home' ? 'أضف أسواق الهلال للشاشة الرئيسية' : 'اختصار أسواق الهلال في المتصفح';
 
   useEffect(() => {
     const d = dialogRef.current;
@@ -83,14 +83,14 @@ export function ShortcutDialog({ kind, onClose }: { kind: ShortcutKind; onClose:
       aria-label={title}
       data-shortcut={kind}
       style={{ width: 'min(24rem, 94vw)' }}
-      className="rounded-2xl bg-white p-0 text-stone-900 shadow-card backdrop:bg-black/50 dark:bg-surface-card dark:text-stone-100"
+      className="rounded-2xl bg-white p-0 text-gray-900 shadow-card backdrop:bg-black/50 dark:bg-surface-card dark:text-gray-100"
     >
       <div className="p-5">
         <div className="flex items-center gap-3 pe-8">
           <img src={`${import.meta.env.BASE_URL}icons/icon-192.png`} alt="" width={40} height={40} className="h-10 w-10 shrink-0 rounded-xl" />
           <h2 className="font-display text-base font-bold">{title}</h2>
         </div>
-        <p data-steps className="mt-3 text-sm leading-relaxed text-stone-600 dark:text-stone-300">
+        <p data-steps className="mt-3 text-sm leading-relaxed text-gray-600 dark:text-gray-300">
           {steps(kind, deviceOf())}
         </p>
         <div className="mt-4 flex justify-end">

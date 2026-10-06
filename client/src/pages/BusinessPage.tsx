@@ -72,7 +72,7 @@ export function BusinessPage() {
     return (
       <div className="mx-auto max-w-md px-4 py-20 text-center">
         <h1 className="font-display text-2xl font-bold">سجّل دخولك الأول</h1>
-        <p className="mt-3 leading-relaxed text-stone-500 dark:text-stone-400">
+        <p className="mt-3 leading-relaxed text-gray-500 dark:text-gray-400">
           نشاطاتك التجارية بتبان بعد تسجيل الدخول.
         </p>
         <button
@@ -93,8 +93,8 @@ export function BusinessPage() {
       return (
         <div className="mx-auto grid min-h-[50vh] max-w-md place-items-center px-4 text-center">
           <div>
-            <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-stone-200 border-t-brand-500 motion-reduce:animate-none dark:border-white/15 dark:border-t-brand-400" />
-            <p className="mt-4 text-sm text-stone-500 dark:text-stone-400">بنجيب بيانات النشاط من وصلة…</p>
+            <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-gray-200 border-t-brand-500 motion-reduce:animate-none dark:border-white/15 dark:border-t-brand-400" />
+            <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">بنجيب بيانات النشاط من وصلة…</p>
           </div>
         </div>
       );
@@ -106,7 +106,7 @@ export function BusinessPage() {
         <h1 className="font-display text-2xl font-bold">
           {businessesError ? 'مقدرناش نجيب النشاط' : 'النشاط ده مش موجود'}
         </h1>
-        <p className="mt-3 text-sm leading-relaxed text-stone-500 dark:text-stone-400">
+        <p className="mt-3 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
           {businessesError || 'يمكن يكون اتحذف، أو تبع حساب تاني.'}
         </p>
         {businessesError ? (
@@ -179,23 +179,23 @@ export function BusinessPage() {
         noun="لوجو"
       >
         <h1 className="font-display text-2xl font-bold sm:text-3xl">{business.name}</h1>
-        <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">نشاط تجاري على أسواق · {business.abbreviation}</p>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">نشاط تجاري على أسواق الهلال · {business.abbreviation}</p>
       </PicturePicker>
 
       {/* نفس أرقام التسجيل — هنا بتتضاف وتتعدل بعده، وبتتحفظ في وصلة على طول */}
-      <section className="mt-7 rounded-2xl border border-stone-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
+      <section className="mt-7 rounded-2xl border border-gray-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
         <ContactsField
           heading={
             <>
               <h2 className="font-display text-lg font-bold">
                 جهات الاتصال
                 {business.contacts.length > 0 && (
-                  <span className="ms-2 rounded-md bg-stone-100 px-1.5 py-0.5 text-xs tabular-nums font-normal text-stone-500 dark:bg-white/10 dark:text-stone-400">
+                  <span className="ms-2 rounded-md bg-gray-100 px-1.5 py-0.5 text-xs tabular-nums font-normal text-gray-500 dark:bg-white/10 dark:text-gray-400">
                     {business.contacts.length}
                   </span>
                 )}
               </h2>
-              <p className="mt-1 text-xs text-stone-400">أرقام النشاط العامة. أرقام كل فرع بتتضاف من المقر بتاعه.</p>
+              <p className="mt-1 text-xs text-gray-400">أرقام النشاط العامة. أرقام كل فرع بتتضاف من المقر بتاعه.</p>
             </>
           }
           contacts={business.contacts}
@@ -206,12 +206,12 @@ export function BusinessPage() {
         />
       </section>
 
-      <section className="mt-5 rounded-2xl border border-stone-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
+      <section className="mt-5 rounded-2xl border border-gray-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-display text-lg font-bold">
             المقرات
             {business.premises.length > 0 && (
-              <span className="ms-2 rounded-md bg-stone-100 px-1.5 py-0.5 text-xs tabular-nums font-normal text-stone-500 dark:bg-white/10 dark:text-stone-400">
+              <span className="ms-2 rounded-md bg-gray-100 px-1.5 py-0.5 text-xs tabular-nums font-normal text-gray-500 dark:bg-white/10 dark:text-gray-400">
                 {business.premises.length}
               </span>
             )}
@@ -219,7 +219,7 @@ export function BusinessPage() {
           <button
             type="button"
             onClick={() => setEditing(EMPTY_PREMISES)}
-            className="rounded-lg border border-stone-300 px-3 py-2 text-xs font-medium transition hover:border-brand-400 hover:text-brand-700 dark:border-white/15 dark:hover:text-brand-400"
+            className="rounded-lg border border-gray-300 px-3 py-2 text-xs font-medium transition hover:border-brand-400 hover:text-brand-700 dark:border-white/15 dark:hover:text-brand-400"
           >
             ＋ إضافة مقر
           </button>
@@ -237,21 +237,21 @@ export function BusinessPage() {
                 />
               ))}
             </ul>
-            <p className="mt-3 text-xs text-stone-400">دوس على أي مقر تفتحه وتعدّله.</p>
+            <p className="mt-3 text-xs text-gray-400">دوس على أي مقر تفتحه وتعدّله.</p>
           </>
         ) : (
-          <p className="mt-4 rounded-xl border border-dashed border-stone-300 px-4 py-6 text-center text-sm text-stone-400 dark:border-white/15">
+          <p className="mt-4 rounded-xl border border-dashed border-gray-300 px-4 py-6 text-center text-sm text-gray-400 dark:border-white/15">
             مفيش مقرات لسه — دوس «إضافة مقر» وضيف فرع أو مخزن أو متجر.
           </p>
         )}
       </section>
 
-      <section className="mt-5 rounded-2xl border border-stone-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
+      <section className="mt-5 rounded-2xl border border-gray-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-display text-lg font-bold">
             المركبات
             {business.vehicles.length > 0 && (
-              <span className="ms-2 rounded-md bg-stone-100 px-1.5 py-0.5 text-xs tabular-nums font-normal text-stone-500 dark:bg-white/10 dark:text-stone-400">
+              <span className="ms-2 rounded-md bg-gray-100 px-1.5 py-0.5 text-xs tabular-nums font-normal text-gray-500 dark:bg-white/10 dark:text-gray-400">
                 {business.vehicles.length}
               </span>
             )}
@@ -259,7 +259,7 @@ export function BusinessPage() {
           <button
             type="button"
             onClick={() => setEditingVehicle(EMPTY_VEHICLE)}
-            className="rounded-lg border border-stone-300 px-3 py-2 text-xs font-medium transition hover:border-brand-400 hover:text-brand-700 dark:border-white/15 dark:hover:text-brand-400"
+            className="rounded-lg border border-gray-300 px-3 py-2 text-xs font-medium transition hover:border-brand-400 hover:text-brand-700 dark:border-white/15 dark:hover:text-brand-400"
           >
             ＋ إضافة مركبة
           </button>
@@ -277,7 +277,7 @@ export function BusinessPage() {
             ))}
           </ul>
         ) : (
-          <p className="mt-4 rounded-xl border border-dashed border-stone-300 px-4 py-6 text-center text-sm text-stone-400 dark:border-white/15">
+          <p className="mt-4 rounded-xl border border-dashed border-gray-300 px-4 py-6 text-center text-sm text-gray-400 dark:border-white/15">
             مفيش مركبات لسه — دوس «إضافة مركبة» وضيف عربية أو موتوسيكل.
           </p>
         )}

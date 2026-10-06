@@ -264,7 +264,7 @@ export function ItemFormPage() {
     return (
       <div className="mx-auto max-w-md px-4 py-20 text-center">
         <h1 className="font-display text-2xl font-bold">سجّل دخولك الأول</h1>
-        <p className="mt-3 leading-relaxed text-stone-500 dark:text-stone-400">
+        <p className="mt-3 leading-relaxed text-gray-500 dark:text-gray-400">
           إضافة الأصناف متاحة بعد تسجيل الدخول.
         </p>
         <button
@@ -284,7 +284,7 @@ export function ItemFormPage() {
           {businessesLoading ? 'بنجيب النشاط…' : 'النشاط ده مش موجود'}
         </h1>
         {!businessesLoading && (
-          <p className="mt-3 leading-relaxed text-stone-500 dark:text-stone-400">
+          <p className="mt-3 leading-relaxed text-gray-500 dark:text-gray-400">
             يمكن يكون اتحذف، أو تبع حساب تاني.
           </p>
         )}
@@ -317,11 +317,11 @@ export function ItemFormPage() {
       )}
 
       {loading ? (
-        <p className="rounded-2xl border border-stone-200 bg-white p-5 text-sm text-stone-500 dark:border-white/10 dark:bg-surface-card dark:text-stone-400">
+        <p className="rounded-2xl border border-gray-200 bg-white p-5 text-sm text-gray-500 dark:border-white/10 dark:bg-surface-card dark:text-gray-400">
           بنجيب الصنف…
         </p>
       ) : loadError ? (
-        <div className="rounded-2xl border border-stone-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
           <p className="text-sm text-red-700 dark:text-red-300">{loadError}</p>
           <Link
             to={`/business/${accountId}/items`}
@@ -338,7 +338,7 @@ export function ItemFormPage() {
          */
         <form
           onSubmit={handleSubmit}
-          className="-mx-4 border-y border-stone-200 bg-white px-4 py-4 dark:border-white/10 dark:bg-surface-card sm:mx-0 sm:rounded-2xl sm:border sm:p-5"
+          className="-mx-4 border-y border-gray-200 bg-white px-4 py-4 dark:border-white/10 dark:bg-surface-card sm:mx-0 sm:rounded-2xl sm:border sm:p-5"
         >
           {/* mt-2 على الأولى: اسم الخانة طالع فوق حدّها بـ٨ بكسل */}
           <label className="relative mt-2 block">
@@ -358,7 +358,7 @@ export function ItemFormPage() {
 
           {/* الصورة بتترفع أول ما تتختار، والصنف بيتحفظ برابطها */}
           <div className="mt-7">
-            <span className="mb-2 block text-xs font-medium text-stone-500 dark:text-stone-400">
+            <span className="mb-2 block text-xs font-medium text-gray-500 dark:text-gray-400">
               صورة الصنف (اختياري)
             </span>
 
@@ -366,7 +366,7 @@ export function ItemFormPage() {
               {picture ? (
                 <img src={picture} alt="" className="h-16 w-16 shrink-0 rounded-xl object-cover" />
               ) : (
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border border-dashed border-stone-300 text-[11px] text-stone-400 dark:border-white/20">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border border-dashed border-gray-300 text-[11px] text-gray-400 dark:border-white/20">
                   مفيش صورة
                 </div>
               )}
@@ -374,7 +374,7 @@ export function ItemFormPage() {
               {uploadsConfigured ? (
                 <div className="flex flex-wrap items-center gap-2">
                   <label
-                    className={`rounded-xl border border-stone-300 px-4 py-2.5 text-sm font-medium transition dark:border-white/15 ${
+                    className={`rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-medium transition dark:border-white/15 ${
                       uploading ? 'cursor-progress opacity-70' : 'cursor-pointer hover:border-brand-400'
                     }`}
                   >
@@ -393,12 +393,12 @@ export function ItemFormPage() {
                   )}
                 </div>
               ) : (
-                <p className="text-xs text-stone-400">رفع الصور مش متظبط في النسخة دي.</p>
+                <p className="text-xs text-gray-400">رفع الصور مش متظبط في النسخة دي.</p>
               )}
             </div>
           </div>
 
-          <div className="mt-8 border-t border-stone-200 pt-5 dark:border-white/10">
+          <div className="mt-8 border-t border-gray-200 pt-5 dark:border-white/10">
             <div className="relative flex items-center gap-2">
               <h2 className="font-display text-lg font-bold">الوحدات</h2>
               <HelpHint label="شرح الوحدات">
@@ -412,10 +412,10 @@ export function ItemFormPage() {
               /* على الموبايل خط فاصل بس بين الوحدات بدل بوكس — عشان الهوامش */
               <div
                 key={index}
-                className="mt-5 border-t border-stone-200 pt-4 dark:border-white/10 sm:rounded-xl sm:border sm:p-4"
+                className="mt-5 border-t border-gray-200 pt-4 dark:border-white/10 sm:rounded-xl sm:border sm:p-4"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-medium text-stone-400">وحدة {index + 1}</span>
+                  <span className="text-xs font-medium text-gray-400">وحدة {index + 1}</span>
                   {units.length > 1 && (
                     <button
                       type="button"
@@ -485,7 +485,7 @@ export function ItemFormPage() {
                       className={compactFieldClass}
                     />
                     <Notch compact>weight</Notch>
-                    <span className="mt-1 block text-center text-[10px] text-stone-400">بالجرام</span>
+                    <span className="mt-1 block text-center text-[10px] text-gray-400">بالجرام</span>
                   </label>
 
                   <label className="relative block">
@@ -496,7 +496,7 @@ export function ItemFormPage() {
                       className={compactFieldClass}
                     />
                     <Notch compact>volume</Notch>
-                    <span className="mt-1 block text-center text-[10px] text-stone-400">بالسم³</span>
+                    <span className="mt-1 block text-center text-[10px] text-gray-400">بالسم³</span>
                   </label>
                 </div>
 
@@ -504,7 +504,7 @@ export function ItemFormPage() {
                 <div className="mt-3 grid grid-cols-2 gap-3">
                   {PRICE_GROUPS.map((group) => (
                     <div key={group.label}>
-                      <div className="mb-2.5 text-center text-[11px] font-medium text-stone-400">{group.label}</div>
+                      <div className="mb-2.5 text-center text-[11px] font-medium text-gray-400">{group.label}</div>
                       <div className="grid grid-cols-2 gap-1.5">
                         {group.fields.map(({ field, label }) => (
                           <label key={field} className="relative block">
@@ -529,7 +529,7 @@ export function ItemFormPage() {
             <button
               type="button"
               onClick={() => setUnits((prev) => [...prev, emptyUnit('')])}
-              className="mt-5 rounded-xl border border-dashed border-stone-300 px-4 py-2.5 text-sm font-medium text-stone-600 transition hover:border-brand-400 dark:border-white/20 dark:text-stone-300"
+              className="mt-5 rounded-xl border border-dashed border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-600 transition hover:border-brand-400 dark:border-white/20 dark:text-gray-300"
             >
               + وحدة تانية
             </button>
@@ -552,7 +552,7 @@ export function ItemFormPage() {
             <button
               type="button"
               onClick={() => navigate(-1)}
-              className="rounded-xl border border-stone-300 px-6 py-3 text-sm font-medium transition hover:border-stone-400 dark:border-white/15"
+              className="rounded-xl border border-gray-300 px-6 py-3 text-sm font-medium transition hover:border-gray-400 dark:border-white/15"
             >
               إلغاء
             </button>

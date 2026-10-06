@@ -3,23 +3,27 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { App } from './App';
 import { ThemeProvider } from './context/ThemeContext';
-import { CartProvider } from './context/CartContext';
 import { StoreCartProvider } from './context/StoreCartContext';
 import { AuthProvider } from './context/AuthContext';
 import { LocationProvider } from './context/LocationContext';
 import { SellerProvider } from './context/SellerContext';
 import { SalesProvider } from './context/SalesContext';
 import { IncomingProvider } from './context/IncomingContext';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { watchErrors } from './lib/errorReport';
 import './index.css';
+
+// أي خطأ ملوش حد يمسكه بيتسجّل في السيرفر (فحص ٦ أكتوبر)
+watchErrors();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter basename={import.meta.env.BASE_URL}>
-      <ThemeProvider>
-        <AuthProvider>
-          <LocationProvider>
-            <SalesProvider>
-              <CartProvider>
+    <ErrorBoundary>
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
+        <ThemeProvider>
+          <AuthProvider>
+            <LocationProvider>
+              <SalesProvider>
                 <StoreCartProvider>
                   <SellerProvider>
                     <IncomingProvider>
@@ -27,12 +31,12 @@ createRoot(document.getElementById('root')!).render(
                     </IncomingProvider>
                   </SellerProvider>
                 </StoreCartProvider>
-              </CartProvider>
-            </SalesProvider>
-          </LocationProvider>
-        </AuthProvider>
-      </ThemeProvider>
-    </BrowserRouter>
+              </SalesProvider>
+            </LocationProvider>
+          </AuthProvider>
+        </ThemeProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   </StrictMode>,
 );
 

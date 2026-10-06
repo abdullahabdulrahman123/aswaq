@@ -209,7 +209,7 @@ export function SalesPanel({
             >
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-bold leading-tight">{buyerLabel(sale)}</span>
-                <span className="block truncate text-[11px] leading-tight text-stone-500 dark:text-stone-400">
+                <span className="block truncate text-[11px] leading-tight text-gray-500 dark:text-gray-400">
                   {sale.method === 'delivery' ? `توصيل — ${sale.address}` : 'استلام من المتجر'}
                 </span>
               </span>
@@ -231,7 +231,7 @@ export function SalesPanel({
             type="button"
             onClick={handlePrint}
             disabled={empty || loading || busy !== null}
-            className="shrink-0 rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-semibold transition hover:border-stone-400 disabled:opacity-50 dark:border-white/15 dark:bg-transparent"
+            className="shrink-0 rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-semibold transition hover:border-gray-400 disabled:opacity-50 dark:border-white/15 dark:bg-transparent"
           >
             {busy === 'print' ? 'لحظة…' : 'طباعة'}
           </button>
@@ -244,7 +244,7 @@ export function SalesPanel({
             className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl border transition ${
               onlyInvoice
                 ? 'border-brand-600 bg-brand-600 text-white'
-                : 'border-stone-300 bg-white text-stone-600 hover:border-stone-400 dark:border-white/15 dark:bg-transparent dark:text-stone-300'
+                : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400 dark:border-white/15 dark:bg-transparent dark:text-gray-300'
             }`}
           >
             <FilterIcon />
@@ -310,7 +310,7 @@ function FilterIcon() {
 
 function Chevron({ up = false }: { up?: boolean }) {
   return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-stone-500" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
       <path d={up ? 'm6 15 6-6 6 6' : 'm6 9 6 6 6-6'} />
     </svg>
   );
@@ -460,7 +460,7 @@ function SalesForm({ business, editing, currentShopId }: { business: Business; e
   }
 
   const optionClass =
-    'flex w-full items-center gap-2.5 px-3 py-2.5 text-start text-sm transition hover:bg-stone-50 dark:hover:bg-white/5';
+    'flex w-full items-center gap-2.5 px-3 py-2.5 text-start text-sm transition hover:bg-gray-50 dark:hover:bg-white/5';
 
   return (
     // مكالمة ٥ أكتوبر: «مفيش سكرول في صفحة مبيعات» — الفورم كله و«ابدأ البيع» باينين على
@@ -468,14 +468,14 @@ function SalesForm({ business, editing, currentShopId }: { business: Business; e
     <form onSubmit={handleSubmit} className="p-3.5 sm:p-5">
       <div className="flex items-center gap-2">
         <h2 className="min-w-0 flex-1 truncate font-display text-lg font-bold">
-          مبيعات <span className="text-sm font-normal text-stone-500 dark:text-stone-400">— {business.name}</span>
+          مبيعات <span className="text-sm font-normal text-gray-500 dark:text-gray-400">— {business.name}</span>
         </h2>
         {/*
           بيقفل الأكورديون زي «ابدأ البيع» (أو «حفظ») بطلب العميل (مكالمة ٢ أكتوبر):
           المتجر والعميل متحددين لوحدهم، فلمّ الجزء من غير كتابة بيبدأ البيعة بيهم.
           «إلغاء» بس اللي بيقفل من غير بيعة
         */}
-        <button type="submit" disabled={!buyer} aria-expanded={true} aria-label="اقفل بيانات البيعة" className="grid h-8 w-8 shrink-0 place-items-center rounded-full transition hover:bg-stone-100 disabled:opacity-50 dark:hover:bg-white/10">
+        <button type="submit" disabled={!buyer} aria-expanded={true} aria-label="اقفل بيانات البيعة" className="grid h-8 w-8 shrink-0 place-items-center rounded-full transition hover:bg-gray-100 disabled:opacity-50 dark:hover:bg-white/10">
           <Chevron up />
         </button>
       </div>
@@ -514,8 +514,8 @@ function SalesForm({ business, editing, currentShopId }: { business: Business; e
           >
             {buyer && !isWalkIn(buyer) && <CustomerAvatar customer={buyer} size={22} />}
             <span className="min-w-0 flex-1 truncate">{buyer ? buyer.name : 'بنجيب العملاء…'}</span>
-            {buyer && !pickerOpen && <span className="shrink-0 text-[11px] text-stone-500 dark:text-stone-400">{priceHint(buyer)}</span>}
-            <svg aria-hidden="true" viewBox="0 0 24 24" className={`h-4 w-4 shrink-0 text-stone-500 transition-transform ${pickerOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            {buyer && !pickerOpen && <span className="shrink-0 text-[11px] text-gray-500 dark:text-gray-400">{priceHint(buyer)}</span>}
+            <svg aria-hidden="true" viewBox="0 0 24 24" className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${pickerOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="m6 9 6 6 6-6" />
             </svg>
           </button>
@@ -524,13 +524,13 @@ function SalesForm({ business, editing, currentShopId }: { business: Business; e
           </Notch>
 
           {pickerOpen && (
-            <div className="mt-1.5 overflow-hidden rounded-xl border border-stone-200 dark:border-white/10">
+            <div className="mt-1.5 overflow-hidden rounded-xl border border-gray-200 dark:border-white/10">
               <ul role="listbox" aria-label="العملاء" className="max-h-60 overflow-y-auto">
                 {(walkIn ?? []).map((c) => (
                   <li key={c.accountId}>
                     <button type="button" role="option" aria-selected={buyer?.accountId === c.accountId} onClick={() => pick(c)} className={`${optionClass} font-medium text-brand-700 dark:text-brand-300`}>
                       <span className="min-w-0 flex-1 truncate">{c.name}</span>
-                      <span className="shrink-0 text-xs font-normal text-stone-400">{priceHint(c)}</span>
+                      <span className="shrink-0 text-xs font-normal text-gray-400">{priceHint(c)}</span>
                     </button>
                   </li>
                 ))}
@@ -540,7 +540,7 @@ function SalesForm({ business, editing, currentShopId }: { business: Business; e
                       <button type="button" role="option" aria-selected={buyer?.accountId === c.accountId} onClick={() => pick(c)} className={optionClass}>
                         <CustomerAvatar customer={c} size={28} />
                         <span className="min-w-0 flex-1 truncate">{c.name}</span>
-                        <span className="shrink-0 text-xs text-stone-400">{c.kind === 'business' ? 'شركة' : 'مستخدم'}</span>
+                        <span className="shrink-0 text-xs text-gray-400">{c.kind === 'business' ? 'شركة' : 'مستخدم'}</span>
                       </button>
                     </li>
                   ))}
@@ -558,10 +558,10 @@ function SalesForm({ business, editing, currentShopId }: { business: Business; e
                 dir="auto"
                 inputMode="email"
                 placeholder="عميل مسجّل؟ اكتب إيميله أو رقمه كامل"
-                className="w-full border-t border-stone-200 bg-transparent px-3 py-2.5 text-sm outline-none dark:border-white/10"
+                className="w-full border-t border-gray-200 bg-transparent px-3 py-2.5 text-sm outline-none dark:border-white/10"
               />
               {search.trim() && (
-                <p className="px-3 pb-2.5 text-xs text-stone-400">
+                <p className="px-3 pb-2.5 text-xs text-gray-400">
                   {matches === 'loading'
                     ? 'بندوّر…'
                     : matches === null
@@ -610,8 +610,8 @@ function SalesForm({ business, editing, currentShopId }: { business: Business; e
 
         <div>
           <div className="flex items-center gap-3">
-            <span className="shrink-0 text-xs font-medium text-stone-500 dark:text-stone-400">الاستلام</span>
-            <div role="radiogroup" aria-label="طريقة الاستلام" className="grid flex-1 grid-cols-2 gap-1 rounded-xl bg-stone-100 p-1 dark:bg-white/5">
+            <span className="shrink-0 text-xs font-medium text-gray-500 dark:text-gray-400">الاستلام</span>
+            <div role="radiogroup" aria-label="طريقة الاستلام" className="grid flex-1 grid-cols-2 gap-1 rounded-xl bg-gray-100 p-1 dark:bg-white/5">
               {METHODS.map((o) => (
                 <button
                   key={o.key}
@@ -622,7 +622,7 @@ function SalesForm({ business, editing, currentShopId }: { business: Business; e
                   className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
                     method === o.key
                       ? 'bg-white text-brand-800 shadow-sm dark:bg-surface-card dark:text-brand-200'
-                      : 'text-stone-600 hover:text-stone-900 dark:text-stone-300 dark:hover:text-white'
+                      : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white'
                   }`}
                 >
                   {o.label}
@@ -654,7 +654,7 @@ function SalesForm({ business, editing, currentShopId }: { business: Business; e
         </p>
       )}
 
-      <div className="mt-4 flex flex-wrap gap-3 border-t border-stone-200 pt-3.5 dark:border-white/10">
+      <div className="mt-4 flex flex-wrap gap-3 border-t border-gray-200 pt-3.5 dark:border-white/10">
         <button
           type="submit"
           disabled={!buyer}
@@ -665,7 +665,7 @@ function SalesForm({ business, editing, currentShopId }: { business: Business; e
         <button
           type="button"
           onClick={closeDialog}
-          className="rounded-xl border border-stone-300 px-6 py-2.5 text-sm font-medium transition hover:border-stone-400 dark:border-white/15"
+          className="rounded-xl border border-gray-300 px-6 py-2.5 text-sm font-medium transition hover:border-gray-400 dark:border-white/15"
         >
           إلغاء
         </button>

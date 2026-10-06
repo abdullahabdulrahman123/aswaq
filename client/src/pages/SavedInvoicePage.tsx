@@ -70,10 +70,10 @@ export function SavedInvoicePage() {
   }, [order, printOnOpen, pathname, navigate]);
 
   if (error || !user) {
-    return <p className="mx-auto max-w-md px-4 py-20 text-center text-sm text-stone-500 dark:text-stone-400">{error || 'سجّل دخول عشان تشوف الفاتورة.'}</p>;
+    return <p className="mx-auto max-w-md px-4 py-20 text-center text-sm text-gray-500 dark:text-gray-400">{error || 'سجّل دخول عشان تشوف الفاتورة.'}</p>;
   }
   if (!order) {
-    return <p className="mx-auto max-w-2xl px-4 py-8 text-sm text-stone-500 dark:text-stone-400">بنجيب الفاتورة…</p>;
+    return <p className="mx-auto max-w-2xl px-4 py-8 text-sm text-gray-500 dark:text-gray-400">بنجيب الفاتورة…</p>;
   }
 
   // البيعة بتتقفل أول ما الفاتورة المؤكدة تفتح (برا «عالم الأوردر») — فالنشاط من الفاتورة نفسها

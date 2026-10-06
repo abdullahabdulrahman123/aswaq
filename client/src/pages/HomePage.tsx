@@ -95,9 +95,9 @@ export function HomePage() {
             </button>
           </div>
         ) : shown === null ? (
-          <p className="text-sm text-stone-500 dark:text-stone-400">بنجيب المتاجر…</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">بنجيب المتاجر…</p>
         ) : shown.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-stone-300 p-8 text-center text-sm text-stone-500 dark:border-white/15 dark:text-stone-400">
+          <p className="rounded-2xl border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500 dark:border-white/15 dark:text-gray-400">
             {session ? 'النشاط ده ملوش متاجر لسه — علّم «متجر» على مقر من «بيانات الشركة».' : 'لسه مفيش متاجر.'}
           </p>
         ) : (
@@ -106,7 +106,7 @@ export function HomePage() {
               <li key={store.id}>
                 <Link
                   to={`/store/${store.id}`}
-                  className="flex h-full items-center gap-3 rounded-2xl border border-stone-200 bg-white p-4 transition hover:border-brand-400 dark:border-white/10 dark:bg-surface-card dark:hover:border-brand-400"
+                  className="flex h-full items-center gap-3 rounded-2xl border border-gray-200 bg-white p-4 transition hover:border-brand-400 dark:border-white/10 dark:bg-surface-card dark:hover:border-brand-400"
                 >
                   <Avatar
                     picture={store.business.picture}
@@ -117,13 +117,13 @@ export function HomePage() {
                   />
                   <div className="min-w-0">
                     <h2 className="break-words font-display font-bold leading-snug">{store.name}</h2>
-                    <p className="mt-0.5 break-words text-sm text-stone-500 dark:text-stone-400">
+                    <p className="mt-0.5 break-words text-sm text-gray-500 dark:text-gray-400">
                       {store.business.name}
                     </p>
                     {location && (
                       <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
                         {km !== null && (
-                          <span className="tabular-nums text-stone-500 dark:text-stone-400">{formatDistance(km)}</span>
+                          <span className="tabular-nums text-gray-500 dark:text-gray-400">{formatDistance(km)}</span>
                         )}
                         {radii &&
                           (deliversTo(store.location, radii.get(store.id), location) ? (
@@ -131,7 +131,7 @@ export function HomePage() {
                               بيوصّل لمكانك
                             </span>
                           ) : (
-                            <span className="rounded-md bg-stone-100 px-1.5 py-0.5 text-stone-500 dark:bg-white/10 dark:text-stone-400">
+                            <span className="rounded-md bg-gray-100 px-1.5 py-0.5 text-gray-500 dark:bg-white/10 dark:text-gray-400">
                               مبيوصّلش لمكانك
                             </span>
                           ))}

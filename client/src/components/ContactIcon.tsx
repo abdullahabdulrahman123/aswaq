@@ -24,9 +24,9 @@ const PATHS: Record<ContactType, ReactElement> = {
 
 /** لون خلفية الأيقونة: الواتساب أخضر وفيسبوك أزرق زي ما الناس عارفينهم، والأرقام رمادي */
 const TINTS: Record<ContactType, string> = {
-  mobile: 'bg-stone-100 text-stone-600 dark:bg-white/10 dark:text-stone-300',
-  landline: 'bg-stone-100 text-stone-600 dark:bg-white/10 dark:text-stone-300',
-  short_number: 'bg-stone-100 text-stone-600 dark:bg-white/10 dark:text-stone-300',
+  mobile: 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300',
+  landline: 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300',
+  short_number: 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300',
   whatsapp: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300',
   facebook: 'bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300',
 };

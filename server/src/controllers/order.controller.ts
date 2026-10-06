@@ -4,7 +4,7 @@ import { currentUser, fetchWaslaStore, findManagedBusiness } from '../middleware
 import { isObjectId } from '../schemas/common.js';
 import { announceIncoming, announceState } from '../realtime.js';
 import { cancelSchema, draftSchema, lineSchema } from '../schemas/order.schema.js';
-import { flowOf, isFinished, nextIn, salesStagesOf, viewOf, withFlow } from '../services/orderFlow.js';
+import { flowOf, isFinished, nextIn, salesStagesOf, viewOf, withFlow, withoutCost, type OrderView } from '../services/orderFlow.js';
 import { PERMISSIONS, can } from '../services/permissions.js';
 import {
   advanceState,
@@ -29,9 +29,13 @@ import {
 } from '../services/order.service.js';
 
 /*
- * الأوردر زي ما هو — كل حقول السكيمة، مفيش حاجة سرية على المحرّر نفسه — ومعاه
- * اسم مرحلته وزرار اللي بعدها حسب مراحل النشاط البائع (viewOf / withFlow).
+ * الأوردر زي ما هو — كل حقول السكيمة — ومعاه اسم مرحلته وزرار اللي بعدها حسب
+ * مراحل النشاط البائع (viewOf / withFlow). ما عدا تكلفة البائع ومكسبه: دول
+ * للبائع بس (فحص ٦ أكتوبر). اللي بيدير النشاط البائع بيشوف الأوردر كامل، وأي
+ * حد تاني (المشتري) من غيرهم — من النسخة المحفوظة من وصلة، من غير ما نسألها تاني.
  */
+const shownTo = (req: Request) => (view: OrderView) =>
+  (req.waslaBusinesses ?? []).some((b) => b.accountId === view.from.acc) ? view : withoutCost(view);
 
 /**
  * PUT /api/orders/draft — المسودة كلها: الهيدر والسطور. بطلب العميل السلة
@@ -127,7 +131,7 @@ export async function putDraft(req: Request, res: Response) {
     res.status(409).json({ message: 'Order already checked out' });
     return;
   }
-  res.json({ order: await viewOf(order) });
+  res.json({ order: shownTo(req)(await viewOf(order)) });
 }
 
 /** كام مرة الصنف بيحاول تاني لو صنف تاني اتحفظ في نفس اللحظة */
@@ -179,7 +183,7 @@ export async function putLine(req: Request, res: Response) {
       return;
     }
     if (await replaceDetails(order, details, { acc: me.accountId, name: me.name })) {
-      res.json({ order: await viewOf((await findMine(me.accountId, id))!) });
+      res.json({ order: shownTo(req)(await viewOf((await findMine(me.accountId, id))!)) });
       return;
     }
   }
@@ -244,7 +248,7 @@ export async function putConfirmedLine(req: Request, res: Response) {
       const view = await viewOf((await findById(id))!);
       // «مهامي» عند الباقيين بالإجمالي الجديد
       await announceState(view).catch(() => undefined);
-      res.json({ order: view });
+      res.json({ order: shownTo(req)(view) });
       return;
     }
   }
@@ -253,7 +257,7 @@ export async function putConfirmedLine(req: Request, res: Response) {
 
 export async function list(req: Request, res: Response) {
   const me = await currentUser(req);
-  res.json({ orders: await withFlow(await listMine(me.accountId)) });
+  res.json({ orders: (await withFlow(await listMine(me.accountId))).map(shownTo(req)) });
 }
 
 /**
@@ -272,7 +276,7 @@ export async function get(req: Request, res: Response) {
     res.status(404).json({ message: 'Order not found' });
     return;
   }
-  res.json({ order: await viewOf(order) });
+  res.json({ order: shownTo(req)(await viewOf(order)) });
 }
 
 /** POST /api/orders/:orderId/checkout — المسودة بتبقى أوردر برقم فاتورة من عدّاد النشاط البائع */
@@ -295,7 +299,7 @@ export async function checkout(req: Request, res: Response) {
   const done = await viewOf(await checkOut(order.id, await nextNumber(order.from.acc)));
   // «الطلبات الواردة» عند النشاط البائع — لحظة بلحظة
   await announceIncoming(done).catch(() => undefined);
-  res.json({ order: done });
+  res.json({ order: shownTo(req)(done) });
 }
 
 /**
@@ -320,7 +324,7 @@ export async function advance(req: Request, res: Response) {
   const view = await viewOf(moved);
   // «مهامي» عند الباقيين بتتحدّث — المكتمل بيخرج منها
   await announceState(view).catch(() => undefined);
-  res.json({ order: view });
+  res.json({ order: shownTo(req)(view) });
 }
 
 /**
@@ -368,7 +372,7 @@ export async function cancel(req: Request, res: Response) {
   const view = await viewOf(cancelled);
   // «مهامي» عند البائع — الملغية بتخرج منها
   await announceState(view).catch(() => undefined);
-  res.json({ order: view });
+  res.json({ order: shownTo(req)(view) });
 }
 
 /**

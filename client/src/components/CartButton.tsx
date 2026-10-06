@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useSales } from '../context/SalesContext';
 import { useStoreCart } from '../context/StoreCartContext';
-import { egp } from '../data/catalog';
+import { egp } from '../lib/money';
 import { itemsLabel } from '../lib/quantity';
 import { CartIcon } from './CartIcon';
 
@@ -65,14 +65,14 @@ function CartLink({
       to={to}
       aria-label={label}
       title={title}
-      className="flex min-w-9 shrink-0 flex-col items-center gap-0.5 rounded-lg px-1.5 py-1 text-stone-700 transition hover:bg-stone-100 dark:text-stone-200 dark:hover:bg-white/10"
+      className="flex min-w-9 shrink-0 flex-col items-center gap-0.5 rounded-lg px-1.5 py-1 text-gray-700 transition hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/10"
     >
       <span className="relative">
         <CartIcon arrow="in" className="h-6 w-6" />
         {count > 0 && (
           <span
             data-badge
-            className="absolute -end-2 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-stone-700 px-1 text-[10px] font-bold leading-none tabular-nums text-white ring-2 ring-surface-light dark:bg-stone-200 dark:text-stone-900 dark:ring-surface-dark"
+            className="absolute -end-2 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-gray-700 px-1 text-[10px] font-bold leading-none tabular-nums text-white ring-2 ring-surface-light dark:bg-gray-200 dark:text-gray-900 dark:ring-surface-dark"
           >
             {count > 99 ? '99+' : count}
           </span>
@@ -82,7 +82,7 @@ function CartLink({
         <span
           className={`text-[11px] font-bold leading-none tabular-nums ${
             minimum === null
-              ? 'text-stone-700 dark:text-stone-200'
+              ? 'text-gray-700 dark:text-gray-200'
               : reached
                 ? 'text-accent-600 dark:text-accent-400'
                 : 'text-red-600 dark:text-red-400'

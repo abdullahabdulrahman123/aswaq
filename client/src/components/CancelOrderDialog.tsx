@@ -56,14 +56,14 @@ export function CancelOrderDialog({ order, buyer = false, onCancelled, onClose }
       onClose={onClose}
       aria-label={`إلغاء ${what}`}
       style={{ width: 'min(26rem, 94vw)' }}
-      className="rounded-2xl bg-white p-0 text-stone-900 shadow-card backdrop:bg-black/50 dark:bg-surface-card dark:text-stone-100"
+      className="rounded-2xl bg-white p-0 text-gray-900 shadow-card backdrop:bg-black/50 dark:bg-surface-card dark:text-gray-100"
     >
       <form onSubmit={handleSubmit} className="p-5">
         <h2 className="pe-8 font-display text-lg font-bold">
           إلغاء {what}
           {order.number != null && <span className="tabular-nums"> رقم {order.number}</span>}
         </h2>
-        <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">{buyer ? 'البائع هيشوف السبب.' : 'المشتري هيشوف إن الفاتورة اتلغت.'}</p>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{buyer ? 'البائع هيشوف السبب.' : 'المشتري هيشوف إن الفاتورة اتلغت.'}</p>
 
         <label className="mt-4 block">
           <span className="mb-1.5 block text-sm font-medium">السبب</span>
@@ -78,7 +78,7 @@ export function CancelOrderDialog({ order, buyer = false, onCancelled, onClose }
             rows={3}
             autoFocus
             placeholder={buyer ? 'مثال: طلبت بالغلط' : 'مثال: العميل رجع في الطلب'}
-            className="w-full resize-none rounded-xl border border-stone-300 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-brand-500 dark:border-white/20"
+            className="w-full resize-none rounded-xl border border-gray-300 bg-transparent px-3 py-2.5 text-sm outline-none transition focus:border-brand-500 dark:border-white/20"
           />
         </label>
 

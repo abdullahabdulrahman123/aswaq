@@ -1,4 +1,4 @@
-# سيرفر أسواق على أي استضافة بتبني Docker (Northflank حالياً) — نفس خطوات render.yaml.
+# سيرفر أسواق على أي استضافة بتبني Docker (Northflank حالياً).
 FROM node:22-slim
 
 # Prisma محتاج openssl، والصورة الـslim مش جاية بيه
@@ -17,5 +17,5 @@ RUN npx prisma generate && npm run build
 
 ENV NODE_ENV=production
 EXPOSE 5100
-# db push بيطابق فهارس MongoDB مع schema.prisma قبل ما السيرفر يقوم — زي startCommand في Render
+# db push بيطابق فهارس MongoDB مع schema.prisma قبل ما السيرفر يقوم
 CMD ["sh", "-c", "npx prisma db push --skip-generate && node dist/index.js"]

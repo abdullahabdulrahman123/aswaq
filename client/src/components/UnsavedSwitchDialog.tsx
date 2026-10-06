@@ -28,7 +28,7 @@ export function UnsavedSwitchDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center bg-stone-900/60 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 grid place-items-center bg-gray-900/60 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-labelledby="unsaved-switch-title"
@@ -36,12 +36,12 @@ export function UnsavedSwitchDialog({
         if (e.target === e.currentTarget) onCancel();
       }}
     >
-      <div className="relative w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl dark:border-white/10 dark:bg-surface-card">
+      <div className="relative w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-xl dark:border-white/10 dark:bg-surface-card">
         <h2 id="unsaved-switch-title" className="font-display text-lg font-bold">
           الصنف اللي بتكتبه مش هيتحفظ
         </h2>
 
-        <p className="mt-3 leading-relaxed text-stone-600 dark:text-stone-300">
+        <p className="mt-3 leading-relaxed text-gray-600 dark:text-gray-300">
           لو غيّرت الحساب لـ«{accountName}» دلوقتي، اللي كتبته هيضيع. تكمل؟
         </p>
 
@@ -49,7 +49,7 @@ export function UnsavedSwitchDialog({
           <button
             ref={stayRef}
             onClick={onCancel}
-            className="flex-1 rounded-xl border border-stone-300 px-4 py-2.5 text-sm font-semibold transition hover:border-stone-400 dark:border-white/15"
+            className="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-semibold transition hover:border-gray-400 dark:border-white/15"
           >
             لأ، كمّل الصنف
           </button>

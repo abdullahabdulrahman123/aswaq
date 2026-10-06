@@ -117,7 +117,7 @@ export function InvoicePage() {
     return (
       <div className="mx-auto max-w-md px-4 py-20 text-center">
         <h1 className="font-display text-2xl font-bold">الفاتورة فاضية</h1>
-        <p className="mt-3 text-sm text-stone-500 dark:text-stone-400">ضيف أصناف من المتجر الأول.</p>
+        <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">ضيف أصناف من المتجر الأول.</p>
         <Link to={`/store/${shopId}`} className="mt-6 inline-block rounded-xl bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-600">
           ارجع للمتجر
         </Link>
@@ -150,7 +150,7 @@ export function InvoicePage() {
             type="button"
             // رأس الفاتورة بيتفتح فوق أصناف المتجر ده (FollowSalesPanel) — مش المتجر اللي البيعة بدأت منه
             onClick={() => openDialog(saleBusiness, session)}
-            className="rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium transition hover:border-stone-400 dark:border-white/15"
+            className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium transition hover:border-gray-400 dark:border-white/15"
           >
             تعديل العميل
           </button>
@@ -192,7 +192,7 @@ export function InvoicePage() {
             <button
               type="button"
               onClick={() => window.print()}
-              className="rounded-xl border border-stone-300 px-5 py-3 text-sm font-medium transition hover:border-stone-400 dark:border-white/15"
+              className="rounded-xl border border-gray-300 px-5 py-3 text-sm font-medium transition hover:border-gray-400 dark:border-white/15"
             >
               طباعة
             </button>
@@ -229,20 +229,20 @@ export function InvoicePage() {
           <button
             type="button"
             onClick={() => window.print()}
-            className="rounded-xl border border-stone-300 px-5 py-3 text-sm font-medium transition hover:border-stone-400 dark:border-white/15"
+            className="rounded-xl border border-gray-300 px-5 py-3 text-sm font-medium transition hover:border-gray-400 dark:border-white/15"
           >
             طباعة
           </button>
         )}
         <Link
           to={`/store/${shopId}`}
-          className="rounded-xl border border-stone-300 px-5 py-3 text-sm font-medium transition hover:border-stone-400 dark:border-white/15"
+          className="rounded-xl border border-gray-300 px-5 py-3 text-sm font-medium transition hover:border-gray-400 dark:border-white/15"
         >
           ارجع للمتجر
         </Link>
       </div>
       {signedIn && unpriced && (
-        <p className="mt-2 text-xs text-stone-500 dark:text-stone-400 print:hidden">شيل الأصناف اللي سعرها لسه متحددش عشان تقدر تأكد.</p>
+        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 print:hidden">شيل الأصناف اللي سعرها لسه متحددش عشان تقدر تأكد.</p>
       )}
     </div>
   );

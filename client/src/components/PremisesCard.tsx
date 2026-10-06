@@ -11,7 +11,7 @@ function KindBadges({ premises }: { premises: Premises }) {
       {kinds.map((kind) => (
         <span
           key={kind}
-          className="shrink-0 rounded-md bg-stone-100 px-1.5 py-0.5 text-[11px] font-medium text-stone-600 dark:bg-white/10 dark:text-stone-300"
+          className="shrink-0 rounded-md bg-gray-100 px-1.5 py-0.5 text-[11px] font-medium text-gray-600 dark:bg-white/10 dark:text-gray-300"
         >
           {kind}
         </span>
@@ -38,11 +38,11 @@ export function PremisesCard({
   const summary = (premises.address && oneLine(premises.address)) || 'من غير عنوان';
 
   return (
-    <li className="overflow-hidden rounded-xl border border-stone-200 bg-white dark:border-white/10 dark:bg-white/5">
+    <li className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/10 dark:bg-white/5">
       <button
         type="button"
         onClick={onOpen}
-        className="flex w-full items-center gap-3 px-4 py-3 text-start transition hover:bg-stone-50 dark:hover:bg-white/5"
+        className="flex w-full items-center gap-3 px-4 py-3 text-start transition hover:bg-gray-50 dark:hover:bg-white/5"
       >
         {/* min-w-0 شرط عشان truncate تشتغل جوه flex */}
         <span className="min-w-0 flex-1">
@@ -50,8 +50,8 @@ export function PremisesCard({
             <span className="truncate font-display text-sm font-bold">{premises.name}</span>
             <KindBadges premises={premises} />
           </span>
-          <span className="mt-0.5 flex min-w-0 items-center gap-1 text-sm text-stone-500 dark:text-stone-400">
-            <PinIcon className="h-3.5 w-3.5 shrink-0 text-stone-400" />
+          <span className="mt-0.5 flex min-w-0 items-center gap-1 text-sm text-gray-500 dark:text-gray-400">
+            <PinIcon className="h-3.5 w-3.5 shrink-0 text-gray-400" />
             <span className="truncate">{summary}</span>
           </span>
           {/* سطر لوحده مش شارة جنب الاسم: الشارة كانت بتقص اسم المتجر على الموبايل */}
@@ -65,7 +65,7 @@ export function PremisesCard({
         <svg
           aria-hidden="true"
           viewBox="0 0 24 24"
-          className="h-4 w-4 shrink-0 text-stone-400"
+          className="h-4 w-4 shrink-0 text-gray-400"
           fill="none"
           stroke="currentColor"
           strokeWidth="2.2"

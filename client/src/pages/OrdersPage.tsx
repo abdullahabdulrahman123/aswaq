@@ -21,7 +21,7 @@ export function OrdersPage() {
           <CartIcon arrow="in" className="h-8 w-8" />
         </div>
         <h1 className="mt-5 font-display text-2xl font-bold">طلباتي</h1>
-        <p className="mt-3 leading-relaxed text-stone-500 dark:text-stone-400">
+        <p className="mt-3 leading-relaxed text-gray-500 dark:text-gray-400">
           {loading ? 'بنجيب طلباتك…' : 'مفيش طلبات. ادخل على أي متجر وضيف أصناف.'}
         </p>
       </div>
@@ -31,7 +31,7 @@ export function OrdersPage() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
       <h1 className="font-display text-2xl font-bold sm:text-3xl">طلباتي</h1>
-      <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">دوس على أي طلب ترجع تكمّله أو تشوف فاتورته.</p>
+      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">دوس على أي طلب ترجع تكمّله أو تشوف فاتورته.</p>
 
       {/* grid-cols-1 = عمود minmax(0,1fr): من غيره العمود بيوسع على قد الاسم الطويل والـtruncate ميشتغلش، والصفحة بتعمل سكرول يمين وشمال على الموبايل (مكالمة ٢٨ سبتمبر) */}
       <ul aria-label="الطلبات المفتوحة" className="mt-5 grid grid-cols-1 gap-2.5">

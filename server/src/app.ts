@@ -7,12 +7,13 @@ import { errorHandler } from './middleware/errorHandler.js';
 import businessRoutes from './routes/business.routes.js';
 import showroomRoutes from './routes/showroom.routes.js';
 import orderRoutes from './routes/order.routes.js';
+import errorRoutes from './routes/error.routes.js';
 import * as settingsController from './controllers/settings.controller.js';
 
 export function createApp() {
   const app = express();
 
-  // Render بينهي TLS ويبعت http للسيرفر
+  // Northflank بينهي TLS ويبعت http للسيرفر
   if (env.trustProxy) app.set('trust proxy', 1);
 
   app.use(helmet());
@@ -25,6 +26,8 @@ export function createApp() {
   app.get('/api/permissions', requireWaslaUser, settingsController.permissions);
   // من غير توكن: الزائر بيشوف المعرض كمان
   app.use('/api/showroom', showroomRoutes);
+  // أخطاء المتصفح (فحص ٦ أكتوبر) — من غير توكن، الخطأ ممكن يحصل قبل الدخول
+  app.use('/api/errors', errorRoutes);
 
   app.use(errorHandler);
 

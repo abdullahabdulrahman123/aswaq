@@ -220,14 +220,14 @@ export function EmployeesPage() {
 
   if (!user) {
     return (
-      <p className="mx-auto max-w-md px-4 py-20 text-center text-sm text-stone-500 dark:text-stone-400">
+      <p className="mx-auto max-w-md px-4 py-20 text-center text-sm text-gray-500 dark:text-gray-400">
         سجّل دخولك الأول.
       </p>
     );
   }
   if (!business) {
     return (
-      <p className="mx-auto max-w-md px-4 py-20 text-center text-sm text-stone-500 dark:text-stone-400">
+      <p className="mx-auto max-w-md px-4 py-20 text-center text-sm text-gray-500 dark:text-gray-400">
         {businessesLoading ? "بنجيب النشاط…" : "النشاط ده مش موجود."}
       </p>
     );
@@ -238,9 +238,9 @@ export function EmployeesPage() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
       <h1 className="font-display text-2xl font-bold sm:text-3xl">الموظفين</h1>
-      <p className="mt-2 text-sm text-stone-500 dark:text-stone-400">
+      <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
         لنشاط{" "}
-        <span className="font-semibold text-stone-700 dark:text-stone-200">
+        <span className="font-semibold text-gray-700 dark:text-gray-200">
           {business.name}
         </span>
       </p>
@@ -259,7 +259,7 @@ export function EmployeesPage() {
       )}
 
       {isOwner ? (
-        <div className="rounded-2xl border border-stone-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
           {/* gap أوسع من العادي: اسم كل خانة طالع فوق حدّها بـ٨ بكسل */}
           <div className="grid gap-5">
             <label className="relative block">
@@ -279,17 +279,17 @@ export function EmployeesPage() {
             {!picked && query.trim() && (
               <div>
                 {matches === "loading" || matches === null ? (
-                  <p className="text-xs text-stone-400">
+                  <p className="text-xs text-gray-400">
                     {matches === "loading"
                       ? "بندوّر…"
                       : "كمّل الاسم (٣ حروف) أو الإيميل أو الرقم."}
                   </p>
                 ) : matches.length === 0 ? (
-                  <p className="text-xs text-stone-400">مفيش مستخدم كده.</p>
+                  <p className="text-xs text-gray-400">مفيش مستخدم كده.</p>
                 ) : (
                   <ul
                     aria-label="نتايج البحث"
-                    className="divide-y divide-stone-100 overflow-hidden rounded-xl border border-stone-200 dark:divide-white/5 dark:border-white/10"
+                    className="divide-y divide-gray-100 overflow-hidden rounded-xl border border-gray-200 dark:divide-white/5 dark:border-white/10"
                   >
                     {matches.map((m) => (
                       <li key={m.accountId}>
@@ -297,7 +297,7 @@ export function EmployeesPage() {
                           type="button"
                           disabled={already.has(m.accountId)}
                           onClick={() => setPicked(m)}
-                          className="flex w-full items-center gap-3 px-3 py-2.5 text-start text-sm transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-white/5"
+                          className="flex w-full items-center gap-3 px-3 py-2.5 text-start text-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-white/5"
                         >
                           <Avatar
                             picture={m.picture}
@@ -310,7 +310,7 @@ export function EmployeesPage() {
                             {m.name}
                           </span>
                           {already.has(m.accountId) && (
-                            <span className="shrink-0 text-xs text-stone-400">
+                            <span className="shrink-0 text-xs text-gray-400">
                               موظف بالفعل
                             </span>
                           )}
@@ -357,7 +357,7 @@ export function EmployeesPage() {
           </div>
         </div>
       ) : (
-        <p className="rounded-xl bg-stone-100 px-4 py-3 text-sm text-stone-600 dark:bg-white/5 dark:text-stone-300">
+        <p className="rounded-xl bg-gray-100 px-4 py-3 text-sm text-gray-600 dark:bg-white/5 dark:text-gray-300">
           صاحب الشركة بس اللي بيضيف ويشيل الموظفين.
         </p>
       )}
@@ -365,13 +365,13 @@ export function EmployeesPage() {
       <h2 className="mt-8 font-display text-lg font-bold">
         الموظفين{" "}
         {employees !== null && (
-          <span className="text-sm font-normal text-stone-400">
+          <span className="text-sm font-normal text-gray-400">
             {employees.length}
           </span>
         )}
       </h2>
       {employees === null ? (
-        <p className="mt-3 text-sm text-stone-500 dark:text-stone-400">
+        <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
           بنجيب الموظفين…
         </p>
       ) : (
@@ -379,7 +379,7 @@ export function EmployeesPage() {
           {employees.map((e) => (
             <li
               key={e.accountId}
-              className="rounded-2xl border border-stone-200 bg-white p-3 dark:border-white/10 dark:bg-surface-card"
+              className="rounded-2xl border border-gray-200 bg-white p-3 dark:border-white/10 dark:bg-surface-card"
             >
               <div className="flex items-center gap-3">
                 <Avatar
@@ -391,7 +391,7 @@ export function EmployeesPage() {
                 />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-semibold">{e.name}</span>
-                  <span className="block truncate text-xs text-stone-500 dark:text-stone-400">
+                  <span className="block truncate text-xs text-gray-500 dark:text-gray-400">
                     {jobLabel(e)}
                     {catalog && !e.owner && (
                       <span className="tabular-nums">
@@ -414,7 +414,7 @@ export function EmployeesPage() {
                     onClick={() =>
                       setPermsOf((v) => (v === e.accountId ? "" : e.accountId))
                     }
-                    className="shrink-0 rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium transition hover:border-stone-400 dark:border-white/15"
+                    className="shrink-0 rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium transition hover:border-gray-400 dark:border-white/15"
                   >
                     الصلاحيات
                   </button>
@@ -434,7 +434,7 @@ export function EmployeesPage() {
                       <button
                         type="button"
                         onClick={() => setConfirmingId("")}
-                        className="rounded-lg px-2 py-1.5 text-xs text-stone-500 dark:text-stone-400"
+                        className="rounded-lg px-2 py-1.5 text-xs text-gray-500 dark:text-gray-400"
                       >
                         رجوع
                       </button>
@@ -443,7 +443,7 @@ export function EmployeesPage() {
                     <button
                       type="button"
                       onClick={() => setConfirmingId(e.accountId)}
-                      className="shrink-0 rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-red-700 transition hover:border-red-300 dark:border-white/15 dark:text-red-300"
+                      className="shrink-0 rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-red-700 transition hover:border-red-300 dark:border-white/15 dark:text-red-300"
                     >
                       شيل
                     </button>
@@ -497,7 +497,7 @@ function PermissionsPanel({
   return (
     <div
       aria-label={`صلاحيات ${employee.name}`}
-      className="mt-3 space-y-3 border-t border-stone-100 pt-3 dark:border-white/5"
+      className="mt-3 space-y-3 border-t border-gray-100 pt-3 dark:border-white/5"
     >
       {categories.map((category) => {
         const inCategory = catalog.permissions.filter((p) =>
@@ -508,7 +508,7 @@ function PermissionsPanel({
           <fieldset key={category} className="space-y-1.5">
             <legend className="flex w-full items-center justify-between gap-2 text-sm font-bold">
               <span>{catalog.categories[category] ?? category}</span>
-              <label className="flex items-center gap-1.5 text-xs font-medium text-stone-500 dark:text-stone-400">
+              <label className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
                 <input
                   type="checkbox"
                   checked={all}

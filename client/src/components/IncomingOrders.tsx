@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Business } from '../context/AuthContext';
 import { useIncoming } from '../context/IncomingContext';
-import { egp } from '../data/catalog';
+import { egp } from '../lib/money';
 import type { Order } from '../lib/aswaqApi';
 import { useOrderRows } from '../lib/orderRows';
 import { stageLabel } from '../lib/orderFlow';
@@ -61,7 +61,7 @@ export function IncomingOrders({ business }: { business: Business }) {
   return (
     <section aria-labelledby="incoming-title" className="mt-6">
       <h2 id="incoming-title" className="font-display text-lg font-bold">الطلبات الواردة</h2>
-      <p className="mt-0.5 text-sm text-stone-500 dark:text-stone-400">
+      <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
         الطلبات المطلوبة من {business.name}، وفواتير «مبيعات».
         {live && <span className="ms-1.5 inline-block h-2 w-2 rounded-full bg-accent-500 align-middle" title="بتتحدّث لوحدها" />}
       </p>
@@ -81,7 +81,7 @@ export function IncomingOrders({ business }: { business: Business }) {
 
       {openSales.length > 0 && (
         <section className="mt-5">
-          <h3 className="text-sm font-semibold text-stone-600 dark:text-stone-300">فواتير بيع لسه متأكدتش</h3>
+          <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-300">فواتير بيع لسه متأكدتش</h3>
           <ul aria-label="فواتير البيع المفتوحة" className="mt-2 grid grid-cols-1 gap-2.5">
             {openSales.map((row) => (
               <OrderRowButton key={row.key} row={row} title={row.buyer ?? row.store} onOpen={() => open(row)} />
@@ -91,9 +91,9 @@ export function IncomingOrders({ business }: { business: Business }) {
       )}
 
       {orders === null ? (
-        <p className="mt-6 text-sm text-stone-500 dark:text-stone-400">بنجيب الطلبات…</p>
+        <p className="mt-6 text-sm text-gray-500 dark:text-gray-400">بنجيب الطلبات…</p>
       ) : orders.length === 0 ? (
-        <p className="mt-6 rounded-xl border border-dashed border-stone-300 px-4 py-8 text-center text-sm text-stone-400 dark:border-white/15">
+        <p className="mt-6 rounded-xl border border-dashed border-gray-300 px-4 py-8 text-center text-sm text-gray-400 dark:border-white/15">
           {openSales.length > 0 ? 'مفيش طلبات مؤكدة لسه.' : 'مفيش طلبات واردة لسه. أول ما حد يأكد طلب من متاجرك هيظهر هنا على طول.'}
         </p>
       ) : (
@@ -115,7 +115,7 @@ function IncomingRow({ order, onOpen }: { order: Order; onOpen: () => void }) {
       <button
         type="button"
         onClick={onOpen}
-        className="flex w-full items-center gap-3 rounded-2xl border border-stone-200 bg-white p-4 text-start transition hover:border-brand-400 dark:border-white/10 dark:bg-surface-card"
+        className="flex w-full items-center gap-3 rounded-2xl border border-gray-200 bg-white p-4 text-start transition hover:border-brand-400 dark:border-white/10 dark:bg-surface-card"
       >
         <span className="min-w-0 flex-1">
           <span className="flex min-w-0 items-center gap-2">
@@ -124,14 +124,14 @@ function IncomingRow({ order, onOpen }: { order: Order; onOpen: () => void }) {
               فاتورة {order.number} · {stageLabel(order)}
             </span>
           </span>
-          <span className="mt-0.5 block truncate text-sm text-stone-500 dark:text-stone-400">
+          <span className="mt-0.5 block truncate text-sm text-gray-500 dark:text-gray-400">
             {order.names.store} · {order.method === 'delivery' ? 'توصيل' : 'استلام'}
           </span>
-          <span className="mt-0.5 block text-xs text-stone-400">{timeFormat.format(new Date(order.checkedOutAt ?? order.updatedAt))}</span>
+          <span className="mt-0.5 block text-xs text-gray-400">{timeFormat.format(new Date(order.checkedOutAt ?? order.updatedAt))}</span>
         </span>
         <span className="shrink-0 text-end">
           <span className="block text-sm font-bold tabular-nums">{egp(order.netTotal)}</span>
-          <span className="block text-xs text-stone-500 dark:text-stone-400">{itemsLabel(count)}</span>
+          <span className="block text-xs text-gray-500 dark:text-gray-400">{itemsLabel(count)}</span>
         </span>
       </button>
     </li>

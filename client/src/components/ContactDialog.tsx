@@ -136,15 +136,15 @@ export function ContactDialog({ open, value, others, ownerName, onSave, onDelete
       aria-label={value ? 'تعديل جهة الاتصال' : 'إضافة جهة اتصال'}
       // العرض في style مش كلاس — نفس سبب AddressDialog
       style={{ width: 'min(30rem, 92vw)' }}
-      className="rounded-2xl bg-white p-0 text-stone-900 shadow-card backdrop:bg-black/50 dark:bg-surface-card dark:text-stone-100"
+      className="rounded-2xl bg-white p-0 text-gray-900 shadow-card backdrop:bg-black/50 dark:bg-surface-card dark:text-gray-100"
     >
       {open && (
         <div className="max-h-[85vh] overflow-y-auto p-5">
           <h2 className="font-display text-lg font-bold">{value ? 'تعديل جهة الاتصال' : 'إضافة جهة اتصال'}</h2>
-          {ownerName && <p className="mt-1 text-xs text-stone-400">أرقام «{ownerName}».</p>}
+          {ownerName && <p className="mt-1 text-xs text-gray-400">أرقام «{ownerName}».</p>}
 
           <fieldset className="mt-5">
-            <legend className="mb-2 block text-xs font-medium text-stone-500 dark:text-stone-400">النوع</legend>
+            <legend className="mb-2 block text-xs font-medium text-gray-500 dark:text-gray-400">النوع</legend>
             <div className="flex flex-wrap gap-2">
               {CONTACT_TYPES.map((option) => (
                 <label
@@ -152,7 +152,7 @@ export function ContactDialog({ open, value, others, ownerName, onSave, onDelete
                   className={`flex cursor-pointer items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand-500 ${
                     option.type === type
                       ? 'border-brand-500 bg-brand-50 text-brand-800 dark:border-brand-400 dark:bg-brand-500/15 dark:text-brand-200'
-                      : 'border-stone-300 hover:border-stone-400 dark:border-white/15 dark:hover:border-white/30'
+                      : 'border-gray-300 hover:border-gray-400 dark:border-white/15 dark:hover:border-white/30'
                   }`}
                 >
                   <input
@@ -196,7 +196,7 @@ export function ContactDialog({ open, value, others, ownerName, onSave, onDelete
               className={`${fieldClass} text-left`}
             />
             <Notch>{info.field}</Notch>
-            <span className="mt-1.5 block text-xs text-stone-400">{info.hint}</span>
+            <span className="mt-1.5 block text-xs text-gray-400">{info.hint}</span>
           </label>
 
           {error && (
@@ -205,7 +205,7 @@ export function ContactDialog({ open, value, others, ownerName, onSave, onDelete
             </p>
           )}
 
-          <div className="mt-6 flex flex-wrap gap-3 border-t border-stone-200 pt-5 dark:border-white/10">
+          <div className="mt-6 flex flex-wrap gap-3 border-t border-gray-200 pt-5 dark:border-white/10">
             <button
               type="button"
               onClick={handleSave}
@@ -217,7 +217,7 @@ export function ContactDialog({ open, value, others, ownerName, onSave, onDelete
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border border-stone-300 px-6 py-3 text-sm font-medium transition hover:border-stone-400 dark:border-white/15"
+              className="rounded-xl border border-gray-300 px-6 py-3 text-sm font-medium transition hover:border-gray-400 dark:border-white/15"
             >
               إلغاء
             </button>
@@ -240,7 +240,7 @@ export function ContactDialog({ open, value, others, ownerName, onSave, onDelete
                     type="button"
                     onClick={() => setConfirmingDelete(false)}
                     disabled={busy}
-                    className="rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium dark:border-white/15"
+                    className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium dark:border-white/15"
                   >
                     لأ
                   </button>

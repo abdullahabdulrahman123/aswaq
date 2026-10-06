@@ -19,7 +19,7 @@ export function LocationBar({ prompt = 'حدد مكانك عشان نرتّبل�
         onClick={() => setOpen(true)}
         className={`flex w-full items-center gap-2.5 rounded-xl border px-3.5 py-2.5 text-start text-sm transition ${
           location
-            ? 'border-stone-200 bg-white hover:border-brand-400 dark:border-white/10 dark:bg-surface-card dark:hover:border-brand-400'
+            ? 'border-gray-200 bg-white hover:border-brand-400 dark:border-white/10 dark:bg-surface-card dark:hover:border-brand-400'
             : 'border-dashed border-brand-400 bg-brand-50/70 hover:bg-brand-50 dark:border-brand-500/60 dark:bg-brand-500/10'
         }`}
       >
@@ -28,7 +28,7 @@ export function LocationBar({ prompt = 'حدد مكانك عشان نرتّبل�
         <span className="min-w-0 flex-1">
           {location ? (
             <span className="block truncate">
-              <span className="text-stone-500 dark:text-stone-400">مكانك: </span>
+              <span className="text-gray-500 dark:text-gray-400">مكانك: </span>
               <span className="font-medium">{location.label}</span>
             </span>
           ) : (

@@ -17,7 +17,7 @@ interface Props {
 }
 
 const buttonClass =
-  'rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium transition hover:border-brand-400 hover:text-brand-700 dark:border-white/15 dark:hover:text-brand-400';
+  'rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium transition hover:border-brand-400 hover:text-brand-700 dark:border-white/15 dark:hover:text-brand-400';
 
 /**
  * الصورة الكبيرة في صفحة الحساب وصفحة النشاط، وزراير تغييرها جنبها. نفس

@@ -14,18 +14,18 @@ import { ShortcutDialog, type ShortcutKind } from './ShortcutDialog';
 import { UnsavedSwitchDialog } from './UnsavedSwitchDialog';
 
 const itemClass =
-  'flex w-full items-center gap-3 px-4 py-2.5 text-start text-sm transition hover:bg-stone-50 dark:hover:bg-white/5';
-const sectionClass = 'border-t border-stone-100 py-1 dark:border-white/5';
+  'flex w-full items-center gap-3 px-4 py-2.5 text-start text-sm transition hover:bg-gray-50 dark:hover:bg-white/5';
+const sectionClass = 'border-t border-gray-100 py-1 dark:border-white/5';
 
-const headingClass = 'px-4 pb-1 pt-2 text-[11px] font-medium text-stone-400';
+const headingClass = 'px-4 pb-1 pt-2 text-[11px] font-medium text-gray-400';
 /** سطر في ليستة «حساباتي» */
 const rowClass =
-  'flex w-full items-center gap-3 px-3 py-2.5 text-start text-sm transition hover:bg-stone-50 dark:hover:bg-white/5';
+  'flex w-full items-center gap-3 px-3 py-2.5 text-start text-sm transition hover:bg-gray-50 dark:hover:bg-white/5';
 /**
  * الإيميل ltr عشان لو طويل يتقص من آخره (…@gmail.com) مش من أوله، ويفضل
  * على اليمين زي باقي المنيو.
  */
-const emailClass = 'block truncate text-right text-xs text-stone-400';
+const emailClass = 'block truncate text-right text-xs text-gray-400';
 
 /** حساب في ليستة «حساباتي» — حساب المستخدم نفسه أو نشاط من أنشطته */
 function AccountOption({
@@ -59,7 +59,7 @@ function AccountOption({
               {subtitle}
             </span>
           ) : (
-            <span className="block truncate text-xs text-stone-400">{subtitle}</span>
+            <span className="block truncate text-xs text-gray-400">{subtitle}</span>
           ))}
       </span>
       {checked && (
@@ -191,13 +191,13 @@ export function IdentityMenu() {
         aria-label={
           user ? `القائمة — ${selectedBusiness ? selectedBusiness.name : userName}` : 'تسجيل الدخول أو إنشاء حساب'
         }
-        className="flex items-center gap-0.5 rounded-xl p-0.5 transition hover:bg-stone-100 dark:hover:bg-white/10"
+        className="flex items-center gap-0.5 rounded-xl p-0.5 transition hover:bg-gray-100 dark:hover:bg-white/10"
       >
         {user ? (
           // عداد الطلبات الواردة الجديدة اتنقل على سلة البيع (مكالمة ٢٨ سبتمبر)
           <span className="relative">{current(34)}</span>
         ) : (
-          <span className="flex h-[34px] w-[34px] items-center justify-center rounded-full border border-stone-300 text-stone-600 dark:border-white/15 dark:text-stone-300">
+          <span className="flex h-[34px] w-[34px] items-center justify-center rounded-full border border-gray-300 text-gray-600 dark:border-white/15 dark:text-gray-300">
             <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
               <circle cx="12" cy="8" r="3.5" />
               <path d="M5 19.5c1.4-3 4-4.5 7-4.5s5.6 1.5 7 4.5" />
@@ -208,7 +208,7 @@ export function IdentityMenu() {
         <svg
           aria-hidden="true"
           viewBox="0 0 24 24"
-          className={`h-3.5 w-3.5 text-stone-500 transition-transform dark:text-stone-400 ${open ? 'rotate-180' : ''}`}
+          className={`h-3.5 w-3.5 text-gray-500 transition-transform dark:text-gray-400 ${open ? 'rotate-180' : ''}`}
           fill="none"
           stroke="currentColor"
           strokeWidth="2.5"
@@ -230,7 +230,7 @@ export function IdentityMenu() {
               accountsButton.current?.focus();
             }
           }}
-          className="absolute start-0 top-full z-40 mt-1.5 max-h-[80vh] w-72 overflow-y-auto rounded-xl border border-stone-200 bg-white shadow-card dark:border-white/10 dark:bg-surface-card"
+          className="absolute start-0 top-full z-40 mt-1.5 max-h-[80vh] w-72 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-card dark:border-white/10 dark:bg-surface-card"
         >
           {user ? (
             <>
@@ -239,7 +239,7 @@ export function IdentityMenu() {
                 role="menuitem"
                 to="/account"
                 onClick={close}
-                className="flex w-full items-center gap-3 px-4 py-3 text-start transition hover:bg-stone-50 dark:hover:bg-white/5"
+                className="flex w-full items-center gap-3 px-4 py-3 text-start transition hover:bg-gray-50 dark:hover:bg-white/5"
               >
                 {userAvatar(40)}
                 <span className="min-w-0 flex-1">
@@ -256,7 +256,7 @@ export function IdentityMenu() {
               </Link>
 
               {/* ٢) «حساباتي»: الحساب اللي شغال بيه دلوقتي، وبتفتح ليستة حساباته */}
-              <div className="border-t border-stone-100 px-4 pb-3 pt-4 dark:border-white/5">
+              <div className="border-t border-gray-100 px-4 pb-3 pt-4 dark:border-white/5">
                 <div className="relative">
                   <button
                     ref={accountsButton}
@@ -265,7 +265,7 @@ export function IdentityMenu() {
                     aria-controls={accountsId}
                     onClick={() => setAccountsOpen((v) => !v)}
                     className={`flex w-full items-center gap-2.5 rounded-xl border px-3 py-2 text-start transition ${
-                      accountsOpen ? 'border-brand-500 ring-1 ring-inset ring-brand-500' : 'border-stone-300 dark:border-white/20'
+                      accountsOpen ? 'border-brand-500 ring-1 ring-inset ring-brand-500' : 'border-gray-300 dark:border-white/20'
                     }`}
                   >
                     {current(30)}
@@ -275,7 +275,7 @@ export function IdentityMenu() {
                     <svg
                       aria-hidden="true"
                       viewBox="0 0 24 24"
-                      className={`h-4 w-4 shrink-0 text-stone-500 transition-transform dark:text-stone-400 ${accountsOpen ? 'rotate-180' : ''}`}
+                      className={`h-4 w-4 shrink-0 text-gray-500 transition-transform dark:text-gray-400 ${accountsOpen ? 'rotate-180' : ''}`}
                       fill="none"
                       stroke="currentColor"
                       strokeWidth="2.2"
@@ -293,7 +293,7 @@ export function IdentityMenu() {
                     id={accountsId}
                     role="group"
                     aria-label="حساباتي"
-                    className="mt-1.5 divide-y divide-stone-100 overflow-hidden rounded-xl border border-stone-200 dark:divide-white/5 dark:border-white/10"
+                    className="mt-1.5 divide-y divide-gray-100 overflow-hidden rounded-xl border border-gray-200 dark:divide-white/5 dark:border-white/10"
                   >
                     <AccountOption
                       checked={!selectedBusiness}
@@ -315,7 +315,7 @@ export function IdentityMenu() {
                       />
                     ))}
                     {businessesLoading && businesses.length === 0 && (
-                      <div className="px-3 py-2.5 text-xs text-stone-400">بنجيب أنشطتك…</div>
+                      <div className="px-3 py-2.5 text-xs text-gray-400">بنجيب أنشطتك…</div>
                     )}
                     {/* زي «إضافة حساب آخر» في ليستة حسابات جوجل */}
                     <Link role="menuitem" to="/business/new" onClick={close} className={rowClass}>
@@ -399,7 +399,7 @@ export function IdentityMenu() {
                     close();
                     signIn('login');
                   }}
-                  className="block w-full rounded-lg border border-stone-300 px-3 py-2 text-sm font-medium transition hover:border-brand-400 dark:border-white/15"
+                  className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium transition hover:border-brand-400 dark:border-white/15"
                 >
                   تسجيل الدخول
                 </button>

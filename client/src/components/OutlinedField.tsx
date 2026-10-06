@@ -20,7 +20,7 @@ import type { ReactNode } from 'react';
  * كانت الخانات هتنطّ وإحنا بننقّل بينها.
  */
 const fieldBase =
-  'peer w-full rounded-xl border border-stone-300 bg-transparent outline-none transition focus:border-brand-500 focus:ring-1 focus:ring-inset focus:ring-brand-500 dark:border-white/20';
+  'peer w-full rounded-xl border border-gray-300 bg-transparent outline-none transition focus:border-brand-500 focus:ring-1 focus:ring-inset focus:ring-brand-500 dark:border-white/20';
 
 export const fieldClass = `${fieldBase} px-3 py-3`;
 
@@ -50,8 +50,8 @@ export function Notch({
 }) {
   return (
     <span
-      className={`pointer-events-none absolute -top-2 whitespace-nowrap bg-white font-medium transition-colors peer-focus:text-brand-600 peer-disabled:text-stone-400 dark:bg-surface-card dark:peer-focus:text-brand-400 ${
-        active ? 'text-brand-600 dark:text-brand-400' : 'text-stone-500 dark:text-stone-400'
+      className={`pointer-events-none absolute -top-2 whitespace-nowrap bg-white font-medium transition-colors peer-focus:text-brand-600 peer-disabled:text-gray-400 dark:bg-surface-card dark:peer-focus:text-brand-400 ${
+        active ? 'text-brand-600 dark:text-brand-400' : 'text-gray-500 dark:text-gray-400'
       } ${compact ? 'start-1.5 px-0.5 text-[11px]' : 'start-3 px-1 text-xs'}`}
     >
       {children}

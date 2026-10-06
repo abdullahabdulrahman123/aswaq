@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { egp } from '../data/catalog';
+import { egp } from '../lib/money';
 import { linePrice, useStoreCart, type CartLine } from '../context/StoreCartContext';
 import type { ShowroomItem } from '../lib/aswaqApi';
 import { thumbnail } from '../lib/cloudinary';
@@ -94,12 +94,12 @@ export function StoreItemCard({
   const lockOf = (u: Unit) => (confirmed ? (mine.has(u.name) ? confirmed.lockQty : confirmed.lockAdd) : null);
 
   return (
-    <li className="flex gap-2 rounded-xl border border-stone-200 bg-white p-1.5 dark:border-white/10 dark:bg-surface-card">
-      <div className="relative h-[60px] w-[60px] shrink-0 overflow-hidden rounded-lg bg-stone-100 dark:bg-white/5">
+    <li className="flex gap-2 rounded-xl border border-gray-200 bg-white p-1.5 dark:border-white/10 dark:bg-surface-card">
+      <div className="relative h-[60px] w-[60px] shrink-0 overflow-hidden rounded-lg bg-gray-100 dark:bg-white/5">
         {item.picture ? (
           <img src={thumbnail(item.picture, 120)} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
         ) : (
-          <span aria-hidden="true" className="absolute inset-0 grid place-items-center font-display text-2xl font-bold text-stone-300 dark:text-stone-600">
+          <span aria-hidden="true" className="absolute inset-0 grid place-items-center font-display text-2xl font-bold text-gray-300 dark:text-gray-600">
             {item.name.trim().charAt(0)}
           </span>
         )}
@@ -267,7 +267,7 @@ function UnitRow({
         >
           <span className="font-semibold">{unit.name}</span>{' '}
           <span
-            className={`tabular-nums underline decoration-dotted underline-offset-2 ${special ? 'font-semibold text-accent-700 dark:text-accent-300' : 'text-stone-500 dark:text-stone-400'}`}
+            className={`tabular-nums underline decoration-dotted underline-offset-2 ${special ? 'font-semibold text-accent-700 dark:text-accent-300' : 'text-gray-500 dark:text-gray-400'}`}
           >
             {priceText}
           </span>
@@ -275,7 +275,7 @@ function UnitRow({
       ) : (
         <span className="min-w-0 flex-1 truncate text-[11.5px] leading-5" title={`${unit.name} ${priceText}`}>
           <span className="font-semibold">{unit.name}</span>{' '}
-          <span className={priced ? 'tabular-nums text-stone-500 dark:text-stone-400' : 'text-stone-400 dark:text-stone-500'}>{priceText}</span>
+          <span className={priced ? 'tabular-nums text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-500'}>{priceText}</span>
         </span>
       )}
 
@@ -296,7 +296,7 @@ function UnitRow({
         aria-disabled={lock ? true : undefined}
         onClick={guarded(onAsk)}
         disabled={!priced}
-        className={`${boxClass} w-7 ${lock ? 'text-stone-500 dark:text-stone-400' : ''}`}
+        className={`${boxClass} w-7 ${lock ? 'text-gray-500 dark:text-gray-400' : ''}`}
       >
         {typedQty ?? line?.qty ?? ''}
       </button>
@@ -342,7 +342,7 @@ function UnitRow({
 }
 
 const stepClass =
-  'grid h-5 w-5 shrink-0 place-items-center rounded-md bg-brand-50 text-sm font-bold leading-none text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-brand-50 dark:bg-brand-500/15 dark:text-brand-300 dark:disabled:text-stone-600';
+  'grid h-5 w-5 shrink-0 place-items-center rounded-md bg-brand-50 text-sm font-bold leading-none text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:text-gray-300 disabled:hover:bg-brand-50 dark:bg-brand-500/15 dark:text-brand-300 dark:disabled:text-gray-600';
 
 const boxClass =
-  'h-5 shrink-0 rounded-md border border-stone-300 bg-transparent px-0.5 text-center text-[11px] font-bold leading-none tabular-nums outline-none transition focus:border-brand-500 disabled:border-stone-200 dark:border-white/20 dark:disabled:border-white/10';
+  'h-5 shrink-0 rounded-md border border-gray-300 bg-transparent px-0.5 text-center text-[11px] font-bold leading-none tabular-nums outline-none transition focus:border-brand-500 disabled:border-gray-200 dark:border-white/20 dark:disabled:border-white/10';

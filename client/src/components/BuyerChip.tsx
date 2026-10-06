@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { buyerLabel, lastSalesShop, useSales } from '../context/SalesContext';
 import { useStoreCart } from '../context/StoreCartContext';
-import { egp } from '../data/catalog';
+import { egp } from '../lib/money';
 import { itemsLabel } from '../lib/quantity';
 import { Avatar, personInitial } from './Avatar';
 
@@ -48,7 +48,7 @@ export function BuyerChip() {
           <span
             data-total
             className={`block text-[11px] font-bold leading-tight tabular-nums ${
-              focus?.minimum == null ? 'text-stone-700 dark:text-stone-200' : reached ? 'text-accent-600 dark:text-accent-400' : 'text-red-600 dark:text-red-400'
+              focus?.minimum == null ? 'text-gray-700 dark:text-gray-200' : reached ? 'text-accent-600 dark:text-accent-400' : 'text-red-600 dark:text-red-400'
             }`}
           >
             {egp(total)}
@@ -58,7 +58,7 @@ export function BuyerChip() {
       {count > 0 && (
         <span
           data-badge
-          className="absolute -end-2 -top-2 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-stone-700 px-1 text-[10px] font-bold leading-none tabular-nums text-white ring-2 ring-surface-light dark:bg-stone-200 dark:text-stone-900 dark:ring-surface-dark"
+          className="absolute -end-2 -top-2 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-gray-700 px-1 text-[10px] font-bold leading-none tabular-nums text-white ring-2 ring-surface-light dark:bg-gray-200 dark:text-gray-900 dark:ring-surface-dark"
         >
           {count > 99 ? '99+' : count}
         </span>

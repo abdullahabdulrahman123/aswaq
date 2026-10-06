@@ -66,7 +66,7 @@ export function BusinessNewPage() {
     return (
       <div className="mx-auto max-w-md px-4 py-20 text-center">
         <h1 className="font-display text-2xl font-bold">سجّل دخولك الأول</h1>
-        <p className="mt-3 leading-relaxed text-stone-500 dark:text-stone-400">
+        <p className="mt-3 leading-relaxed text-gray-500 dark:text-gray-400">
           تسجيل نشاط تجاري متاح بعد تسجيل الدخول.
         </p>
         <button
@@ -82,8 +82,8 @@ export function BusinessNewPage() {
   return (
     <div className="mx-auto max-w-lg px-4 py-8">
       <h1 className="font-display text-2xl font-bold sm:text-3xl">أنشئ نشاط تجاري</h1>
-      <p className="mt-2 text-sm leading-relaxed text-stone-500 dark:text-stone-400">
-        سجّل نشاطك عشان تبدأ تبيع على أسواق.
+      <p className="mt-2 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+        سجّل نشاطك عشان تبدأ تبيع على أسواق الهلال.
       </p>
 
       <div className="mt-6">
@@ -92,7 +92,7 @@ export function BusinessNewPage() {
 
       <form
         onSubmit={handleSubmit}
-        className="rounded-2xl border border-stone-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card"
+        className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card"
       >
         {/* mt-2 على الأولى: اسم الخانة طالع فوق حدّها بـ٨ بكسل */}
         <label className="relative mt-2 block">
@@ -117,14 +117,14 @@ export function BusinessNewPage() {
             className={fieldClass}
           />
           <Notch>الاختصار</Notch>
-          <span className="mt-1.5 block text-xs text-stone-400">
+          <span className="mt-1.5 block text-xs text-gray-400">
             اسم قصير بيظهر كشارة جنب نشاطك — {ABBR_MAX} حروف كحد أقصى.
           </span>
         </label>
 
         <div role="group" aria-label="جهات الاتصال" className="mt-6">
           <ContactsField
-            heading={<span className="block text-xs font-medium text-stone-500 dark:text-stone-400">جهات الاتصال</span>}
+            heading={<span className="block text-xs font-medium text-gray-500 dark:text-gray-400">جهات الاتصال</span>}
             contacts={contacts}
             ownerName={name.trim()}
             hint="أرقام النشاط العامة أو الكول سنتر — اختياري، وتقدر تضيفها بعدين من صفحة النشاط."
@@ -151,13 +151,13 @@ export function BusinessNewPage() {
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="rounded-xl border border-stone-300 px-6 py-3 text-sm font-medium transition hover:border-stone-400 dark:border-white/15"
+            className="rounded-xl border border-gray-300 px-6 py-3 text-sm font-medium transition hover:border-gray-400 dark:border-white/15"
           >
             إلغاء
           </button>
         </div>
 
-        <p className="mt-5 border-t border-stone-200 pt-4 text-xs leading-relaxed text-stone-400 dark:border-white/10">
+        <p className="mt-5 border-t border-gray-200 pt-4 text-xs leading-relaxed text-gray-400 dark:border-white/10">
           المقرات بتتضاف بعد التسجيل من صفحة النشاط — تقدر تضيف أكتر من مقر (فرع،
           مخزن، متجر)، أو تسيبه من غير مقرات دلوقتي.
         </p>

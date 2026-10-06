@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { egp } from '../data/catalog';
+import { egp } from '../lib/money';
 import { MAX_QTY, clampQtyOrZero, moneyInput, qtyInput, toPiastres, toPounds } from '../lib/quantity';
 import { DialogCloseButton, useBackdropClose } from './DialogClose';
 import { Notch, compactFieldClass } from './OutlinedField';
@@ -88,7 +88,7 @@ export function QuantityDialog({
       aria-label="الكمية"
       // العرض والمكان في style مش كلاس — نفس سبب باقي النوافذ. فوق الشاشة عشان الكيبورد ميغطيهاش
       style={{ width: 'min(23rem, 94vw)', margin: '0.75rem auto auto' }}
-      className="rounded-2xl bg-white p-0 text-stone-900 shadow-card backdrop:bg-black/50 dark:bg-surface-card dark:text-stone-100"
+      className="rounded-2xl bg-white p-0 text-gray-900 shadow-card backdrop:bg-black/50 dark:bg-surface-card dark:text-gray-100"
     >
       {open && (
         <form
@@ -101,7 +101,7 @@ export function QuantityDialog({
         >
           <h2 className="truncate pe-8 text-sm font-bold leading-snug">
             {itemName}
-            <span className="font-normal text-stone-500 dark:text-stone-400">
+            <span className="font-normal text-gray-500 dark:text-gray-400">
               {' '}· {unitName}
               {!editPrice && <span className="tabular-nums"> · {egp(unitPrice)}</span>}
             </span>
@@ -138,7 +138,7 @@ export function QuantityDialog({
                   onChange={(e) => setPriceText(moneyInput(e.target.value))}
                   onFocus={(e) => (priceLocked ? setPriceDenied(true) : e.currentTarget.select())}
                   onClick={(e) => (priceLocked ? setPriceDenied(true) : e.currentTarget.select())}
-                  className={`${compactFieldClass} h-10 py-0 text-center font-bold tabular-nums ${priceLocked ? 'cursor-not-allowed text-stone-400 dark:text-stone-500' : ''}`}
+                  className={`${compactFieldClass} h-10 py-0 text-center font-bold tabular-nums ${priceLocked ? 'cursor-not-allowed text-gray-400 dark:text-gray-500' : ''}`}
                 />
                 <Notch compact>السعر</Notch>
               </label>
@@ -152,8 +152,8 @@ export function QuantityDialog({
             </button>
           </div>
 
-          <p className="mt-2 text-center text-xs text-stone-500 dark:text-stone-400">
-            الإجمالي <span className="font-bold tabular-nums text-stone-800 dark:text-stone-100">{egp(price * clampQtyOrZero(qty))}</span>
+          <p className="mt-2 text-center text-xs text-gray-500 dark:text-gray-400">
+            الإجمالي <span className="font-bold tabular-nums text-gray-800 dark:text-gray-100">{egp(price * clampQtyOrZero(qty))}</span>
             {/* غير «التسعير» اللي بيغيّر سعر المتجر لكل العملاء (٣٠ سبتمبر) */}
             {editPrice && <span className="ms-1.5">· السعر ده للفاتورة دي بس</span>}
           </p>
@@ -170,4 +170,4 @@ export function QuantityDialog({
 }
 
 const stepClass =
-  'grid h-10 w-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-xl font-bold leading-none text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-brand-50 dark:bg-brand-500/15 dark:text-brand-300 dark:disabled:text-stone-600';
+  'grid h-10 w-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-xl font-bold leading-none text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:text-gray-300 disabled:hover:bg-brand-50 dark:bg-brand-500/15 dark:text-brand-300 dark:disabled:text-gray-600';

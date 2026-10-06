@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useIncoming } from '../context/IncomingContext';
-import { egp } from '../data/catalog';
+import { egp } from '../lib/money';
 
 /** كام ثانية التنبيه بيفضل ظاهر */
 const TOAST_MS = 8000;
@@ -25,7 +25,7 @@ export function IncomingToast() {
 
   return (
     <div role="status" className="fixed inset-x-3 bottom-16 z-50 mx-auto max-w-sm print:hidden">
-      <div className="flex items-center gap-3 rounded-2xl bg-stone-900 px-4 py-3 text-white shadow-card dark:bg-white dark:text-stone-900">
+      <div className="flex items-center gap-3 rounded-2xl bg-gray-900 px-4 py-3 text-white shadow-card dark:bg-white dark:text-gray-900">
         <Link to="/tasks" onClick={dismissToast} className="min-w-0 flex-1">
           <span className="block text-sm font-bold">طلب وارد جديد · فاتورة {toast.number}</span>
           <span className="block truncate text-xs opacity-80">

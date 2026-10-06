@@ -34,7 +34,7 @@ function ItemThumb({ item, size }: { item: Item; size: 'sm' | 'md' }) {
   return (
     <span
       aria-hidden
-      className={`${box} flex shrink-0 items-center justify-center bg-stone-100 font-bold text-stone-400 dark:bg-white/10 dark:text-stone-500`}
+      className={`${box} flex shrink-0 items-center justify-center bg-gray-100 font-bold text-gray-400 dark:bg-white/10 dark:text-gray-500`}
     >
       {item.name.trim().charAt(0)}
     </span>
@@ -74,30 +74,30 @@ function ItemCombo({
         type="button"
         disabled={disabled || items === null}
         onClick={() => setOpen(!open)}
-        className={`${fieldClass} peer flex items-center justify-between gap-2 text-start disabled:cursor-not-allowed disabled:text-stone-400`}
+        className={`${fieldClass} peer flex items-center justify-between gap-2 text-start disabled:cursor-not-allowed disabled:text-gray-400`}
       >
-        <span className={`min-w-0 truncate ${picked ? '' : 'text-stone-400'}`}>
+        <span className={`min-w-0 truncate ${picked ? '' : 'text-gray-400'}`}>
           {items === null ? 'بنجيب الأصناف…' : (picked?.name ?? 'اختار صنف')}
         </span>
-        <span aria-hidden className="shrink-0 text-xs text-stone-400">▾</span>
+        <span aria-hidden className="shrink-0 text-xs text-gray-400">▾</span>
       </button>
       <Notch active={open}>الصنف</Notch>
 
       {open && (
-        <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-xl border border-stone-200 bg-white shadow-lg dark:border-white/10 dark:bg-surface-card">
-          <div className="border-b border-stone-100 p-2 dark:border-white/10">
+        <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg dark:border-white/10 dark:bg-surface-card">
+          <div className="border-b border-gray-100 p-2 dark:border-white/10">
             <input
               autoFocus
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="دوّر على صنف"
-              className="w-full rounded-lg bg-stone-50 px-3 py-2 text-sm outline-none placeholder:text-stone-400 dark:bg-white/5"
+              className="w-full rounded-lg bg-gray-50 px-3 py-2 text-sm outline-none placeholder:text-gray-400 dark:bg-white/5"
             />
           </div>
 
           <ul aria-label="اختيار صنف" className="max-h-64 overflow-y-auto py-1">
             {shown.length === 0 ? (
-              <li className="px-3 py-4 text-center text-sm text-stone-500 dark:text-stone-400">
+              <li className="px-3 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
                 {(items ?? []).length === 0 ? 'كل أصناف النشاط متضافة للمتجر ده.' : 'مفيش صنف بالاسم ده.'}
               </li>
             ) : (
@@ -109,7 +109,7 @@ function ItemCombo({
                       onPick(item.id);
                       close();
                     }}
-                    className={`flex w-full items-center gap-3 px-3 py-2.5 text-start text-sm transition hover:bg-stone-50 dark:hover:bg-white/5 ${
+                    className={`flex w-full items-center gap-3 px-3 py-2.5 text-start text-sm transition hover:bg-gray-50 dark:hover:bg-white/5 ${
                       item.id === pickedId ? 'font-semibold text-brand-700 dark:text-brand-400' : ''
                     }`}
                   >
@@ -234,7 +234,7 @@ export function StoreItemsPage() {
     return (
       <div className="mx-auto max-w-md px-4 py-20 text-center">
         <h1 className="font-display text-2xl font-bold">سجّل دخولك الأول</h1>
-        <p className="mt-3 leading-relaxed text-stone-500 dark:text-stone-400">
+        <p className="mt-3 leading-relaxed text-gray-500 dark:text-gray-400">
           أصناف المتاجر متاحة بعد تسجيل الدخول.
         </p>
         <button
@@ -254,7 +254,7 @@ export function StoreItemsPage() {
           {businessesLoading ? 'بنجيب النشاط…' : 'النشاط ده مش موجود'}
         </h1>
         {!businessesLoading && (
-          <p className="mt-3 leading-relaxed text-stone-500 dark:text-stone-400">
+          <p className="mt-3 leading-relaxed text-gray-500 dark:text-gray-400">
             يمكن يكون اتحذف، أو تبع حساب تاني.
           </p>
         )}
@@ -265,8 +265,8 @@ export function StoreItemsPage() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
       <h1 className="font-display text-2xl font-bold sm:text-3xl">إدارة أصناف المتاجر</h1>
-      <p className="mt-2 text-sm text-stone-500 dark:text-stone-400">
-        لنشاط <span className="font-semibold text-stone-700 dark:text-stone-200">{business.name}</span>
+      <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+        لنشاط <span className="font-semibold text-gray-700 dark:text-gray-200">{business.name}</span>
       </p>
 
       <div className="mt-6">
@@ -286,8 +286,8 @@ export function StoreItemsPage() {
       )}
 
       {stores.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-stone-300 p-8 text-center dark:border-white/15">
-          <p className="text-sm leading-relaxed text-stone-500 dark:text-stone-400">
+        <div className="rounded-2xl border border-dashed border-gray-300 p-8 text-center dark:border-white/15">
+          <p className="text-sm leading-relaxed text-gray-500 dark:text-gray-400">
             مفيش متاجر في النشاط ده. ضيف مقر وعلّم عليه «متجر» الأول.
           </p>
           <Link
@@ -299,7 +299,7 @@ export function StoreItemsPage() {
         </div>
       ) : (
         <>
-          <div className="rounded-2xl border border-stone-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
             {/* gap أوسع من العادي: اسم كل خانة طالع فوق حدّها بـ٨ بكسل */}
             <div className="grid gap-5">
               <label className="relative block">
@@ -337,23 +337,23 @@ export function StoreItemsPage() {
 
           <h2 className="mt-8 font-display text-lg font-bold">
             أصناف المتجر{' '}
-            {items !== null && <span className="text-sm font-normal text-stone-400">{items.length}</span>}
+            {items !== null && <span className="text-sm font-normal text-gray-400">{items.length}</span>}
           </h2>
 
           {items === null ? (
             !sessionExpired && (
-              <p className="mt-3 text-sm text-stone-500 dark:text-stone-400">بنجيب أصناف المتجر…</p>
+              <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">بنجيب أصناف المتجر…</p>
             )
           ) : items.length === 0 ? (
-            <div className="mt-3 rounded-2xl border border-dashed border-stone-300 p-8 text-center dark:border-white/15">
-              <p className="text-sm text-stone-500 dark:text-stone-400">لسه مفيش أصناف في المتجر ده.</p>
+            <div className="mt-3 rounded-2xl border border-dashed border-gray-300 p-8 text-center dark:border-white/15">
+              <p className="text-sm text-gray-500 dark:text-gray-400">لسه مفيش أصناف في المتجر ده.</p>
             </div>
           ) : (
             <ul aria-label="أصناف المتجر" className="mt-3 space-y-2">
               {items.map((item) => (
                 <li
                   key={item.id}
-                  className="flex items-center gap-3 rounded-2xl border border-stone-200 bg-white p-3 dark:border-white/10 dark:bg-surface-card"
+                  className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-white p-3 dark:border-white/10 dark:bg-surface-card"
                 >
                   <ItemThumb item={item} size="md" />
                   {/* الدوسة على الاسم بتفتح «التسعير» بطلب العميل (٣٠ سبتمبر) */}
@@ -361,7 +361,7 @@ export function StoreItemsPage() {
                     type="button"
                     onClick={() => setPricing(item)}
                     aria-label={`تسعير ${item.name}`}
-                    className="min-w-0 flex-1 truncate text-start font-semibold underline decoration-stone-300 decoration-dotted underline-offset-4 transition hover:text-brand-700 dark:decoration-white/25 dark:hover:text-brand-400"
+                    className="min-w-0 flex-1 truncate text-start font-semibold underline decoration-gray-300 decoration-dotted underline-offset-4 transition hover:text-brand-700 dark:decoration-white/25 dark:hover:text-brand-400"
                   >
                     {item.name}
                   </button>
@@ -381,7 +381,7 @@ export function StoreItemsPage() {
                         type="button"
                         onClick={() => setConfirmingId('')}
                         disabled={removingId === item.id}
-                        className="rounded-lg px-2 py-1.5 text-xs text-stone-500 transition hover:text-stone-700 disabled:opacity-60 dark:text-stone-400"
+                        className="rounded-lg px-2 py-1.5 text-xs text-gray-500 transition hover:text-gray-700 disabled:opacity-60 dark:text-gray-400"
                       >
                         رجوع
                       </button>
@@ -390,7 +390,7 @@ export function StoreItemsPage() {
                     <button
                       type="button"
                       onClick={() => setConfirmingId(item.id)}
-                      className="shrink-0 rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-red-700 transition hover:border-red-300 dark:border-white/15 dark:text-red-300"
+                      className="shrink-0 rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-red-700 transition hover:border-red-300 dark:border-white/15 dark:text-red-300"
                     >
                       شيل
                     </button>

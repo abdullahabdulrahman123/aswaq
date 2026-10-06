@@ -19,7 +19,7 @@ export function BottomNav() {
   return (
     <nav
       aria-label="التنقل السفلي"
-      className="fixed inset-x-0 bottom-0 z-[44] border-t border-stone-200 bg-surface-light/95 pb-[env(safe-area-inset-bottom)] backdrop-blur dark:border-white/10 dark:bg-surface-dark/95 print:hidden"
+      className="fixed inset-x-0 bottom-0 z-[44] border-t border-gray-200 bg-surface-light/95 pb-[env(safe-area-inset-bottom)] backdrop-blur dark:border-white/10 dark:bg-surface-dark/95 print:hidden"
     >
       <div className="mx-auto flex h-12 max-w-6xl items-center justify-center">
         <NavLink
@@ -27,7 +27,7 @@ export function BottomNav() {
           aria-label={pending > 0 ? `مهامي — ${pending === 1 ? 'فاتورة لسه متنفذتش' : `${pending} فواتير لسه متنفذتش`}` : undefined}
           className={({ isActive }) =>
             `flex flex-col items-center gap-0.5 rounded-lg px-4 py-1 text-[10px] font-medium transition ${
-              isActive ? 'text-brand-700 dark:text-brand-400' : 'text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-white'
+              isActive ? 'text-brand-700 dark:text-brand-400' : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white'
             }`
           }
         >

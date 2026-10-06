@@ -17,7 +17,7 @@ export function DialogCloseButton({ onClick }: { onClick?: () => void }) {
       aria-label="اقفل"
       title="اقفل"
       onClick={(e) => (onClick ? onClick() : e.currentTarget.closest('dialog')?.close())}
-      className="absolute end-2 top-2 grid h-8 w-8 place-items-center rounded-full text-stone-500 transition hover:bg-stone-100 hover:text-stone-800 dark:text-stone-400 dark:hover:bg-white/10 dark:hover:text-stone-100"
+      className="absolute end-2 top-2 grid h-8 w-8 place-items-center rounded-full text-gray-500 transition hover:bg-gray-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-gray-100"
     >
       <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true">
         <path d="M6 6l12 12M18 6L6 18" />

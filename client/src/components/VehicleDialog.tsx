@@ -51,7 +51,7 @@ function amount(text: string, max: number): number | null | undefined {
   return Number.isFinite(n) && n > 0 && n <= max ? n : undefined;
 }
 
-const legendClass = 'mb-2 block text-xs font-medium text-stone-500 dark:text-stone-400';
+const legendClass = 'mb-2 block text-xs font-medium text-gray-500 dark:text-gray-400';
 
 interface Props {
   open: boolean;
@@ -141,7 +141,7 @@ export function VehicleDialog({ open, value, premises, onSave, onClose }: Props)
       aria-label={mode === 'add' ? 'إضافة مركبة' : 'تعديل المركبة'}
       // العرض في style مش كلاس — نفس سبب باقي النوافذ
       style={{ width: 'min(32rem, 92vw)' }}
-      className="rounded-2xl bg-white p-0 text-stone-900 shadow-card backdrop:bg-black/50 dark:bg-surface-card dark:text-stone-100"
+      className="rounded-2xl bg-white p-0 text-gray-900 shadow-card backdrop:bg-black/50 dark:bg-surface-card dark:text-gray-100"
     >
       {open && (
         <div className="max-h-[85vh] overflow-y-auto p-5">
@@ -183,7 +183,7 @@ export function VehicleDialog({ open, value, premises, onSave, onClose }: Props)
                   <Notch compact>أقصى حجم (م³)</Notch>
                 </label>
               </div>
-              <span className="mt-1.5 block text-xs text-stone-400">
+              <span className="mt-1.5 block text-xs text-gray-400">
                 أقصى حاجة العربية تشيلها. الطلبية بتتحط على العربية اللي تستحملها.
               </span>
             </fieldset>
@@ -212,7 +212,7 @@ export function VehicleDialog({ open, value, premises, onSave, onClose }: Props)
                   <Notch compact>الكيلو</Notch>
                 </label>
               </div>
-              <span className="mt-1.5 block text-xs text-stone-400">زي أوبر: مبلغ ثابت أول الرحلة، وبعده سعر لكل كيلو.</span>
+              <span className="mt-1.5 block text-xs text-gray-400">زي أوبر: مبلغ ثابت أول الرحلة، وبعده سعر لكل كيلو.</span>
             </fieldset>
 
             <label className="relative block">
@@ -229,7 +229,7 @@ export function VehicleDialog({ open, value, premises, onSave, onClose }: Props)
                 ))}
               </select>
               <Notch>الجراج</Notch>
-              <span className="mt-1.5 block text-xs text-stone-400">المقر اللي العربية بترجعله بعد التوصيل.</span>
+              <span className="mt-1.5 block text-xs text-gray-400">المقر اللي العربية بترجعله بعد التوصيل.</span>
             </label>
           </div>
 
@@ -239,7 +239,7 @@ export function VehicleDialog({ open, value, premises, onSave, onClose }: Props)
             </p>
           )}
 
-          <div className="mt-6 flex flex-wrap gap-3 border-t border-stone-200 pt-5 dark:border-white/10">
+          <div className="mt-6 flex flex-wrap gap-3 border-t border-gray-200 pt-5 dark:border-white/10">
             <button
               type="button"
               onClick={handleSave}
@@ -251,7 +251,7 @@ export function VehicleDialog({ open, value, premises, onSave, onClose }: Props)
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border border-stone-300 px-6 py-3 text-sm font-medium transition hover:border-stone-400 dark:border-white/15"
+              className="rounded-xl border border-gray-300 px-6 py-3 text-sm font-medium transition hover:border-gray-400 dark:border-white/15"
             >
               إلغاء
             </button>

@@ -18,7 +18,7 @@ export function TasksPage() {
           <TasksIcon className="h-8 w-8" />
         </div>
         <h1 className="mt-5 font-display text-2xl font-bold">مهامي</h1>
-        <p className="mt-3 leading-relaxed text-stone-500 dark:text-stone-400">مفيش مهام مطلوبة منك دلوقتي.</p>
+        <p className="mt-3 leading-relaxed text-gray-500 dark:text-gray-400">مفيش مهام مطلوبة منك دلوقتي.</p>
       </div>
     );
   }

@@ -1,4 +1,4 @@
-import type { Order } from '@prisma/client';
+import type { Order, OrderAmount } from '@prisma/client';
 import { prisma } from '../config/db.js';
 
 /**
@@ -99,4 +99,23 @@ function labelOfAction(state: string): string {
 
 export async function viewOf(order: Order): Promise<OrderView> {
   return (await withFlow([order]))[0];
+}
+
+const withoutAvg = ({ avg: _avg, ...amount }: OrderAmount) => amount;
+
+/**
+ * الأوردر زي ما المشتري بيشوفه: من غير تكلفة البائع (avg) ولا مكسبه (فحص ٦
+ * أكتوبر — كانوا بيوصلوا في رد السيرفر من غير ما يظهروا في الشاشة). البائع
+ * بس اللي بيشوفهم — shownTo في order.controller.
+ */
+export function withoutCost(view: OrderView) {
+  const { totalAvg: _totalAvg, totalProfit: _totalProfit, ...rest } = view;
+  return {
+    ...rest,
+    details: view.details.map(({ avg: _avg, profit: _profit, demanded, deviation, ...detail }) => ({
+      ...detail,
+      demanded: withoutAvg(demanded),
+      deviation: withoutAvg(deviation),
+    })),
+  };
 }

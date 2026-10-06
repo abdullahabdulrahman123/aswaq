@@ -176,8 +176,8 @@ export function InstallPrompt() {
       */}
       <div aria-hidden="true" className="h-44 shrink-0 sm:h-40" />
       <aside
-        aria-label="تثبيت أسواق"
-        className="fixed inset-x-3 bottom-16 z-40 print:hidden mx-auto max-w-md rounded-2xl border border-stone-200 bg-white p-4 shadow-card dark:border-white/10 dark:bg-surface-card sm:inset-x-auto sm:bottom-16 sm:end-4 sm:w-96"
+        aria-label="تثبيت أسواق الهلال"
+        className="fixed inset-x-3 bottom-16 z-40 print:hidden mx-auto max-w-md rounded-2xl border border-gray-200 bg-white p-4 shadow-card dark:border-white/10 dark:bg-surface-card sm:inset-x-auto sm:bottom-16 sm:end-4 sm:w-96"
       >
         <div className="flex items-start gap-3">
           <img
@@ -188,13 +188,13 @@ export function InstallPrompt() {
             className="h-11 w-11 shrink-0 rounded-xl"
           />
           <div className="min-w-0 flex-1">
-            <h2 className="font-display text-sm font-bold">ثبّت أسواق على جهازك</h2>
+            <h2 className="font-display text-sm font-bold">ثبّت أسواق الهلال على جهازك</h2>
             {showInstall ? (
-              <p className="mt-1 text-xs leading-relaxed text-stone-500 dark:text-stone-400">
+              <p className="mt-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
                 افتحه من سطح المكتب أو شاشة التطبيقات زي أي تطبيق — من غير متجر ومن غير ما يشيل مساحة.
               </p>
             ) : (
-              <p className="mt-1 text-xs leading-relaxed text-stone-500 dark:text-stone-400">
+              <p className="mt-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
                 دوس على زرار المشاركة <ShareIcon /> في المتصفح، وبعدين اختار
                 «إضافة إلى الشاشة الرئيسية».
               </p>
@@ -206,7 +206,7 @@ export function InstallPrompt() {
           <button
             type="button"
             onClick={snooze}
-            className="rounded-lg px-3 py-2 text-xs font-medium text-stone-500 transition hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-200"
+            className="rounded-lg px-3 py-2 text-xs font-medium text-gray-500 transition hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
           >
             {showInstall ? 'مش دلوقتي' : 'تمام'}
           </button>

@@ -34,14 +34,14 @@ export function HelpHint({ label, children }: Props) {
         aria-label={label}
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="flex h-5 w-5 select-none items-center justify-center rounded-full border border-stone-300 text-[11px] font-bold text-stone-500 dark:border-white/20 dark:text-stone-400"
+        className="flex h-5 w-5 select-none items-center justify-center rounded-full border border-gray-300 text-[11px] font-bold text-gray-500 dark:border-white/20 dark:text-gray-400"
       >
         ?
       </button>
       {open && (
         <span
           role="tooltip"
-          className="absolute start-0 top-full z-20 mt-2 block w-full max-w-sm rounded-xl border border-stone-200 bg-white p-3 text-xs font-normal leading-relaxed text-stone-600 shadow-card dark:border-white/10 dark:bg-surface-card dark:text-stone-300"
+          className="absolute start-0 top-full z-20 mt-2 block w-full max-w-sm rounded-xl border border-gray-200 bg-white p-3 text-xs font-normal leading-relaxed text-gray-600 shadow-card dark:border-white/10 dark:bg-surface-card dark:text-gray-300"
         >
           {children}
         </span>

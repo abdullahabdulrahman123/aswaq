@@ -7,7 +7,7 @@ import { ApiError, SessionExpiredError } from './waslaApi';
  * التوكن هو نفسه توكن وصلة: أسواق بيسأل وصلة بيه عن المستخدم وأنشطته،
  * فمفيش تسجيل دخول تاني ولا توكن تاني.
  */
-const ORIGIN = (import.meta.env.VITE_ASWAQ_API_ORIGIN ?? '').trim().replace(/\/+$/, '');
+export const ORIGIN = (import.meta.env.VITE_ASWAQ_API_ORIGIN ?? '').trim().replace(/\/+$/, '');
 
 /** سيرفر الأصناف متوصّل؟ لو لأ الصفحات بتقول كده بدل ما ترمي خطأ */
 export const aswaqApiConfigured = Boolean(ORIGIN);
@@ -82,7 +82,7 @@ async function request<T>(path: string, token: string | null, init: RequestInit 
       },
     });
   } catch {
-    throw new ApiError(0, 'مقدرناش نوصل لسيرفر أسواق. اتأكد من النت وجرّب تاني.');
+    throw new ApiError(0, 'مقدرناش نوصل للسيرفر. اتأكد من النت وجرّب تاني.');
   }
 
   if (res.status === 401) throw new SessionExpiredError();

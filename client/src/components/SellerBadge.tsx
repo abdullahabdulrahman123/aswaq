@@ -21,7 +21,7 @@ export function SellerBadge() {
       to={seller.href}
       aria-label={`البائع: ${seller.name}`}
       title={seller.name}
-      className="rounded-xl p-0.5 transition hover:bg-stone-100 dark:hover:bg-white/10"
+      className="rounded-xl p-0.5 transition hover:bg-gray-100 dark:hover:bg-white/10"
     >
       <Avatar kind="business" tone="soft" picture={seller.picture} fallback={seller.initials} size={34} />
     </Link>

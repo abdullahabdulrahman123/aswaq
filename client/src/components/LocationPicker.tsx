@@ -19,7 +19,7 @@ export const PIN = L.divIcon({
   className: '',
   html:
     '<div style="width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);' +
-    'background:#c2703a;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35)"></div>',
+    'background:#1f4fd8;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35)"></div>',
   iconSize: [26, 26],
   iconAnchor: [13, 26],
 });
@@ -191,28 +191,28 @@ export function LocationPicker({ value, onChange, hint, onLocate, locating, labe
          * عنده 30 — فالخريطة كانت بتعدّي فوقه وقت التمرير. isolation:isolate
          * بيعمل سياق تكديس مستقل، فأرقام Leaflet تفضل محبوسة جوه الخريطة.
          */
-        className="isolate h-64 w-full overflow-hidden rounded-xl border border-stone-300 dark:border-white/15"
+        className="isolate h-64 w-full overflow-hidden rounded-xl border border-gray-300 dark:border-white/15"
       />
       {/*
         الإحداثيات: dir="ltr" على الأرقام نفسها عشان في صفحة عربية الرقم
         بيتقلب ويبان بالعكس. tabular-nums بيخلي كل الأرقام بنفس العرض فالسطر
         مبيرقصش وإحنا بنسحب الدبوس.
       */}
-      <p className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-stone-400">
+      <p className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-gray-400">
         <span>
           خط العرض{' '}
-          <span dir="ltr" className="font-mono tabular-nums text-stone-500 dark:text-stone-300">
+          <span dir="ltr" className="font-mono tabular-nums text-gray-500 dark:text-gray-300">
             {fmt(shown.lat)}
           </span>
         </span>
         <span>
           خط الطول{' '}
-          <span dir="ltr" className="font-mono tabular-nums text-stone-500 dark:text-stone-300">
+          <span dir="ltr" className="font-mono tabular-nums text-gray-500 dark:text-gray-300">
             {fmt(shown.lng)}
           </span>
         </span>
       </p>
-      <p className="mt-1 text-xs leading-relaxed text-stone-400">{hint}</p>
+      <p className="mt-1 text-xs leading-relaxed text-gray-400">{hint}</p>
     </div>
   );
 }

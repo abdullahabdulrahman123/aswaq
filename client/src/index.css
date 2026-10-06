@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 body {
-  @apply bg-surface-light text-stone-900 dark:bg-surface-dark dark:text-stone-100 font-sans antialiased transition-colors;
+  @apply bg-surface-page text-gray-900 dark:bg-surface-dark dark:text-gray-100 font-sans antialiased transition-colors;
 }
 
 /* أرقام مصفوفة في الجداول والأسعار */
@@ -21,5 +21,5 @@ body {
 }
 
 :focus-visible {
-  @apply outline-none ring-2 ring-brand-500 ring-offset-2 ring-offset-surface-light dark:ring-offset-surface-dark;
+  @apply outline-none ring-2 ring-brand-500 ring-offset-2 ring-offset-surface-page dark:ring-offset-surface-dark;
 }

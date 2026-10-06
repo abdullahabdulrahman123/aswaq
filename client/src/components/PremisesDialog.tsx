@@ -43,7 +43,7 @@ const KINDS = [
   { key: 'isStore', label: 'متجر' },
 ] as const;
 
-const legendClass = 'mb-2 block text-xs font-medium text-stone-500 dark:text-stone-400';
+const legendClass = 'mb-2 block text-xs font-medium text-gray-500 dark:text-gray-400';
 
 interface Props {
   open: boolean;
@@ -176,7 +176,7 @@ export function PremisesDialog({ open, value, mode, settings, withStoreSettings,
         aria-label={mode === 'add' ? 'إضافة مقر' : 'تعديل المقر'}
         // العرض في style مش كلاس — نفس سبب AddressDialog
         style={{ width: 'min(38rem, 92vw)' }}
-        className="rounded-2xl bg-white p-0 text-stone-900 shadow-card backdrop:bg-black/50 dark:bg-surface-card dark:text-stone-100"
+        className="rounded-2xl bg-white p-0 text-gray-900 shadow-card backdrop:bg-black/50 dark:bg-surface-card dark:text-gray-100"
       >
         {open && (
           <div className="max-h-[85vh] overflow-y-auto p-5">
@@ -193,7 +193,7 @@ export function PremisesDialog({ open, value, mode, settings, withStoreSettings,
                   className={fieldClass}
                 />
                 <Notch>اسم المقر</Notch>
-                <span className="mt-1.5 block text-xs text-stone-400">اسم يفرّقه عن باقي مقراتك.</span>
+                <span className="mt-1.5 block text-xs text-gray-400">اسم يفرّقه عن باقي مقراتك.</span>
               </label>
 
               {/* مربعات مش اختيار واحد — نفس المكان ممكن يبقى الاتنين */}
@@ -206,7 +206,7 @@ export function PremisesDialog({ open, value, mode, settings, withStoreSettings,
                       className={`flex cursor-pointer items-center gap-2.5 rounded-xl border px-4 py-3 text-sm font-medium transition ${
                         draft[key]
                           ? 'border-brand-500 bg-brand-50 text-brand-800 dark:border-brand-400 dark:bg-brand-500/15 dark:text-brand-200'
-                          : 'border-stone-300 hover:border-stone-400 dark:border-white/15 dark:hover:border-white/30'
+                          : 'border-gray-300 hover:border-gray-400 dark:border-white/15 dark:hover:border-white/30'
                       }`}
                     >
                       <input
@@ -219,7 +219,7 @@ export function PremisesDialog({ open, value, mode, settings, withStoreSettings,
                     </label>
                   ))}
                 </div>
-                <span className="mt-1.5 block text-xs text-stone-400">
+                <span className="mt-1.5 block text-xs text-gray-400">
                   تقدر تختار الاتنين لو نفس المكان مخزن ومتجر مع بعض.
                 </span>
               </fieldset>
@@ -240,7 +240,7 @@ export function PremisesDialog({ open, value, mode, settings, withStoreSettings,
                       className={fieldClass}
                     />
                     <Notch>نطاق التوصيل (كم)</Notch>
-                    <span className="mt-1.5 block text-xs text-stone-400">
+                    <span className="mt-1.5 block text-xs text-gray-400">
                       المتجر بيوصّل لحد المسافة دي من مكانه. سيبها فاضية لو مبيوصّلش.
                     </span>
                   </label>
@@ -265,7 +265,7 @@ export function PremisesDialog({ open, value, mode, settings, withStoreSettings,
                         </label>
                       ))}
                     </div>
-                    <span className="mt-1.5 block text-xs text-stone-400">
+                    <span className="mt-1.5 block text-xs text-gray-400">
                       أقل قيمة أوردر المتجر يقبلها، لكل نوع سعر. سيب الخانة فاضية لو مفيش حد أدنى.
                     </span>
                   </fieldset>
@@ -275,7 +275,7 @@ export function PremisesDialog({ open, value, mode, settings, withStoreSettings,
               <div role="group" aria-label="العنوان">
                 <span className={legendClass}>العنوان</span>
                 {draft.address ? (
-                  <div className="overflow-hidden rounded-xl border border-stone-300 dark:border-white/15">
+                  <div className="overflow-hidden rounded-xl border border-gray-300 dark:border-white/15">
                     <MapPreview lat={draft.address.lat} lng={draft.address.lng} />
                     <div className="flex items-center gap-3 px-3 py-2.5">
                       <PinIcon className="h-[18px] w-[18px] shrink-0 text-brand-600 dark:text-brand-400" />
@@ -285,7 +285,7 @@ export function PremisesDialog({ open, value, mode, settings, withStoreSettings,
                       <button
                         type="button"
                         onClick={() => setPickingAddress(true)}
-                        className="shrink-0 whitespace-nowrap rounded-lg border border-stone-300 px-3 py-2 text-xs font-medium transition hover:border-brand-400 hover:text-brand-700 dark:border-white/15 dark:hover:text-brand-400"
+                        className="shrink-0 whitespace-nowrap rounded-lg border border-gray-300 px-3 py-2 text-xs font-medium transition hover:border-brand-400 hover:text-brand-700 dark:border-white/15 dark:hover:text-brand-400"
                       >
                         غيّر العنوان
                       </button>
@@ -301,7 +301,7 @@ export function PremisesDialog({ open, value, mode, settings, withStoreSettings,
                       <PinIcon className="h-[18px] w-[18px]" />
                       حدد العنوان
                     </button>
-                    <span className="mt-1.5 block text-xs text-stone-400">
+                    <span className="mt-1.5 block text-xs text-gray-400">
                       مكان المقر على الخريطة وتفاصيله — لازم لكل مقر.
                     </span>
                   </>
@@ -328,7 +328,7 @@ export function PremisesDialog({ open, value, mode, settings, withStoreSettings,
               </p>
             )}
 
-            <div className="mt-6 flex flex-wrap gap-3 border-t border-stone-200 pt-5 dark:border-white/10">
+            <div className="mt-6 flex flex-wrap gap-3 border-t border-gray-200 pt-5 dark:border-white/10">
               <button
                 type="button"
                 onClick={handleSave}
@@ -340,7 +340,7 @@ export function PremisesDialog({ open, value, mode, settings, withStoreSettings,
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-xl border border-stone-300 px-6 py-3 text-sm font-medium transition hover:border-stone-400 dark:border-white/15"
+                className="rounded-xl border border-gray-300 px-6 py-3 text-sm font-medium transition hover:border-gray-400 dark:border-white/15"
               >
                 إلغاء
               </button>

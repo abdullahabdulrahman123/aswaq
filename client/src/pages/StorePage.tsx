@@ -179,7 +179,7 @@ export function StorePage() {
     return (
       <div className="mx-auto max-w-md px-4 py-20 text-center">
         <h1 className="font-display text-2xl font-bold">المتجر ده مش موجود</h1>
-        <p className="mt-3 text-sm leading-relaxed text-stone-500 dark:text-stone-400">
+        <p className="mt-3 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
           يمكن يكون اتقفل، أو صاحبه خلاه مخزن بس.
         </p>
         <Link
@@ -213,7 +213,7 @@ export function StorePage() {
   }
 
   if (!store || !details) {
-    return <p className="mx-auto max-w-6xl px-4 py-8 text-sm text-stone-500 dark:text-stone-400">بنجيب المتجر…</p>;
+    return <p className="mx-auto max-w-6xl px-4 py-8 text-sm text-gray-500 dark:text-gray-400">بنجيب المتجر…</p>;
   }
 
   /** رأس فاتورة جديدة مفتوح هنا — من غير مشتري لسه، فالأصناف مستخبية */
@@ -285,7 +285,7 @@ export function StorePage() {
         <Avatar picture={store.business.picture} fallback={store.business.abbreviation} kind="business" size={36} tone="soft" />
         <div className="min-w-0">
           <h1 className="break-words font-display text-lg font-bold leading-tight sm:text-xl">{store.name}</h1>
-          <p className="break-words text-xs text-stone-500 dark:text-stone-400">
+          <p className="break-words text-xs text-gray-500 dark:text-gray-400">
             {store.business.name}
             {km !== null && <span className="tabular-nums"> · {formatDistance(km)}</span>}
           </p>
@@ -316,7 +316,7 @@ export function StorePage() {
             <div
               role="radiogroup"
               aria-label="طريقة الاستلام"
-              className="grid grid-cols-2 gap-1 rounded-xl bg-stone-100 p-1 dark:bg-white/5"
+              className="grid grid-cols-2 gap-1 rounded-xl bg-gray-100 p-1 dark:bg-white/5"
             >
               {METHODS.map(({ key, label }) => {
                 const picked = method === key;
@@ -335,7 +335,7 @@ export function StorePage() {
                     className={`rounded-lg px-3 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
                       picked
                         ? 'bg-white text-brand-800 shadow-sm dark:bg-surface-card dark:text-brand-200'
-                        : 'text-stone-600 hover:text-stone-900 dark:text-stone-300 dark:hover:text-white'
+                        : 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white'
                     }`}
                   >
                     {label}
@@ -350,7 +350,7 @@ export function StorePage() {
                 </p>
               )
             ) : (
-              !canDeliver && <p className="mt-1.5 text-xs leading-relaxed text-stone-500 dark:text-stone-400">{noDeliveryReason}</p>
+              !canDeliver && <p className="mt-1.5 text-xs leading-relaxed text-gray-500 dark:text-gray-400">{noDeliveryReason}</p>
       )}
         </div>
       </div>
@@ -358,7 +358,7 @@ export function StorePage() {
 
       <div className="mt-4 print:hidden">
         {newSale ? null : shown.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-stone-300 p-8 text-center text-sm text-stone-500 dark:border-white/15 dark:text-stone-400">
+          <p className="rounded-2xl border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500 dark:border-white/15 dark:text-gray-400">
             {details.items.length === 0 ? 'لسه مفيش أصناف في المتجر ده.' : 'لسه مفيش أصناف في الفاتورة.'}
           </p>
         ) : (

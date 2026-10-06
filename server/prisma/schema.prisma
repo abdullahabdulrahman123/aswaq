@@ -316,3 +316,28 @@ type ItemUnit {
   /** قطاعي أونلاين */
   onLRP       Int?
 }
+
+/**
+ * سجل الأخطاء (فحص ٦ أكتوبر): العميل فاهم إن كل خطأ بيتسجّل، وكان بيظهر في لوج
+ * السيرفر بس. دلوقتي أخطاء السيرفر (٥٠٠) وأخطاء المتصفح (الصفحة اللي وقعت،
+ * وأي خطأ ملوش حد يمسكه) بتتحفظ هنا، وبتتقري بـ`npm run errors`.
+ */
+model ErrorLog {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  at        DateTime @default(now())
+  /** server | client */
+  source    String
+  message   String
+  stack     String?
+  /** client: الصفحة اللي كان عليها. server: METHOD /path */
+  where     String?
+  /** client: المتصفح والجهاز */
+  userAgent String?
+  /** المستخدم لو معروف (sub) — من المتصفح ممكن ميبقاش متأكد منه */
+  userId    String?
+  /** client: نسخة الموقع (الـbuild) — عشان نعرف الخطأ اتصلّح ولا لأ */
+  version   String?
+
+  @@index([at])
+  @@map("error_logs")
+}

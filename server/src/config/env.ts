@@ -19,6 +19,6 @@ export const env = {
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean),
-  /** خلف بروكسي HTTPS (Render) */
+  /** خلف بروكسي HTTPS (Northflank) */
   trustProxy: process.env.TRUST_PROXY === 'true',
 };

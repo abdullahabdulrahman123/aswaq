@@ -54,11 +54,11 @@ export function SettingsPage() {
   }, [accountId, user, sessionExpired, Boolean(business), withToken]);
 
   if (!user) {
-    return <p className="mx-auto max-w-md px-4 py-20 text-center text-sm text-stone-500 dark:text-stone-400">سجّل دخولك الأول.</p>;
+    return <p className="mx-auto max-w-md px-4 py-20 text-center text-sm text-gray-500 dark:text-gray-400">سجّل دخولك الأول.</p>;
   }
   if (!business) {
     return (
-      <p className="mx-auto max-w-md px-4 py-20 text-center text-sm text-stone-500 dark:text-stone-400">
+      <p className="mx-auto max-w-md px-4 py-20 text-center text-sm text-gray-500 dark:text-gray-400">
         {businessesLoading ? 'بنجيب النشاط…' : 'النشاط ده مش موجود.'}
       </p>
     );
@@ -106,8 +106,8 @@ export function SettingsPage() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
       <h1 className="font-display text-2xl font-bold sm:text-3xl">الإعدادات</h1>
-      <p className="mt-2 text-sm text-stone-500 dark:text-stone-400">
-        لشركة <span className="font-semibold text-stone-700 dark:text-stone-200">{business.name}</span> كلها
+      <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+        لشركة <span className="font-semibold text-gray-700 dark:text-gray-200">{business.name}</span> كلها
       </p>
 
       <div className="mt-6">
@@ -120,11 +120,11 @@ export function SettingsPage() {
         </p>
       )}
 
-      <section aria-labelledby="sales-stages" className="rounded-2xl border border-stone-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
+      <section aria-labelledby="sales-stages" className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
         <h2 id="sales-stages" className="font-display text-lg font-bold">
           مراحل البيع
         </h2>
-        <p className="mt-1 text-sm leading-relaxed text-stone-500 dark:text-stone-400">
+        <p className="mt-1 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
           اختار المراحل اللي فواتيرك بتعدّي عليها بعد «تأكيد»، ورتّبها. زرار الفاتورة في «مبيعات» بيمشي عليها مرحلة مرحلة.
         </p>
         <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
@@ -132,7 +132,7 @@ export function SettingsPage() {
         </p>
 
         {template === null ? (
-          <p className="mt-4 text-sm text-stone-500 dark:text-stone-400">بنجيب الإعدادات…</p>
+          <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">بنجيب الإعدادات…</p>
         ) : (
           <>
             <ol aria-label="مراحل البيع" className="mt-4 space-y-2">
@@ -144,7 +144,7 @@ export function SettingsPage() {
                   <li
                     key={stage.key}
                     data-stage={stage.key}
-                    className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 ${on ? 'border-brand-300 bg-brand-50/50 dark:border-brand-500/40 dark:bg-brand-500/10' : 'border-stone-200 dark:border-white/10'}`}
+                    className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 ${on ? 'border-brand-300 bg-brand-50/50 dark:border-brand-500/40 dark:bg-brand-500/10' : 'border-gray-200 dark:border-white/10'}`}
                   >
                     <input
                       type="checkbox"
@@ -156,7 +156,7 @@ export function SettingsPage() {
                     />
                     <span className="min-w-0 flex-1">
                       <span className="block font-semibold">{stage.label}</span>
-                      <span className="block text-xs text-stone-500 dark:text-stone-400">الزرار: «{stage.action}»</span>
+                      <span className="block text-xs text-gray-500 dark:text-gray-400">الزرار: «{stage.action}»</span>
                     </span>
                     {owner && on && (
                       <span className="flex shrink-0 gap-1">
@@ -165,7 +165,7 @@ export function SettingsPage() {
                           aria-label={`${stage.label} لفوق`}
                           disabled={i === 0}
                           onClick={() => move(stage.key, -1)}
-                          className="grid h-8 w-8 place-items-center rounded-lg border border-stone-300 text-sm transition hover:border-stone-400 disabled:opacity-30 dark:border-white/15"
+                          className="grid h-8 w-8 place-items-center rounded-lg border border-gray-300 text-sm transition hover:border-gray-400 disabled:opacity-30 dark:border-white/15"
                         >
                           ▲
                         </button>
@@ -174,7 +174,7 @@ export function SettingsPage() {
                           aria-label={`${stage.label} لتحت`}
                           disabled={i === chosen.length - 1}
                           onClick={() => move(stage.key, 1)}
-                          className="grid h-8 w-8 place-items-center rounded-lg border border-stone-300 text-sm transition hover:border-stone-400 disabled:opacity-30 dark:border-white/15"
+                          className="grid h-8 w-8 place-items-center rounded-lg border border-gray-300 text-sm transition hover:border-gray-400 disabled:opacity-30 dark:border-white/15"
                         >
                           ▼
                         </button>
@@ -187,7 +187,7 @@ export function SettingsPage() {
             </ol>
 
             <p aria-label="الترتيب" className="mt-4 text-sm leading-relaxed">
-              <span className="text-stone-500 dark:text-stone-400">الفاتورة بتمشي كده: </span>
+              <span className="text-gray-500 dark:text-gray-400">الفاتورة بتمشي كده: </span>
               <span className="font-semibold">{flow.join(' ← ')}</span>
             </p>
 
@@ -208,7 +208,7 @@ export function SettingsPage() {
                 )}
               </div>
             ) : (
-              <p className="mt-5 rounded-xl bg-stone-100 px-4 py-3 text-sm text-stone-600 dark:bg-white/5 dark:text-stone-300">صاحب الشركة بس اللي بيغيّر الإعدادات.</p>
+              <p className="mt-5 rounded-xl bg-gray-100 px-4 py-3 text-sm text-gray-600 dark:bg-white/5 dark:text-gray-300">صاحب الشركة بس اللي بيغيّر الإعدادات.</p>
             )}
           </>
         )}
@@ -220,15 +220,15 @@ export function SettingsPage() {
 /** «مؤكد» و«مكتمل» — ثابتين في أول وآخر الليستة */
 function FixedRow({ label, note }: { label: string; note: string }) {
   return (
-    <li className="flex items-center gap-3 rounded-xl bg-stone-100 px-3 py-2.5 dark:bg-white/5">
-      <span aria-hidden="true" className="grid h-4 w-4 shrink-0 place-items-center text-xs text-stone-400">
+    <li className="flex items-center gap-3 rounded-xl bg-gray-100 px-3 py-2.5 dark:bg-white/5">
+      <span aria-hidden="true" className="grid h-4 w-4 shrink-0 place-items-center text-xs text-gray-400">
         ●
       </span>
       <span className="min-w-0 flex-1">
         <span className="block font-semibold">{label}</span>
-        <span className="block text-xs text-stone-500 dark:text-stone-400">{note}</span>
+        <span className="block text-xs text-gray-500 dark:text-gray-400">{note}</span>
       </span>
-      <span className="shrink-0 text-xs text-stone-400">ثابتة</span>
+      <span className="shrink-0 text-xs text-gray-400">ثابتة</span>
     </li>
   );
 }
