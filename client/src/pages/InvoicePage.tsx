@@ -7,6 +7,7 @@ import { buyerLabel, useSales } from '../context/SalesContext';
 import { linePrice, useCartFocus, useStoreCart } from '../context/StoreCartContext';
 import { checkoutOrder, putDraft, type Order } from '../lib/aswaqApi';
 import { draftInput, draftRef, rememberDraftId, rememberedMethod } from '../lib/draftSync';
+import { rememberedDelivery } from '../lib/delivery';
 import { orderToView } from '../lib/invoiceView';
 import { buyerPriceField } from '../lib/itemUnits';
 import { ApiError, fetchStore, type ShowroomStore } from '../lib/waslaApi';
@@ -74,7 +75,7 @@ export function InvoicePage() {
     if (!signedIn || lines.length === 0) return;
     let cancelled = false;
     const method = session?.method ?? rememberedMethod(shopId);
-    withToken((token) => putDraft(token, draftInput(shopId, lines, method, session, selectedBusiness?.accountId ?? null)))
+    withToken((token) => putDraft(token, draftInput(shopId, lines, method, session, selectedBusiness?.accountId ?? null, rememberedDelivery(shopId))))
       .then((order) => {
         // الصنف الجاي من المتجر بيتبعت لوحده على المسودة دي
         rememberDraftId(draftRef(shopId, session), order?.id ?? null);
@@ -134,6 +135,8 @@ export function InvoicePage() {
     buyerPhone: session?.phone ?? '',
     method: session?.method ?? null,
     address: session?.address ?? '',
+    deliveryAt: session ? (session.deliveryAt ?? null) : (rememberedDelivery(shopId)?.deliveryAt ?? null),
+    deliveryNotes: session ? (session.deliveryNotes ?? null) : (rememberedDelivery(shopId)?.deliveryNotes ?? null),
     lines: lines.map((l) => ({ key: `${l.itemId}|${l.unitName}`, itemId: l.itemId, item: l.itemName, unit: l.unitName, quantity: l.qty, price: linePrice(l) })),
     total: totalOf(shopId),
     weightKg: null,

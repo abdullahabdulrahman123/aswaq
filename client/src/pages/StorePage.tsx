@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Avatar } from '../components/Avatar';
+import { DeliveryFields } from '../components/DeliveryFields';
 import { LocationBar } from '../components/LocationBar';
 import { SalesPanel } from '../components/SalesPanel';
 import { StoreItemCard } from '../components/StoreItemCard';
@@ -13,6 +14,7 @@ import { fetchOrder, fetchShowroomStore, putConfirmedLine, type Order, type Show
 import { deliversTo, distanceKm, formatDistance } from '../lib/buyerLocation';
 import { buyerPriceField, type ReceivingMethod } from '../lib/itemUnits';
 import { useDraftSync } from '../lib/draftSync';
+import { newDelivery, rememberDelivery, rememberedDelivery, type Delivery } from '../lib/delivery';
 import { closedMessage, isOpenState } from '../lib/orderFlow';
 import { PERMISSIONS, can, deniedMessage } from '../lib/permissions';
 import { ApiError, SessionExpiredError, fetchStore, type ShowroomStore } from '../lib/waslaApi';
@@ -60,6 +62,11 @@ export function StorePage() {
   const [chosen, setChosen] = useState<ReceivingMethod | null>(null);
   /** داس «توصيل» ومكانه مش متحدد — بنقوله يحدده الأول */
   const [askedForLocation, setAskedForLocation] = useState(false);
+  /**
+   * ميعاد التسليم وملاحظاته (رسالة العميل ٦ أكتوبر). سلة فيها أصناف بترجع بميعادها،
+   * والفاضية بتبدأ من «دلوقتي» — فاتورة جديدة
+   */
+  const [delivery, setDelivery] = useState<Delivery>(() => (linesOf(storeId).length > 0 ? rememberedDelivery(storeId) : null) ?? newDelivery());
   /** «مبيعات»: الفاتورة اللي اتأكدت هنا وفاضلة قدام البائع */
   const [saleOrder, setSaleOrder] = useState<Order | null>(null);
   /** فلتر «مبيعات»: أصناف الفاتورة بس */
@@ -163,8 +170,23 @@ export function StorePage() {
   // السلة اللي في الناڤبار تخص المتجر ده، بلون حسب حده الأدنى
   useCartFocus(store?.id ?? null, minimum);
 
+  // متجر تاني في نفس الصفحة: ميعاده هو
+  const deliveryShop = useRef(storeId);
+  useEffect(() => {
+    if (deliveryShop.current === storeId) return;
+    deliveryShop.current = storeId;
+    setDelivery((linesOf(storeId).length > 0 ? rememberedDelivery(storeId) : null) ?? newDelivery());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId]);
+
+  // صفحة الفاتورة بتبعت المسودة بنفس الميعاد (طريقة الاستلام بيكتبها useDraftSync)
+  useEffect(() => {
+    if (session || !store) return;
+    rememberDelivery(store.id, delivery);
+  }, [session, store, delivery]);
+
   // المسودة على السيرفر مع كل تغيير في سلة المتجر ده
-  const { settle } = useDraftSync(store?.id ?? null, store ? linesOf(store.id) : [], method);
+  const { settle } = useDraftSync(store?.id ?? null, store ? linesOf(store.id) : [], method, session ? null : delivery);
 
   // الأسعار بتتغيّر مع نوع الحساب ولما البيعة تبدأ — سطور السلة بتمشي معاها
   useEffect(() => {
@@ -311,6 +333,9 @@ export function StorePage() {
       {session || newSale ? null : (
         <div className="mt-4 space-y-3 sm:max-w-xl print:hidden">
           <LocationBar prompt="حدد مكانك عشان نعرف المتجر بعيد عنك قد إيه" />
+
+          {/* رسالة العميل ٦ أكتوبر: ميعاد التسليم وملاحظاته قبل «استلام ولا توصيل» */}
+          <DeliveryFields value={delivery} onChange={setDelivery} />
 
           <div>
             <div

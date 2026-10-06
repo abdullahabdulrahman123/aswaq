@@ -4,8 +4,10 @@ import { useIncoming } from '../context/IncomingContext';
 import { egp } from '../lib/money';
 import type { Order } from '../lib/aswaqApi';
 import { useOrderRows } from '../lib/orderRows';
+import { deliveryLabel } from '../lib/delivery';
 import { stageLabel } from '../lib/orderFlow';
 import { itemsLabel } from '../lib/quantity';
+import { stageColor } from '../lib/stageColors';
 import { OrderRowButton } from './OrderRowButton';
 
 const timeFormat = new Intl.DateTimeFormat('ar-EG', { dateStyle: 'medium', timeStyle: 'short' });
@@ -108,26 +110,45 @@ export function IncomingOrders({ business }: { business: Business }) {
   );
 }
 
+/** ١٢٥٠٠ جرام ← «12.5 كجم» */
+const kg = (grams: number) => `${(grams / 1000).toLocaleString('en-EG', { maximumFractionDigits: 1 })} كجم`;
+/** سم³ ← «0.35 م³»، والصغير باللتر */
+const volume = (cm3: number) =>
+  cm3 >= 10_000 ? `${(cm3 / 1_000_000).toLocaleString('en-EG', { maximumFractionDigits: 2 })} م³` : `${(cm3 / 1000).toLocaleString('en-EG', { maximumFractionDigits: 1 })} لتر`;
+
+/**
+ * صف طلب وارد — رسالة العميل ٦ أكتوبر: رقم الفاتورة لوحده في مربع صغير بلون مرحلتها
+ * (هوية بصرية، من «الإعدادات»)، وبعده اسم المشتري. والوزن والحجم لو متسجّلين: اللي
+ * مش موجود مبيظهرش ومبياخدش مكان. والميعاد ميعاد التسليم لو اتحدد، وإلا ساعة التأكيد.
+ */
 function IncomingRow({ order, onOpen }: { order: Order; onOpen: () => void }) {
   const count = new Set(order.details.map((d) => d.itemId)).size;
+  const color = stageColor(order);
+  const measures = [order.totalWeight > 0 ? kg(order.totalWeight) : null, order.totalVolume ? volume(order.totalVolume) : null].filter(Boolean);
   return (
     <li>
       <button
         type="button"
         onClick={onOpen}
+        data-stage-color={order.stateColor ?? ''}
         className="flex w-full items-center gap-3 rounded-2xl border border-gray-200 bg-white p-4 text-start transition hover:border-brand-400 dark:border-white/10 dark:bg-surface-card"
       >
         <span className="min-w-0 flex-1">
           <span className="flex min-w-0 items-center gap-2">
-            <span className="truncate font-display font-bold">{order.names.buyer}</span>
-            <span className="shrink-0 rounded-md bg-accent-50 px-1.5 py-0.5 text-[11px] font-medium text-accent-700 dark:bg-accent-500/15 dark:text-accent-300">
-              فاتورة {order.number} · {stageLabel(order)}
+            <span className={`shrink-0 rounded-md px-1.5 py-0.5 font-display text-sm font-bold leading-snug tabular-nums ${color.box}`}>
+              {/* «فاتورة» للقارئ الصوتي ولنسخ النص — مش sr-only عشان النص يفضل «فاتورة 3» في سطر واحد */}
+              <span className="text-[0px]">فاتورة </span>
+              {order.number}
             </span>
+            <span className="truncate font-display font-bold">{order.names.buyer}</span>
           </span>
           <span className="mt-0.5 block truncate text-sm text-gray-500 dark:text-gray-400">
-            {order.names.store} · {order.method === 'delivery' ? 'توصيل' : 'استلام'}
+            <span className={`font-semibold ${color.text}`}>{stageLabel(order)}</span> · {order.names.store} · {order.method === 'delivery' ? 'توصيل' : 'استلام'}
           </span>
-          <span className="mt-0.5 block text-xs text-gray-400">{timeFormat.format(new Date(order.checkedOutAt ?? order.updatedAt))}</span>
+          <span className="mt-0.5 block truncate text-xs text-gray-400">
+            {order.deliveryAt ? `تسليم ${deliveryLabel(order.deliveryAt)}` : timeFormat.format(new Date(order.checkedOutAt ?? order.updatedAt))}
+            {measures.length > 0 && <span className="tabular-nums" data-measures> · {measures.join(' · ')}</span>}
+          </span>
         </span>
         <span className="shrink-0 text-end">
           <span className="block text-sm font-bold tabular-nums">{egp(order.netTotal)}</span>

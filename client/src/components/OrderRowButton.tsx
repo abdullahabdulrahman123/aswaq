@@ -2,6 +2,7 @@ import { egp } from '../lib/money';
 import type { OrderRow } from '../lib/orderRows';
 import { stageLabel } from '../lib/orderFlow';
 import { itemsLabel } from '../lib/quantity';
+import { stageColor } from '../lib/stageColors';
 
 /**
  * صف أوردر في «طلباتي» أو في بيعات «الطلبات الواردة» اللي لسه متأكدتش: الشركة
@@ -19,11 +20,7 @@ export function OrderRowButton({ row, onOpen, title }: { row: OrderRow; onOpen: 
           <span className="flex min-w-0 items-center gap-2">
             <span className="truncate font-display font-bold">{title}</span>
             {row.state && row.state !== 'draft' ? (
-              <span
-                className={`shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-medium ${
-                  row.state === 'cancelled' ? 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300' : 'bg-accent-50 text-accent-700 dark:bg-accent-500/15 dark:text-accent-300'
-                }`}
-              >
+              <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-medium ${stageColor(row.order ?? { state: row.state }).chip}`}>
                 فاتورة {row.number} · {row.order ? stageLabel(row.order) : stageLabel({ state: row.state })}
               </span>
             ) : (

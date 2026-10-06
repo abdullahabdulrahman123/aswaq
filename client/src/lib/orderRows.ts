@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { buyerLabel, useSales, type SalesSession } from '../context/SalesContext';
 import { useStoreCart } from '../context/StoreCartContext';
-import { fetchOrders, orderShopId, type Order } from './aswaqApi';
+import { fetchOrders, fetchPurchases, orderShopId, type Order } from './aswaqApi';
 import { fetchStores, type ShowroomStore } from './waslaApi';
 
 /** صف في الليستة — أوردر على الجهاز، أو على السيرفر، أو الاتنين (نفس المفتاح) */
@@ -19,6 +19,8 @@ export interface OrderRow {
   state: string | null;
   number: number | null;
   local: boolean;
+  /** «طلباتي»: سلة المشتري على الجهاز، أو أوردر المشتري فيه الحساب المختار */
+  buying: boolean;
   sale: SalesSession | null;
   order: Order | null;
 }
@@ -30,16 +32,23 @@ export interface OrderRow {
  *
  * «طلباتي» بتعرض اللي المستخدم طالبه لنفسه (sale = null)، و«الطلبات الواردة»
  * بتعرض بيعات «مبيعات» اللي لسه متأكدتش — بطلب العميل (مكالمة ٢٨ سبتمبر).
+ *
+ * رسالة العميل ٦ أكتوبر: «الباسكت اللي فوق بتكويري بدون شرط… محتاج where orders.from =
+ * انا او البيزنس اللي انا فاتحه» — أوردرات «طلباتي» من السيرفر بقت اللي المشتري فيها
+ * الحساب المختار (fetchPurchases)، مش كل اللي المستخدم عمله لنفسه بأي حساب.
  */
 export function useOrderRows() {
   const { orders: local, restoreLines } = useStoreCart();
   const { resume, leave, restore, openConfirmed } = useSales();
-  const { user, sessionExpired, withToken } = useAuth();
+  const { user, sessionExpired, selectedBusiness, withToken } = useAuth();
   const navigate = useNavigate();
   /** اسم الشركة من وصلة — سطور الجهاز فيها اسم المتجر بس */
   const [stores, setStores] = useState<Map<string, ShowroomStore>>(new Map());
   /** null = لسه بنجيب أو مفيش حساب */
   const [saved, setSaved] = useState<Order[] | null>(null);
+  /** «طلباتي» للحساب المختار — null = لسه بنجيب */
+  const [purchases, setPurchases] = useState<Order[] | null>(null);
+  const buyerAccount = selectedBusiness?.accountId ?? null;
   const signedIn = Boolean(user && !user.demo && !sessionExpired);
 
   useEffect(() => {
@@ -69,6 +78,22 @@ export function useOrderRows() {
     };
   }, [signedIn, withToken]);
 
+  useEffect(() => {
+    if (!signedIn) return;
+    let cancelled = false;
+    setPurchases(null);
+    withToken((token) => fetchPurchases(token, buyerAccount))
+      .then((list) => {
+        if (!cancelled) setPurchases(list);
+      })
+      .catch(() => {
+        if (!cancelled) setPurchases([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [signedIn, withToken, buyerAccount]);
+
   const rows: OrderRow[] = local.map((o) => ({
     key: o.key,
     shopId: o.shopId,
@@ -80,10 +105,19 @@ export function useOrderRows() {
     state: null,
     number: null,
     local: true,
+    buying: !o.sale,
     sale: o.sale,
     order: null,
   }));
-  for (const order of saved ?? []) {
+  // بيعات «مبيعات» من «أوردراتي» (اللي أنا عاملها)، وأوردرات «طلباتي» من الحساب المختار
+  const sources: [Order, boolean][] = [
+    ...(saved ?? []).filter((o) => o.sale != null).map((o): [Order, boolean] => [o, false]),
+    ...(purchases ?? []).map((o): [Order, boolean] => [o, true]),
+  ];
+  const seen = new Set<string>();
+  for (const [order, buying] of sources) {
+    if (seen.has(order.id)) continue;
+    seen.add(order.id);
     const onDevice = order.state === 'draft' ? rows.find((r) => r.local && r.key === order.ref) : undefined;
     if (onDevice) {
       onDevice.state = 'draft';
@@ -102,6 +136,7 @@ export function useOrderRows() {
       state: order.state,
       number: order.number,
       local: false,
+      buying,
       sale,
       order,
     });
@@ -146,7 +181,7 @@ export function useOrderRows() {
     navigate(`/store/${orderShopId(order)}`);
   }
 
-  return { rows, open, openOnStore, loading: signedIn && saved === null, signedIn };
+  return { rows, open, openOnStore, loading: signedIn && (saved === null || purchases === null), signedIn };
 }
 
 /** طلب من المعرض في صورة بيعة — اسم المشتري ورقمه وطريقة الاستلام من الأوردر نفسه */
@@ -162,6 +197,8 @@ function saleOf(order: Order): SalesSession {
     sellerName: order.seller.name,
     method: order.method,
     address: order.address,
+    deliveryAt: order.deliveryAt ?? null,
+    deliveryNotes: order.deliveryNotes ?? '',
     shopId: orderShopId(order),
   };
 }

@@ -1,22 +1,44 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../config/db.js';
-import { STAGE_TEMPLATE, salesStagesOf } from '../services/orderFlow.js';
+import { FIXED_COLORS, STAGE_COLOR_CHOICES, STAGE_TEMPLATE, stageColorsOf } from '../services/orderFlow.js';
 import { CATEGORIES, listPermissions } from '../services/permissions.js';
 
 /**
  * إعدادات النشاط (مكالمة ٢ أكتوبر) — على الشركة كلها. أي حد في الشركة بيشوفها،
  * وصاحب الشركة بس اللي بيغيّرها. أول إعداد: مراحل البيع من القالب، بالترتيب.
  */
-const settingsSchema = z.object({
-  salesStages: z
-    .array(z.enum(STAGE_TEMPLATE.map((s) => s.key) as [string, ...string[]]))
-    .max(STAGE_TEMPLATE.length)
-    .refine((keys) => new Set(keys).size === keys.length, 'Each stage once'),
-});
+const stageKey = z.enum(STAGE_TEMPLATE.map((s) => s.key) as [string, ...string[]]);
+const settingsSchema = z
+  .object({
+    salesStages: z
+      .array(stageKey)
+      .max(STAGE_TEMPLATE.length)
+      .refine((keys) => new Set(keys).size === keys.length, 'Each stage once'),
+    /** لون كل مرحلة (رسالة العميل ٦ أكتوبر) — اللي مش مبعوت بيفضل زي ما هو */
+    stageColors: z.record(stageKey, z.enum(STAGE_COLOR_CHOICES as [string, ...string[]])).optional(),
+  })
+  // «ميبقاش لونين زي بعض»: المراحل اللي الشركة شغالة بيها، كل واحدة بلون
+  .refine(
+    ({ salesStages, stageColors }) => {
+      const colors = salesStages.map((k) => stageColors?.[k]).filter(Boolean);
+      return new Set(colors).size === colors.length;
+    },
+    { message: 'Each stage needs its own color', path: ['stageColors'] },
+  );
+
+/** الإعدادات زي ما الواجهة بتعرضها: المراحل، ولون كل مرحلة، والألوان المتاحة والثابتة */
+function settingsView(row: { salesStages: string[]; stageColors: unknown } | null) {
+  return {
+    settings: { salesStages: row?.salesStages ?? [], stageColors: stageColorsOf(row?.stageColors ?? null) },
+    stageTemplate: STAGE_TEMPLATE,
+    stageColorChoices: STAGE_COLOR_CHOICES,
+    fixedColors: FIXED_COLORS,
+  };
+}
 
 export async function get(req: Request, res: Response) {
-  res.json({ settings: { salesStages: await salesStagesOf(req.business!.accountId) }, stageTemplate: STAGE_TEMPLATE });
+  res.json(settingsView(await prisma.businessSettings.findUnique({ where: { businessId: req.business!.accountId } })));
 }
 
 export async function update(req: Request, res: Response) {
@@ -30,12 +52,20 @@ export async function update(req: Request, res: Response) {
     return;
   }
   const businessId = req.business!.accountId;
+  const current = await prisma.businessSettings.findUnique({ where: { businessId } });
+  const stageColors = { ...stageColorsOf(current?.stageColors ?? null), ...(parsed.data.stageColors ?? {}) };
+  // المحفوظ + الجديد مع بعض — مرحلة مختارة لونها الافتراضي ممكن يكون نفس اللي اتختار لمرحلة تانية
+  const used = parsed.data.salesStages.map((k) => stageColors[k]);
+  if (new Set(used).size !== used.length) {
+    res.status(400).json({ message: 'Each stage needs its own color' });
+    return;
+  }
   const row = await prisma.businessSettings.upsert({
     where: { businessId },
-    create: { businessId, salesStages: parsed.data.salesStages },
-    update: { salesStages: parsed.data.salesStages },
+    create: { businessId, salesStages: parsed.data.salesStages, stageColors },
+    update: { salesStages: parsed.data.salesStages, stageColors },
   });
-  res.json({ settings: { salesStages: row.salesStages }, stageTemplate: STAGE_TEMPLATE });
+  res.json(settingsView(row));
 }
 
 /** GET /api/permissions — رصيد الصلاحيات وأقسامها، لصفحة «الموظفين» */

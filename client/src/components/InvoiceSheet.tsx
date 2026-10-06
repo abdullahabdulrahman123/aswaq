@@ -1,3 +1,4 @@
+import { deliveryLabel } from '../lib/delivery';
 import { egp } from '../lib/money';
 
 const dateFormat = new Intl.DateTimeFormat('ar-EG', { dateStyle: 'long', timeStyle: 'short' });
@@ -24,6 +25,9 @@ export interface InvoiceView {
   buyerPhone: string;
   method: 'pickup' | 'delivery' | null;
   address: string;
+  /** ميعاد التسليم ISO وملاحظاته (رسالة العميل ٦ أكتوبر) */
+  deliveryAt?: string | null;
+  deliveryNotes?: string | null;
   lines: InvoiceLine[];
   /** بالقرش */
   total: number;
@@ -50,13 +54,17 @@ const label = `${cell} bg-gray-100 font-semibold dark:bg-white/10 print:bg-gray-
  * مكالمة ٥ أكتوبر: خانة الحجم اتشالت — الوزن بس، زي الورق. الحجم لسه في الصنف
  * عشان تحميل العربية.
  *
+ * رسالة العميل ٦ أكتوبر: تحت الأصناف «الحد الأدنى من الداتا» — إجمالي الفاتورة وإجمالي
+ * الوزن بس (الكمية وحساب سابق ويعتمد والمدفوع اتشالوا)، و«ربما يكون الوزن غير دقيق» بخط
+ * صغير تحت الوزن لو فيه صنف وزنه مش متسجّل بدل «الحسابات غير دقيقة». وميعاد التسليم
+ * وملاحظاته في الرأس للسواق.
+ *
  * onPrice (للبائع بس): اسم الصنف بيبقى زرار بيفتح «التسعير». في الورقة شكله نص عادي.
  *
  * بيانات الشركة الرسمية (س.ت، ب.ض، رخصة) وسطر آخر الفاتورة لسه مش متسجّلين
  * في النشاط، فمش ظاهرين.
  */
 export function InvoiceSheet({ view, onPrice }: { view: InvoiceView; onPrice?: (line: InvoiceLine) => void }) {
-  const totalQty = view.lines.reduce((n, l) => n + l.quantity, 0);
   const unpriced = view.lines.some((l) => l.price === null);
 
   return (
@@ -109,6 +117,18 @@ export function InvoiceSheet({ view, onPrice }: { view: InvoiceView; onPrice?: (
               <dd className="break-words">{view.address}</dd>
             </>
           )}
+          {view.deliveryAt && (
+            <>
+              <dt className="text-gray-500 dark:text-gray-400 print:text-black">ميعاد التسليم</dt>
+              <dd className="font-semibold">{deliveryLabel(view.deliveryAt)}</dd>
+            </>
+          )}
+          {view.deliveryNotes && (
+            <>
+              <dt className="text-gray-500 dark:text-gray-400 print:text-black">ملاحظات التسليم</dt>
+              <dd className="break-words">{view.deliveryNotes}</dd>
+            </>
+          )}
         </dl>
       </header>
 
@@ -146,38 +166,28 @@ export function InvoiceSheet({ view, onPrice }: { view: InvoiceView; onPrice?: (
             </tr>
           ))}
           <tr>
-            <td className={`${label} text-center`}>الكمية</td>
-            <td className={`${cell} text-center font-bold tabular-nums`}>{totalQty}</td>
-            <td className={`${label} text-center`}>الإجمالي</td>
-            <td className={`${cell} text-center font-bold tabular-nums`}>{egp(view.total)}</td>
-          </tr>
-          <tr>
-            <td className={`${label} text-center`}>الوزن</td>
-            <td className={`${cell} text-center tabular-nums`}>{view.weightKg === null ? '—' : `${amount(view.weightKg)} كجم`}</td>
-            <td className={`${label} text-center`}>حساب سابق</td>
-            <td className={cell} />
-          </tr>
-          <tr>
-            <td className={`${label} text-center`}>يعتمد</td>
-            <td className={`${label} text-center`}>إجمالي المبلغ</td>
+            <td className={`${label} text-center`} colSpan={2}>
+              إجمالي الفاتورة
+            </td>
             <td className={`${cell} text-center text-base font-bold tabular-nums`} colSpan={2}>
               {egp(view.total)}
             </td>
           </tr>
           <tr>
-            <td className={`${cell} h-12`} />
-            <td className={`${label} text-center`}>المدفوع</td>
-            <td className={cell} colSpan={2} />
+            <td className={`${label} text-center`} colSpan={2}>
+              إجمالي الوزن
+            </td>
+            <td className={`${cell} text-center tabular-nums`} colSpan={2}>
+              <span className="font-semibold">{view.weightKg === null ? '—' : `${amount(view.weightKg)} كجم`}</span>
+              {view.measuresMissing && (
+                <span data-weight-note className="block text-[10px] font-normal leading-tight text-gray-500 dark:text-gray-400 print:text-black">
+                  ربما يكون الوزن غير دقيق
+                </span>
+              )}
+            </td>
           </tr>
         </tbody>
       </table>
-
-      {/* نص العميل (٢٧ سبتمبر)، من غير الحجم من ٥ أكتوبر */}
-      {view.measuresMissing && (
-        <p className="mt-2 text-xs text-amber-700 dark:text-amber-300 print:text-black">
-          ربما تكون هذه الحسابات غير دقيقة نتيجة لعدم تسجيل الوزن لبعض الأصناف.
-        </p>
-      )}
 
       {unpriced && (
         <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 print:text-black">

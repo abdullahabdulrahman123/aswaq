@@ -12,7 +12,7 @@ import { useOrderRows } from '../lib/orderRows';
  */
 export function OrdersPage() {
   const { rows: all, open, loading } = useOrderRows();
-  const rows = all.filter((row) => !row.sale);
+  const rows = all.filter((row) => row.buying);
 
   if (rows.length === 0) {
     return (

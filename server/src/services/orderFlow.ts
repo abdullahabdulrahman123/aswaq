@@ -41,6 +41,28 @@ const FIXED: Record<string, StageTemplate> = {
 
 const byKey = new Map([...STAGE_TEMPLATE, ...Object.values(FIXED)].map((s) => [s.key, s]));
 
+/**
+ * ألوان المراحل (رسالة العميل ٦ أكتوبر): «هوية بصرية للحالة… بس يديني شرط وانا بختار
+ * الالوان ميبقاش لونين زي بعض». مفاتيح بس — شكل كل لون في الواجهة (lib/stageColors).
+ * مؤكد ومكتمل وملغية ثابتين، والمراحل اللي في النص صاحب الشركة بيختار لها من الباقي.
+ */
+export const FIXED_COLORS: Record<string, string> = { draft: 'gray', order: 'blue', done: 'green', cancelled: 'red' };
+export const STAGE_COLOR_CHOICES = ['amber', 'violet', 'orange', 'teal', 'pink', 'lime', 'brown'];
+const DEFAULT_STAGE_COLORS: Record<string, string> = { preparing: 'amber', packing: 'violet', loading: 'orange', on_the_way: 'teal', delivered: 'pink' };
+
+/** لون كل مرحلة في القالب: اللي صاحب الشركة اختاره، وإلا الافتراضي */
+export function stageColorsOf(saved: unknown): Record<string, string> {
+  const chosen = saved && typeof saved === 'object' && !Array.isArray(saved) ? (saved as Record<string, unknown>) : {};
+  return Object.fromEntries(
+    STAGE_TEMPLATE.map((s) => {
+      const color = chosen[s.key];
+      return [s.key, typeof color === 'string' && STAGE_COLOR_CHOICES.includes(color) ? color : DEFAULT_STAGE_COLORS[s.key]];
+    }),
+  );
+}
+
+const colorOf = (state: string, colors: Record<string, string>) => FIXED_COLORS[state] ?? colors[state] ?? 'gray';
+
 /** المسودة والمكتمل والملغية — كل اللي بينهم مفتوح («مهامي») */
 export const CLOSED_STATES = ['draft', 'done', 'cancelled'];
 
@@ -77,6 +99,8 @@ export type OrderView = Order & {
   stateLabel: string;
   /** زرار المرحلة اللي بعدها، للبائع. فاضي = آخر مرحلة */
   nextAction: string | null;
+  /** لون المرحلة — مفتاح من FIXED_COLORS أو STAGE_COLOR_CHOICES */
+  stateColor: string;
 };
 
 /**
@@ -87,9 +111,15 @@ export async function withFlow(orders: Order[]): Promise<OrderView[]> {
   const sellers = [...new Set(orders.map((o) => o.from.acc))];
   const rows = sellers.length ? await prisma.businessSettings.findMany({ where: { businessId: { in: sellers } } }) : [];
   const flows = new Map(rows.map((r) => [r.businessId, flowOf(r.salesStages)]));
+  const colors = new Map(rows.map((r) => [r.businessId, stageColorsOf(r.stageColors)]));
   return orders.map((order) => {
     const next = nextIn(flows.get(order.from.acc) ?? flowOf([]), order.state);
-    return { ...order, stateLabel: labelOf(order.state), nextAction: next ? labelOfAction(next) : null };
+    return {
+      ...order,
+      stateLabel: labelOf(order.state),
+      nextAction: next ? labelOfAction(next) : null,
+      stateColor: colorOf(order.state, colors.get(order.from.acc) ?? stageColorsOf(null)),
+    };
   });
 }
 

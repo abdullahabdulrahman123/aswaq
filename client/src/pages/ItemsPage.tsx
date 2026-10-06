@@ -1,60 +1,29 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { SessionExpiredNotice } from '../components/SessionExpiredNotice';
 import { ApiError, SessionExpiredError } from '../lib/waslaApi';
-import { aswaqApiConfigured, deleteItem, fetchItems, type Item, type ItemUnit } from '../lib/aswaqApi';
-import { egp } from '../lib/money';
+import { aswaqApiConfigured, deleteItem, fetchItems, type Item } from '../lib/aswaqApi';
 import { PRICE_FIELDS, PRICE_LABELS } from '../lib/itemUnits';
 
-/** وزن وحجم — ١٢٠٠ → "1,200" */
-const amount = (value: number) => value.toLocaleString('en-EG', { maximumFractionDigits: 2 });
+/** بالقرش ← «7.5» — العمود عنوانه فوق، فمن غير «ج.م» */
+const price = (piasters: number | null) => (piasters === null ? '—' : (piasters / 100).toLocaleString('en-EG', { maximumFractionDigits: 2 }));
+
+/** الصنف اللي اتفتح للتعديل — الرجوع (حفظ أو رجوع المتصفح) بينزل عليه */
+const RETURN_KEY = 'aswaq_items_return';
 
 /**
  * أصناف النشاط المختار — العرض والتعديل والمسح.
  * الإضافة في صفحتها (ItemFormPage)، والاتنين من قائمة ☰.
+ *
+ * رسالة العميل ٦ أكتوبر: الكارت أقصر عشان أصناف أكتر تبان — سطر لكل وحدة فيه اسمها
+ * والأربع أسعار جنب بعض، وفوقهم سطر صغير بأسامي الأسعار. التعديل والمسح أيقونتين.
+ * وبعد «حفظ» (أو الرجوع) الليستة بتنزل على الصنف اللي كان بيتعدّل بدل أولها.
  */
-
-function UnitLine({ unit }: { unit: ItemUnit }) {
-  const values: [label: string, text: string][] = [];
-  // أصناف اتحفظت قبل avg ممكن متكونش فيها الحقل خالص، فـ!= null مش !== null
-  if (unit.avgCost != null) values.push(['avg', egp(unit.avgCost)]);
-  if (unit.rate != null) values.push(['rate', String(unit.rate)]);
-  if (unit.weight != null) values.push(['weight', `${amount(unit.weight)} جم`]);
-  if (unit.volume != null) values.push(['volume', `${amount(unit.volume)} سم³`]);
-  for (const field of PRICE_FIELDS) {
-    const price = unit[field];
-    if (price !== null) values.push([PRICE_LABELS[field], egp(price)]);
-  }
-
-  return (
-    <li className="rounded-lg bg-gray-50 px-3 py-2.5 dark:bg-white/5">
-      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span className="text-sm font-semibold">{unit.name}</span>
-        <span className="text-xs text-gray-400">
-          {unit.unitContent === 1 ? 'أصغر وحدة' : `فيها ${unit.unitContent}`}
-        </span>
-      </div>
-
-      {values.length > 0 ? (
-        <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
-          {values.map(([label, text]) => (
-            <span key={label} className="text-xs text-gray-600 dark:text-gray-300">
-              <span className="text-gray-400">{label}</span>{' '}
-              <span className="font-medium tabular-nums">{text}</span>
-            </span>
-          ))}
-        </div>
-      ) : (
-        <p className="mt-1.5 text-xs text-gray-400">لسه مفيش أسعار</p>
-      )}
-    </li>
-  );
-}
 
 export function ItemsPage() {
   const { accountId = '' } = useParams<{ accountId: string }>();
-  const { state } = useLocation() as { state?: { saved?: string } };
+  const { state } = useLocation() as { state?: { saved?: string; itemId?: string } };
   const { user, businesses, businessesLoading, signIn, withToken, sessionExpired } = useAuth();
 
   /** null = لسه بنجيب */
@@ -64,6 +33,28 @@ export function ItemsPage() {
   const [deletingId, setDeletingId] = useState('');
 
   const business = businesses.find((b) => b.accountId === accountId);
+  /** الصنف اللي رجعنا عليه — بيتعلّم ثانيتين */
+  const [returnedId, setReturnedId] = useState('');
+  const returned = useRef(false);
+
+  // الرجوع من التعديل: على نفس الصنف — مرة واحدة، مش مع كل مسح بعدها
+  useEffect(() => {
+    if (!items?.length || returned.current) return;
+    returned.current = true;
+    let target = state?.itemId ?? '';
+    try {
+      target ||= sessionStorage.getItem(RETURN_KEY) ?? '';
+      sessionStorage.removeItem(RETURN_KEY);
+    } catch {
+      // من غير تخزين: من أول الليستة
+    }
+    if (!target || !items.some((i) => i.id === target)) return;
+    requestAnimationFrame(() => document.querySelector(`[data-item="${target}"]`)?.scrollIntoView({ block: 'center' }));
+    setReturnedId(target);
+    const timer = setTimeout(() => setReturnedId(''), 2000);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items]);
 
   // الجلسة خلصت؟ بنستنى لحد ما يسجّل دخول (هنا أو في شباك تاني) ونجيبها ساعتها
   useEffect(() => {
@@ -187,42 +178,28 @@ export function ItemsPage() {
           </Link>
         </div>
       ) : (
-        <ul className="space-y-4">
+        <ul className="space-y-2">
           {items.map((item) => (
             <li
               key={item.id}
-              className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card"
+              data-item={item.id}
+              className={`rounded-xl border bg-white px-3 py-2 transition-shadow dark:bg-surface-card ${
+                returnedId === item.id ? 'border-brand-400 ring-2 ring-brand-300 dark:ring-brand-500/50' : 'border-gray-200 dark:border-white/10'
+              }`}
             >
-              <div className="flex items-start gap-3">
-                {item.picture && (
-                  <img src={item.picture} alt="" className="h-12 w-12 shrink-0 rounded-xl object-cover" />
-                )}
-                <h2 className="min-w-0 flex-1 font-display text-lg font-bold">{item.name}</h2>
-              </div>
-
-              <ul className="mt-4 space-y-2">
-                {item.units.map((unit) => (
-                  <UnitLine key={unit.name} unit={unit} />
-                ))}
-              </ul>
-
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                <Link
-                  to={`/business/${accountId}/items/${item.id}/edit`}
-                  className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium transition hover:border-brand-400 hover:text-brand-700 dark:border-white/15 dark:hover:text-brand-400"
-                >
-                  تعديل
-                </Link>
+              <div className="flex items-center gap-2">
+                {item.picture && <img src={item.picture} alt="" className="h-8 w-8 shrink-0 rounded-lg object-cover" />}
+                <h2 className="min-w-0 flex-1 truncate font-display text-[15px] font-bold">{item.name}</h2>
 
                 {/* تأكيد في المكان بدل نافذة المتصفح — المسح مالوش رجعة */}
                 {confirmingId === item.id ? (
-                  <>
+                  <span className="flex shrink-0 items-center gap-1.5">
                     <span className="text-xs text-gray-500 dark:text-gray-400">متأكد؟</span>
                     <button
                       type="button"
                       onClick={() => handleDelete(item)}
                       disabled={deletingId === item.id}
-                      className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-red-700 disabled:cursor-progress disabled:opacity-70"
+                      className="rounded-lg bg-red-600 px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-red-700 disabled:cursor-progress disabled:opacity-70"
                     >
                       {deletingId === item.id ? 'بنمسح…' : 'امسح'}
                     </button>
@@ -230,25 +207,92 @@ export function ItemsPage() {
                       type="button"
                       onClick={() => setConfirmingId('')}
                       disabled={deletingId === item.id}
-                      className="rounded-lg px-2 py-1.5 text-xs text-gray-500 transition hover:text-gray-700 disabled:opacity-60 dark:text-gray-400"
+                      className="rounded-lg px-1.5 py-1 text-xs text-gray-500 transition hover:text-gray-700 disabled:opacity-60 dark:text-gray-400"
                     >
                       رجوع
                     </button>
-                  </>
+                  </span>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => setConfirmingId(item.id)}
-                    className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-red-700 transition hover:border-red-300 dark:border-white/15 dark:text-red-300"
-                  >
-                    مسح
-                  </button>
+                  <span className="flex shrink-0 items-center gap-1">
+                    <Link
+                      to={`/business/${accountId}/items/${item.id}/edit`}
+                      aria-label={`تعديل ${item.name}`}
+                      title="تعديل"
+                      onClick={() => {
+                        try {
+                          sessionStorage.setItem(RETURN_KEY, item.id);
+                        } catch {
+                          // من غير تخزين: الرجوع على أول الليستة
+                        }
+                      }}
+                      className="grid h-8 w-8 place-items-center rounded-lg text-gray-500 transition hover:bg-gray-100 hover:text-brand-700 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-brand-400"
+                    >
+                      <PencilIcon />
+                    </Link>
+                    <button
+                      type="button"
+                      aria-label={`مسح ${item.name}`}
+                      title="مسح"
+                      onClick={() => setConfirmingId(item.id)}
+                      className="grid h-8 w-8 place-items-center rounded-lg text-gray-500 transition hover:bg-red-50 hover:text-red-700 dark:text-gray-400 dark:hover:bg-red-500/10 dark:hover:text-red-300"
+                    >
+                      <TrashIcon />
+                    </button>
+                  </span>
                 )}
               </div>
+
+              {item.units.length > 0 ? (
+                <table className="mt-1 w-full table-fixed text-sm tabular-nums">
+                  <thead>
+                    <tr className="text-[10px] leading-tight text-gray-400">
+                      <th className="w-[22%] pb-0.5 text-start font-normal">الوحدة</th>
+                      {PRICE_FIELDS.map((field) => (
+                        <th key={field} className="pb-0.5 text-center font-normal">
+                          {PRICE_LABELS[field]}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {item.units.map((unit) => (
+                      <tr key={unit.name} data-unit={unit.name}>
+                        <td className="truncate py-0.5 text-start font-semibold">{unit.name}</td>
+                        {PRICE_FIELDS.map((field) => (
+                          <td key={field} className={`py-0.5 text-center ${unit[field] === null ? 'text-gray-300 dark:text-gray-600' : ''}`}>
+                            {price(unit[field])}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <p className="mt-1 text-xs text-gray-400">لسه مفيش وحدات</p>
+              )}
             </li>
           ))}
         </ul>
       )}
     </div>
+  );
+}
+
+function PencilIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 6h18" />
+      <path d="M8 6V4h8v2" />
+      <path d="M19 6l-1 14H6L5 6" />
+    </svg>
   );
 }

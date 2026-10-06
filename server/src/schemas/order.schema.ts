@@ -1,6 +1,15 @@
 import { z } from 'zod';
 import { objectIdSchema } from './common.js';
 
+/**
+ * ميعاد التسليم وملاحظاته (رسالة العميل ٦ أكتوبر) — في رأس البيعة، وللمشتري من المعرض
+ * جنب طريقة الاستلام. الميعاد ISO بالمنطقة الزمنية؛ فاضي = مش متحدد
+ */
+const deliveryFields = {
+  deliveryAt: z.string().datetime({ offset: true }).nullable().optional(),
+  deliveryNotes: z.string().trim().max(300).optional(),
+};
+
 /** بيعة «مبيعات» زي ما الواجهة شايلاها — بتتحفظ مع الأوردر عشان ترجع على جهاز تاني */
 const saleSchema = z
   .object({
@@ -16,6 +25,7 @@ const saleSchema = z
     sellerName: z.string().max(120).default(''),
     method: z.enum(['pickup', 'delivery']),
     address: z.string().trim().max(200).default(''),
+    ...deliveryFields,
   })
   .passthrough();
 
@@ -32,6 +42,8 @@ export const draftSchema = z.object({
   /** للمستخدم لنفسه: حسابه أو واحد من أنشطته. في البيعة بيتاخد من sale */
   to: objectIdSchema.optional(),
   sale: saleSchema.optional(),
+  /** للمشتري من المعرض — في البيعة بيتاخدوا من sale */
+  ...deliveryFields,
   lines: z
     .array(
       z.object({
@@ -56,10 +68,18 @@ export const lineSchema = z.object({
   price: sellerPrice,
 });
 
+/**
+ * رأس فاتورة مؤكدة (رسالة العميل ٦ أكتوبر: «اكسباند الجزء اللي فيه مستخدم غير مسجل
+ * وأعدّل الهيدر زي زمان») — نفس خانات رأس البيعة من غير المتجر. طلب المعرض
+ * المشتري بتاعه مبيتغيّرش.
+ */
+export const headerSchema = saleSchema.omit({ id: true, accountId: true });
+
 /** إلغاء فاتورة (مكالمة ٥ أكتوبر): السبب لازم يتكتب */
 export const cancelSchema = z.object({
   reason: z.string().trim().min(1).max(300),
 });
 
 export type DraftInput = z.infer<typeof draftSchema>;
+export type HeaderInput = z.infer<typeof headerSchema>;
 export type LineInput = z.infer<typeof lineSchema>;

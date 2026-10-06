@@ -26,6 +26,8 @@ export const PERMISSIONS = {
   invoiceAddItem: 'sales.invoice.add_item',
   /** إلغاء فاتورة مؤكدة لسه مخلصتش، بسبب (مكالمة ٥ أكتوبر) */
   invoiceCancel: 'sales.invoice.cancel',
+  /** رأس فاتورة مؤكدة: العميل والموبايل والاستلام والعنوان وميعاد التسليم (رسالة العميل ٦ أكتوبر) */
+  invoiceHeader: 'sales.invoice.header',
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -35,6 +37,7 @@ const CATALOG: { key: PermissionKey; name: string; categories: string[]; default
   { key: PERMISSIONS.invoiceQuantity, name: 'تغيير كمية صنف في فاتورة البيع', categories: ['sales'], defaultOn: true },
   { key: PERMISSIONS.invoiceAddItem, name: 'إضافة صنف مش موجود في فاتورة البيع', categories: ['sales'], defaultOn: true },
   { key: PERMISSIONS.invoiceCancel, name: 'إلغاء فاتورة بيع', categories: ['sales'], defaultOn: true },
+  { key: PERMISSIONS.invoiceHeader, name: 'تعديل بيانات فاتورة البيع', categories: ['sales'], defaultOn: true },
 ];
 
 /** الرصيد في الداتابيز زي الكود — ساعة ما السيرفر يقوم */

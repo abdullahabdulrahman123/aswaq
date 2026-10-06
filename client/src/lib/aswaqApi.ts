@@ -296,6 +296,8 @@ export interface Order {
   state: 'draft' | 'order' | 'done' | 'cancelled' | string;
   /** اسم المرحلة من السيرفر (مكالمة ٢ أكتوبر: المراحل من إعدادات النشاط البائع) */
   stateLabel?: string;
+  /** لون المرحلة من إعدادات النشاط البائع (رسالة العميل ٦ أكتوبر) — مفتاح في lib/stageColors */
+  stateColor?: string;
   /** زرار المرحلة اللي بعدها — null = آخر مرحلة */
   nextAction?: string | null;
   /** me:<shopId> أو <saleId>:<shopId> — نفس مفتاح الأوردر على الجهاز */
@@ -321,6 +323,10 @@ export interface Order {
   names: { business: string; store: string; buyer: string; buyerPhone: string; buyerKind: 'user' | 'business' };
   method: 'pickup' | 'delivery';
   address: string;
+  /** ميعاد التسليم ISO (رسالة العميل ٦ أكتوبر) — الأوردرات اللي قبله من غيره */
+  deliveryAt?: string | null;
+  /** ملاحظات التسليم للسواق */
+  deliveryNotes?: string | null;
   /** بيعة «مبيعات» زي ما اتبعتت — null للمستخدم لنفسه */
   sale: unknown;
   totalAvg: number;
@@ -344,6 +350,9 @@ export interface DraftInput {
   /** للمستخدم لنفسه: نشاطه لو بيشتري بيه. فاضي = حسابه هو */
   to?: string;
   sale?: unknown;
+  /** ميعاد التسليم وملاحظاته للمشتري من المعرض — في البيعة جوه sale */
+  deliveryAt?: string | null;
+  deliveryNotes?: string;
   /** price: السعر اللي البائع كتبه بالقرش — السيرفر بياخده في «مبيعات» بس */
   lines: { itemId: string; unitName: string; quantity: number; price?: number }[];
 }
@@ -390,6 +399,18 @@ export async function putConfirmedLine(token: string, orderId: string, line: Lin
   return order;
 }
 
+/**
+ * رأس فاتورة مؤكدة (رسالة العميل ٦ أكتوبر) — للنشاط البائع بصلاحية «تعديل بيانات
+ * فاتورة البيع». 403 = الصلاحية مش معاه، 409 = خلصت، 422 = طلب معرض والعميل اتغيّر
+ */
+export async function putOrderHeader(token: string, orderId: string, header: unknown): Promise<Order> {
+  const { order } = await request<{ order: Order }>(`/api/orders/${encodeURIComponent(orderId)}/header`, token, {
+    method: 'PUT',
+    body: JSON.stringify(header),
+  });
+  return order;
+}
+
 /** مرحلة من قالب مراحل البيع — label اللي المشتري بيشوفه، وaction الزرار */
 export interface StageTemplate {
   key: string;
@@ -400,18 +421,28 @@ export interface StageTemplate {
 export interface BusinessSettings {
   /** المراحل اللي بين «مؤكد» و«مكتمل» بالترتيب */
   salesStages: string[];
+  /** لون كل مرحلة من القالب (رسالة العميل ٦ أكتوبر) — مفتاح المرحلة ← مفتاح اللون */
+  stageColors: Record<string, string>;
+}
+
+/** الإعدادات ومعاها القالب والألوان المتاحة والثابتة (مؤكد ومكتمل وملغية) */
+export interface SettingsResponse {
+  settings: BusinessSettings;
+  stageTemplate: StageTemplate[];
+  stageColorChoices: string[];
+  fixedColors: Record<string, string>;
 }
 
 const businessSettingsPath = (accountId: string) => `/api/businesses/${encodeURIComponent(accountId)}/settings`;
 
 /** إعدادات النشاط والقالب اللي بيختار منه (مكالمة ٢ أكتوبر) */
 export function fetchSettings(token: string, accountId: string) {
-  return request<{ settings: BusinessSettings; stageTemplate: StageTemplate[] }>(businessSettingsPath(accountId), token);
+  return request<SettingsResponse>(businessSettingsPath(accountId), token);
 }
 
-/** لصاحب الشركة بس — 403 لغيره */
+/** لصاحب الشركة بس — 403 لغيره، و400 لو مرحلتين بنفس اللون */
 export function saveSettings(token: string, accountId: string, settings: BusinessSettings) {
-  return request<{ settings: BusinessSettings; stageTemplate: StageTemplate[] }>(businessSettingsPath(accountId), token, {
+  return request<SettingsResponse>(businessSettingsPath(accountId), token, {
     method: 'PUT',
     body: JSON.stringify(settings),
   });
@@ -441,6 +472,15 @@ export async function fetchIncoming(token: string, accountId: string): Promise<O
 
 export async function fetchOrders(token: string): Promise<Order[]> {
   const { orders } = await request<{ orders: Order[] }>('/api/orders', token);
+  return orders;
+}
+
+/**
+ * «طلباتي» (رسالة العميل ٦ أكتوبر): الأوردرات اللي المشتري فيها الحساب المختار —
+ * نشاط (as) أو المستخدم نفسه (من غير as)
+ */
+export async function fetchPurchases(token: string, as: string | null): Promise<Order[]> {
+  const { orders } = await request<{ orders: Order[] }>(`/api/orders/purchases${as ? `?as=${encodeURIComponent(as)}` : ''}`, token);
   return orders;
 }
 

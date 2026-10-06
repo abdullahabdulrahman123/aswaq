@@ -43,6 +43,10 @@ export interface SalesSession {
   method: ReceivingMethod;
   /** عنوان التوصيل كتابة — «جنب الجامع الكبير». فاضي في الاستلام */
   address: string;
+  /** ميعاد التسليم ISO (رسالة العميل ٦ أكتوبر) — البيعات اللي قبله من غيره */
+  deliveryAt?: string | null;
+  /** ملاحظات التسليم للسواق */
+  deliveryNotes?: string;
   /** المتجر اللي البائع بيبيع منه — البيعات اللي اتحفظت قبل ٢٨ سبتمبر من غيره */
   shopId?: string;
 }
@@ -73,7 +77,7 @@ interface Sales {
    * رأس الفاتورة مفتوح (الأكورديون في صفحة المتجر) — لنشاط، ومعاه البيعة اللي
    * بتتعدّل لو فيه. FollowSalesPanel بيودّي على متجر النشاط لو الصفحة مش عليه.
    */
-  dialog: { business: Business; editing: SalesSession | null } | null;
+  dialog: { business: Business; editing: SalesSession | null; returnTo: string } | null;
   openDialog: (business: Business, editing?: SalesSession | null) => void;
   closeDialog: () => void;
   /**
@@ -127,6 +131,16 @@ function readSessions(): SalesSession[] {
   return Array.isArray(list)
     ? list.filter((s): s is SalesSession => Boolean(s) && typeof s.id === 'string' && typeof s.buyer?.accountId === 'string')
     : [];
+}
+
+/**
+ * الصفحة اللي البائع كان فيها لما فتح «مبيعات» — «إلغاء» بيرجّعه لها (رسالة العميل ٦
+ * أكتوبر: «الغاء يرجعني على اخر بيدج… او الهوم بيدج»). من غير المسار الأساسي (/aswaq/).
+ */
+function currentPath(): string {
+  const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+  const path = window.location.pathname;
+  return (base && path.startsWith(base) ? path.slice(base.length) : path) || '/';
 }
 
 const SalesContext = createContext<Sales | null>(null);
@@ -189,7 +203,7 @@ export function SalesProvider({ children }: { children: ReactNode }) {
       leave: () => setActiveId(null),
       drop,
       dialog,
-      openDialog: (business, editing = null) => setDialog({ business, editing }),
+      openDialog: (business, editing = null) => setDialog({ business, editing, returnTo: currentPath() }),
       closeDialog: () => setDialog(null),
       confirmedOrderId: session ? (confirmed[session.id] ?? null) : null,
       markConfirmed: (orderId) => {

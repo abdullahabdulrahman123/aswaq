@@ -8,9 +8,11 @@ import * as orderController from '../controllers/order.controller.js';
 const router = Router();
 
 router.get('/', orderController.list);
+router.get('/purchases', orderController.purchases);
 router.put('/draft', orderController.putDraft);
 router.put('/:orderId/lines', orderController.putLine);
 router.put('/:orderId/confirmed-lines', orderController.putConfirmedLine);
+router.put('/:orderId/header', orderController.putHeader);
 router.get('/:orderId', orderController.get);
 router.post('/:orderId/checkout', orderController.checkout);
 router.post('/:orderId/advance', orderController.advance);

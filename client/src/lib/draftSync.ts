@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSales, type SalesSession } from '../context/SalesContext';
 import type { CartLine } from '../context/StoreCartContext';
 import { putDraft, putLine, type DraftInput } from './aswaqApi';
+import type { Delivery } from './delivery';
 import type { ReceivingMethod } from './itemUnits';
 import { ApiError } from './waslaApi';
 
@@ -30,12 +31,15 @@ export function draftInput(
   method: ReceivingMethod,
   session: SalesSession | null,
   businessAccountId: string | null,
+  /** ميعاد التسليم وملاحظاته للمشتري لنفسه (رسالة العميل ٦ أكتوبر) — في البيعة جوه session */
+  delivery: Delivery | null = null,
 ): DraftInput {
   return {
     shopId,
     method: session?.method ?? method,
     to: session ? undefined : (businessAccountId ?? undefined),
     sale: session ?? undefined,
+    ...(!session && delivery ? { deliveryAt: delivery.deliveryAt, deliveryNotes: delivery.deliveryNotes.trim() } : {}),
     lines: lines.map((l) => ({
       itemId: l.itemId,
       unitName: l.unitName,
@@ -108,11 +112,11 @@ const ALL = '*';
  * مثلاً) أو المشتري خرج من المتجر، اللي مستني بيتبعت على طول. لو الحفظ فشل
  * (النت مثلاً) السلة على الجهاز سليمة، والتغيير الجاي بيبعت المسودة كلها.
  */
-export function useDraftSync(shopId: string | null, lines: CartLine[], method: ReceivingMethod) {
+export function useDraftSync(shopId: string | null, lines: CartLine[], method: ReceivingMethod, delivery: Delivery | null = null) {
   const { user, sessionExpired, selectedBusiness, withToken } = useAuth();
   const { session } = useSales();
   const enabled = Boolean(user && !user.demo && !sessionExpired && shopId);
-  const input = shopId ? draftInput(shopId, lines, method, session, selectedBusiness?.accountId ?? null) : null;
+  const input = shopId ? draftInput(shopId, lines, method, session, selectedBusiness?.accountId ?? null, delivery) : null;
   const ref = shopId ? draftRef(shopId, session) : '';
 
   /** آخر نسخة من السلة — الطلب اللي بيتنفّذ بعدين بياخد منها */

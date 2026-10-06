@@ -141,6 +141,13 @@ model Order {
   method       String
   /** عنوان التوصيل كتابة — «جنب الجامع الكبير» */
   address      String      @default("")
+  /**
+   * ميعاد التسليم (رسالة العميل ٦ أكتوبر): «واحد طالب دلوقتي بس عايزها يوم السبت».
+   * الافتراضي ساعة التحرير. فاضي = الأوردرات اللي قبله
+   */
+  deliveryAt    DateTime?
+  /** ملاحظات التسليم للسواق — «ابعت عمال ينزّلوا»، «بعد السوق عشان الشارع زحمة» */
+  deliveryNotes String?
   /** بيانات بيعة «مبيعات» عشان ترجع زي ما هي على جهاز تاني. فاضي = المستخدم لنفسه */
   sale         Json?
 
@@ -259,6 +266,12 @@ model BusinessSettings {
   businessId  String   @unique @db.ObjectId
   /** مفاتيح المراحل اللي بين «مؤكد» و«مكتمل»، بالترتيب */
   salesStages String[]
+  /**
+   * لون كل مرحلة (رسالة العميل ٦ أكتوبر: «هوية بصرية للحالة») — مفتاح المرحلة ←
+   * مفتاح اللون من STAGE_COLOR_CHOICES. اللي مش هنا بياخد لونه الافتراضي. مؤكد
+   * ومكتمل وملغية ألوانهم ثابتة (src/services/orderFlow.ts)
+   */
+  stageColors Json?
   updatedAt   DateTime @updatedAt
 
   @@map("business_settings")

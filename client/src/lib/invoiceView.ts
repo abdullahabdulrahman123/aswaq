@@ -12,6 +12,8 @@ export function orderToView(order: Order): InvoiceView {
     buyerPhone: order.names.buyerPhone,
     method: order.method,
     address: order.address,
+    deliveryAt: order.deliveryAt ?? null,
+    deliveryNotes: order.deliveryNotes ?? null,
     lines: order.details.map((d) => ({
       key: `${d.itemId}|${d.unit}`,
       itemId: d.itemId,

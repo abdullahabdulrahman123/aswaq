@@ -219,6 +219,23 @@ export function listMine(creatorAcc: string) {
 }
 
 /**
+ * «طلباتي» (رسالة العميل ٦ أكتوبر: «where orders.from = أنا أو البيزنس اللي انا فاتحه»):
+ * الأوردرات اللي المشتري فيها الحساب المختار — المستخدم نفسه أو نشاط بيديره —
+ * حتى اللي حد تاني في النشاط طلبها. المسودات اللي هو عاملها بس: مسودة حد تاني
+ * لسه سلة على جهازه.
+ */
+export function listPurchases(buyerAcc: string, meAcc: string) {
+  return prisma.order.findMany({
+    where: {
+      to: { is: { acc: buyerAcc } },
+      OR: [{ state: { not: 'draft' } }, { creator: { is: { acc: meAcc } } }],
+    },
+    orderBy: { updatedAt: 'desc' },
+    take: 200,
+  });
+}
+
+/**
  * الأوردرات المفتوحة (اتأكدت ولسه متمتش — في أي مرحلة من مراحل النشاط) اللي
  * النشاط ده بائعها، الأحدث تأكيداً الأول
  */
@@ -262,6 +279,18 @@ export async function advanceState(order: Order, to: string) {
   const { count } = await prisma.order.updateMany({
     where: { id: order.id, state: order.state },
     data: { state: to, ...(to === 'done' ? { completedAt: new Date() } : {}) },
+  });
+  return count === 1 ? prisma.order.findUnique({ where: { id: order.id } }) : null;
+}
+
+/**
+ * رأس فاتورة مؤكدة (رسالة العميل ٦ أكتوبر) — بشرط إنها متغيّرتش من ساعة ما
+ * اتقرت. null = اتعدّلت أو اتنقلت من مكان تاني في نفس اللحظة
+ */
+export async function replaceHeader(order: Order, data: Prisma.OrderUpdateManyMutationInput) {
+  const { count } = await prisma.order.updateMany({
+    where: { id: order.id, state: order.state, updatedAt: order.updatedAt },
+    data: { ...data, updatedAt: new Date() },
   });
   return count === 1 ? prisma.order.findUnique({ where: { id: order.id } }) : null;
 }

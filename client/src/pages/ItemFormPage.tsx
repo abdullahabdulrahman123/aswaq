@@ -239,8 +239,8 @@ export function ItemFormPage() {
             isOwner: source?.isOwner ?? true,
           }),
         );
-        // المستخدم جاي من قائمة الأصناف — نرجّعه لها وهي فيها الخبر
-        navigate(`/business/${accountId}/items`, { state: { saved: cleanName } });
+        // المستخدم جاي من قائمة الأصناف — نرجّعه لها على نفس الصنف (رسالة العميل ٦ أكتوبر)
+        navigate(`/business/${accountId}/items`, { state: { saved: cleanName, itemId } });
         return;
       }
 

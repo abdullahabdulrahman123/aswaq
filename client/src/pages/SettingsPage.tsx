@@ -4,6 +4,7 @@ import { SessionExpiredNotice } from '../components/SessionExpiredNotice';
 import { useAuth } from '../context/AuthContext';
 import { fetchSettings, saveSettings, type StageTemplate } from '../lib/aswaqApi';
 import { isOwner } from '../lib/permissions';
+import { STAGE_COLORS } from '../lib/stageColors';
 import { ApiError, SessionExpiredError } from '../lib/waslaApi';
 
 /**
@@ -16,6 +17,10 @@ import { ApiError, SessionExpiredError } from '../lib/waslaApi';
  * المراحل دي بالترتيب، والمشتري بيشوف اسم المرحلة على طلبه.
  *
  * أي حد في الشركة بيشوفها، وصاحب الشركة بس اللي بيغيّرها.
+ *
+ * رسالة العميل ٦ أكتوبر: كل مرحلة ليها لون — «هوية بصرية للحالة… بس يديني شرط وانا
+ * بختار الالوان ميبقاش لونين زي بعض». اللون اللي مرحلة تانية واخداه بيبقى مقفول،
+ * ومؤكد ومكتمل وملغية ألوانهم ثابتة. رقم الفاتورة في «مهامي» بيتلوّن بيه.
  */
 export function SettingsPage() {
   const { accountId = '' } = useParams<{ accountId: string }>();
@@ -28,6 +33,14 @@ export function SettingsPage() {
   const [chosen, setChosen] = useState<string[]>([]);
   /** آخر حاجة اتحفظت — عشان «حفظ» يتقفل لو مفيش تغيير */
   const [saved, setSaved] = useState<string[]>([]);
+  /** لون كل مرحلة في القالب، والمحفوظ منه */
+  const [colors, setColors] = useState<Record<string, string>>({});
+  const [savedColors, setSavedColors] = useState<Record<string, string>>({});
+  /** الألوان اللي المراحل بتختار منها، وألوان مؤكد ومكتمل وملغية */
+  const [choices, setChoices] = useState<string[]>([]);
+  const [fixed, setFixed] = useState<Record<string, string>>({});
+  /** المرحلة اللي ألوانها مفتوحة تحتها */
+  const [picking, setPicking] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState('');
@@ -36,11 +49,15 @@ export function SettingsPage() {
     if (!user || sessionExpired || !business) return;
     let cancelled = false;
     withToken((token) => fetchSettings(token, accountId))
-      .then(({ settings, stageTemplate }) => {
+      .then(({ settings, stageTemplate, stageColorChoices, fixedColors }) => {
         if (cancelled) return;
         setTemplate(stageTemplate);
         setChosen(settings.salesStages);
         setSaved(settings.salesStages);
+        setColors(settings.stageColors);
+        setSavedColors(settings.stageColors);
+        setChoices(stageColorChoices);
+        setFixed(fixedColors);
       })
       .catch((err: unknown) => {
         if (cancelled || err instanceof SessionExpiredError) return;
@@ -67,11 +84,28 @@ export function SettingsPage() {
   const byKey = new Map((template ?? []).map((s) => [s.key, s]));
   /** المختار بالترتيب، وبعده الباقي بترتيب القالب */
   const rows = [...chosen.flatMap((k) => byKey.get(k) ?? []), ...(template ?? []).filter((s) => !chosen.includes(s.key))];
-  const dirty = chosen.join() !== saved.join();
+  const dirty = chosen.join() !== saved.join() || chosen.some((k) => colors[k] !== savedColors[k]);
+  /** اللون واخداه مرحلة تانية من اللي الشركة شغالة بيها */
+  const takenBy = (color: string, except: string) => chosen.find((k) => k !== except && colors[k] === color);
 
   const toggle = (key: string) => {
     setNotice('');
-    setChosen((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+    if (chosen.includes(key)) {
+      setChosen((prev) => prev.filter((k) => k !== key));
+      if (picking === key) setPicking(null);
+      return;
+    }
+    // مرحلة بتتضاف ولونها مع مرحلة تانية: تاخد أول لون فاضي
+    if (takenBy(colors[key], key)) {
+      const free = choices.find((c) => !takenBy(c, key));
+      if (free) setColors((prev) => ({ ...prev, [key]: free }));
+    }
+    setChosen((prev) => [...prev, key]);
+  };
+  const pickColor = (key: string, color: string) => {
+    setNotice('');
+    setColors((prev) => ({ ...prev, [key]: color }));
+    setPicking(null);
   };
   const move = (key: string, by: -1 | 1) => {
     setNotice('');
@@ -90,9 +124,11 @@ export function SettingsPage() {
     setSaving(true);
     setError('');
     try {
-      const { settings } = await withToken((token) => saveSettings(token, accountId, { salesStages: chosen }));
+      const { settings } = await withToken((token) => saveSettings(token, accountId, { salesStages: chosen, stageColors: colors }));
       setChosen(settings.salesStages);
       setSaved(settings.salesStages);
+      setColors(settings.stageColors);
+      setSavedColors(settings.stageColors);
       setNotice('اتحفظت. الفواتير الجاية والمفتوحة بتمشي على المراحل دي.');
     } catch (err) {
       if (!(err instanceof SessionExpiredError)) setError(err instanceof ApiError ? err.message : 'مقدرناش نحفظ الإعدادات.');
@@ -136,16 +172,19 @@ export function SettingsPage() {
         ) : (
           <>
             <ol aria-label="مراحل البيع" className="mt-4 space-y-2">
-              <FixedRow label="مؤكد" note="بعد «تأكيد» على طول" />
+              <FixedRow label="مؤكد" note="بعد «تأكيد» على طول" color={fixed.order} />
               {rows.map((stage) => {
                 const on = chosen.includes(stage.key);
                 const i = chosen.indexOf(stage.key);
+                const color = STAGE_COLORS[colors[stage.key]];
                 return (
                   <li
                     key={stage.key}
                     data-stage={stage.key}
-                    className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 ${on ? 'border-brand-300 bg-brand-50/50 dark:border-brand-500/40 dark:bg-brand-500/10' : 'border-gray-200 dark:border-white/10'}`}
+                    data-color={colors[stage.key]}
+                    className={`rounded-xl border px-3 py-2.5 ${on ? 'border-brand-300 bg-brand-50/50 dark:border-brand-500/40 dark:bg-brand-500/10' : 'border-gray-200 dark:border-white/10'}`}
                   >
+                    <div className="flex items-center gap-3">
                     <input
                       type="checkbox"
                       checked={on}
@@ -154,6 +193,17 @@ export function SettingsPage() {
                       aria-label={stage.label}
                       className="h-4 w-4 shrink-0 accent-brand-600"
                     />
+                    {/* لون المرحلة — الدوسة بتفتح الألوان تحتها */}
+                    <button
+                      type="button"
+                      aria-label={`لون ${stage.label}: ${color?.name ?? ''}`}
+                      aria-expanded={picking === stage.key}
+                      disabled={!owner || !on}
+                      onClick={() => setPicking((p) => (p === stage.key ? null : stage.key))}
+                      className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-gray-300 transition hover:border-gray-400 disabled:cursor-default disabled:opacity-40 dark:border-white/20"
+                    >
+                      <span className={`h-4 w-4 rounded-full ${color?.dot ?? 'bg-gray-300'}`} />
+                    </button>
                     <span className="min-w-0 flex-1">
                       <span className="block font-semibold">{stage.label}</span>
                       <span className="block text-xs text-gray-500 dark:text-gray-400">الزرار: «{stage.action}»</span>
@@ -180,10 +230,35 @@ export function SettingsPage() {
                         </button>
                       </span>
                     )}
+                    </div>
+                    {picking === stage.key && (
+                      <div role="radiogroup" aria-label={`لون ${stage.label}`} className="mt-2.5 flex flex-wrap gap-2 ps-7">
+                        {choices.map((c) => {
+                          const other = takenBy(c, stage.key);
+                          return (
+                            <button
+                              key={c}
+                              type="button"
+                              role="radio"
+                              aria-checked={colors[stage.key] === c}
+                              aria-label={`${STAGE_COLORS[c]?.name ?? c}${other ? ` — واخداه «${byKey.get(other)?.label ?? other}»` : ''}`}
+                              title={other ? `واخداه «${byKey.get(other)?.label ?? other}»` : STAGE_COLORS[c]?.name}
+                              disabled={Boolean(other)}
+                              onClick={() => pickColor(stage.key, c)}
+                              className={`grid h-8 w-8 place-items-center rounded-full border-2 transition disabled:cursor-not-allowed disabled:opacity-25 ${
+                                colors[stage.key] === c ? 'border-gray-900 dark:border-white' : 'border-transparent'
+                              }`}
+                            >
+                              <span className={`h-6 w-6 rounded-full ${STAGE_COLORS[c]?.dot ?? ''}`} />
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </li>
                 );
               })}
-              <FixedRow label="مكتمل" note="«إتمام» — بتخرج من «مهامي»" />
+              <FixedRow label="مكتمل" note="«إتمام» — بتخرج من «مهامي»" color={fixed.done} />
             </ol>
 
             <p aria-label="الترتيب" className="mt-4 text-sm leading-relaxed">
@@ -217,12 +292,12 @@ export function SettingsPage() {
   );
 }
 
-/** «مؤكد» و«مكتمل» — ثابتين في أول وآخر الليستة */
-function FixedRow({ label, note }: { label: string; note: string }) {
+/** «مؤكد» و«مكتمل» — ثابتين في أول وآخر الليستة، وبلونهم الثابت */
+function FixedRow({ label, note, color }: { label: string; note: string; color?: string }) {
   return (
     <li className="flex items-center gap-3 rounded-xl bg-gray-100 px-3 py-2.5 dark:bg-white/5">
-      <span aria-hidden="true" className="grid h-4 w-4 shrink-0 place-items-center text-xs text-gray-400">
-        ●
+      <span aria-hidden="true" className="grid h-7 w-7 shrink-0 place-items-center">
+        <span className={`h-4 w-4 rounded-full ${STAGE_COLORS[color ?? '']?.dot ?? 'bg-gray-400'}`} />
       </span>
       <span className="min-w-0 flex-1">
         <span className="block font-semibold">{label}</span>

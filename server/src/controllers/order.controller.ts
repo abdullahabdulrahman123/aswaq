@@ -3,7 +3,7 @@ import type { Prisma } from '@prisma/client';
 import { currentUser, fetchWaslaStore, findManagedBusiness } from '../middleware/auth.js';
 import { isObjectId } from '../schemas/common.js';
 import { announceIncoming, announceState } from '../realtime.js';
-import { cancelSchema, draftSchema, lineSchema } from '../schemas/order.schema.js';
+import { cancelSchema, draftSchema, headerSchema, lineSchema } from '../schemas/order.schema.js';
 import { flowOf, isFinished, nextIn, salesStagesOf, viewOf, withFlow, withoutCost, type OrderView } from '../services/orderFlow.js';
 import { PERMISSIONS, can } from '../services/permissions.js';
 import {
@@ -17,10 +17,12 @@ import {
   findMine,
   listIncoming,
   listMine,
+  listPurchases,
   nextNumber,
   priceFieldFor,
   replaceConfirmedDetails,
   replaceDetails,
+  replaceHeader,
   saveDraft,
   storeItems,
   totalsOf,
@@ -100,6 +102,8 @@ export async function putDraft(req: Request, res: Response) {
   }
 
   const method = input.sale?.method ?? input.method;
+  // ميعاد التسليم وملاحظاته (رسالة العميل ٦ أكتوبر): من رأس البيعة، وللمشتري من المعرض جنب طريقة الاستلام
+  const delivery = input.sale ?? input;
   // السعر اللي في السطر بيتاخد في «مبيعات» بس، وبصلاحية «تغيير سعر صنف في فاتورة البيع» (٢ أكتوبر)
   const details = buildDetails(await storeItems(input.shopId), input.lines, priceFieldFor(Boolean(input.sale), buyerKind), pricedBySeller);
   if (typeof details === 'string') {
@@ -120,6 +124,8 @@ export async function putDraft(req: Request, res: Response) {
     names: { business: store.business.name, store: store.name, buyer: buyerName, buyerPhone, buyerKind },
     method,
     address: method === 'delivery' ? (input.sale?.address ?? '') : '',
+    deliveryAt: delivery.deliveryAt ? new Date(delivery.deliveryAt) : null,
+    deliveryNotes: delivery.deliveryNotes?.trim() || null,
     sale: input.sale ? (input.sale as Prisma.InputJsonValue) : undefined,
     // «مبيعات» = الشباك، والمشتري من المعرض = أونلاين
     source: input.sale ? 'onsite' : 'online',
@@ -261,8 +267,24 @@ export async function list(req: Request, res: Response) {
 }
 
 /**
+ * GET /api/orders/purchases?as=<accountId> — «طلباتي» للحساب المختار (رسالة العميل ٦
+ * أكتوبر: «where orders.from = أنا أو البيزنس اللي انا فاتحه»): الأوردرات اللي هو
+ * المشتري فيها. من غير as = المستخدم نفسه، ونشاط مش بيديره = 404.
+ */
+export async function purchases(req: Request, res: Response) {
+  const me = await currentUser(req);
+  const as = typeof req.query.as === 'string' && req.query.as ? req.query.as : null;
+  if (as && !(isObjectId(as) && (await findManagedBusiness(req, as)))) {
+    res.status(404).json({ message: 'Business not found' });
+    return;
+  }
+  res.json({ orders: (await withFlow(await listPurchases(as ?? me.accountId, me.accountId))).map(shownTo(req)) });
+}
+
+/**
  * الأوردر لصاحبه (المحرّر) — وللنشاط البائع كمان لو اتأكد: «الطلبات الواردة»
- * بتفتح فاتورته. المسودة للمحرّر بس.
+ * بتفتح فاتورته. وللمشتري (هو أو نشاط بيديره) لو اتأكد: «طلباتي» بتجيب اللي
+ * المشتري فيه الحساب المختار حتى لو حد تاني اللي عمله. المسودة للمحرّر بس.
  */
 export async function get(req: Request, res: Response) {
   const id = String(req.params.orderId);
@@ -270,7 +292,11 @@ export async function get(req: Request, res: Response) {
   let order = isObjectId(id) ? await findMine(me.accountId, id) : null;
   if (!order && isObjectId(id)) {
     const sold = await findById(id);
-    if (sold && sold.state !== 'draft' && (await findManagedBusiness(req, sold.from.acc))) order = sold;
+    const allowed =
+      sold &&
+      sold.state !== 'draft' &&
+      (sold.to.acc === me.accountId || (await findManagedBusiness(req, sold.from.acc)) || (await findManagedBusiness(req, sold.to.acc)));
+    if (allowed) order = sold;
   }
   if (!order) {
     res.status(404).json({ message: 'Order not found' });
@@ -300,6 +326,71 @@ export async function checkout(req: Request, res: Response) {
   // «الطلبات الواردة» عند النشاط البائع — لحظة بلحظة
   await announceIncoming(done).catch(() => undefined);
   res.json({ order: shownTo(req)(done) });
+}
+
+/**
+ * PUT /api/orders/:orderId/header — رأس فاتورة مؤكدة ولسه مخلصتش (رسالة العميل ٦ أكتوبر:
+ * «اكسباند الجزء اللي فيه مستخدم غير مسجل… وأعدّل الهيدر زي زمان» — من ٢ أكتوبر كان
+ * بيتقفل مع «تأكيد»). للنشاط البائع، بصلاحية «تعديل بيانات فاتورة البيع»: العميل
+ * والاسم الأدبي والموبايل والاستلام والعنوان وميعاد التسليم وملاحظاته.
+ *
+ * الأسعار زي ما اتأكدت — حتى لو العميل اتغيّر من مستخدم لشركة. وطلب المعرض المشتري
+ * بتاعه هو اللي طلبه، فمبيتغيّرش (422).
+ */
+export async function putHeader(req: Request, res: Response) {
+  const id = String(req.params.orderId);
+  const parsed = headerSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ message: 'Invalid input', issues: parsed.error.issues });
+    return;
+  }
+  const header = parsed.data;
+  const me = await currentUser(req);
+  const order = isObjectId(id) ? await findById(id) : null;
+  const seller = order && order.state !== 'draft' ? await findManagedBusiness(req, order.from.acc) : undefined;
+  if (!order || !seller) {
+    res.status(order?.state === 'draft' ? 409 : 404).json({ message: order?.state === 'draft' ? 'Order is not confirmed yet' : 'Order not found' });
+    return;
+  }
+  if (isFinished(order.state)) {
+    res.status(409).json({ message: order.state === 'cancelled' ? 'Order is cancelled' : 'Order is already completed' });
+    return;
+  }
+  if (!can(seller, PERMISSIONS.invoiceHeader)) {
+    res.status(403).json({ message: 'Permission required', permission: PERMISSIONS.invoiceHeader });
+    return;
+  }
+  const onsite = order.sale != null;
+  if (!onsite && header.buyer.accountId !== order.to.acc) {
+    res.status(422).json({ message: 'An online order keeps the buyer who placed it' });
+    return;
+  }
+
+  const delivery = header.method === 'delivery';
+  const saved = await replaceHeader(order, {
+    to: { acc: onsite ? header.buyer.accountId : order.to.acc, subAcc: order.to.subAcc },
+    names: {
+      ...order.names,
+      buyer: onsite ? header.buyerName || header.buyer.name : order.names.buyer,
+      buyerPhone: header.phone,
+      buyerKind: onsite ? header.buyer.kind : order.names.buyerKind,
+    },
+    method: header.method,
+    address: delivery ? header.address : '',
+    deliveryAt: header.deliveryAt ? new Date(header.deliveryAt) : null,
+    deliveryNotes: header.deliveryNotes?.trim() || null,
+    // البيعة نفسها بترجع على جهاز تاني بالرأس الجديد
+    ...(onsite ? { sale: { ...(order.sale as Prisma.JsonObject), ...header, address: delivery ? header.address : '' } as Prisma.InputJsonValue } : {}),
+    editor: { acc: me.accountId, name: me.name },
+  });
+  if (!saved) {
+    res.status(409).json({ message: 'Order changed while saving, try again' });
+    return;
+  }
+  const view = await viewOf(saved);
+  // «مهامي» عند الباقيين بالعميل والميعاد الجديد
+  await announceState(view).catch(() => undefined);
+  res.json({ order: shownTo(req)(view) });
 }
 
 /**

@@ -3,16 +3,19 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth, type Business } from '../context/AuthContext';
 import { buyerLabel, lastSalesShop, rememberSalesShop, useSales, type SalesSession } from '../context/SalesContext';
 import { useStoreCart } from '../context/StoreCartContext';
-import { advanceOrder, checkoutOrder, fetchOrder, putDraft, type Order } from '../lib/aswaqApi';
+import { advanceOrder, checkoutOrder, fetchOrder, putDraft, putOrderHeader, type Order } from '../lib/aswaqApi';
+import { nowMinute, type Delivery } from '../lib/delivery';
 import { draftInput, draftRef, rememberDraftId } from '../lib/draftSync';
 import { orderToView } from '../lib/invoiceView';
 import type { ReceivingMethod } from '../lib/itemUnits';
-import { CONFIRM_ACTION, isOpenState, nextActionOf, stageLabel } from '../lib/orderFlow';
+import { CONFIRM_ACTION, closedMessage, isOpenState, nextActionOf, stageLabel } from '../lib/orderFlow';
 import { PERMISSIONS, can, deniedMessage } from '../lib/permissions';
 import { latinDigits } from '../lib/quantity';
 import { ApiError, searchCustomers, type Customer } from '../lib/waslaApi';
 import { Avatar, personInitial } from './Avatar';
+import { stageColor } from '../lib/stageColors';
 import { CancelOrderDialog, CancellationNote } from './CancelOrderDialog';
+import { DeliveryFields } from './DeliveryFields';
 import { InvoiceSheet, type InvoiceView } from './InvoiceSheet';
 import { Notch, compactFieldClass } from './OutlinedField';
 
@@ -97,7 +100,15 @@ export function SalesPanel({
   if (dialog && dialog.business.accountId === businessId) {
     return (
       <section aria-label="مبيعات" data-expanded="true" className="mt-3 rounded-2xl border border-brand-300 bg-white dark:border-brand-500/40 dark:bg-surface-card sm:max-w-xl print:hidden">
-        <SalesForm key={`${dialog.editing?.id ?? 'new'}-${storeId}`} business={dialog.business} editing={dialog.editing} currentShopId={storeId} />
+        <SalesForm
+          key={`${dialog.editing?.id ?? 'new'}-${storeId}`}
+          business={dialog.business}
+          editing={dialog.editing}
+          returnTo={dialog.returnTo}
+          currentShopId={storeId}
+          confirmedOrder={dialog.editing && confirmedOrderId !== null && order?.id === confirmedOrderId ? order : null}
+          onOrder={onOrder}
+        />
       </section>
     );
   }
@@ -188,17 +199,40 @@ export function SalesPanel({
         className="mt-3 rounded-2xl border border-brand-300 bg-brand-50/60 p-1.5 dark:border-brand-500/40 dark:bg-brand-500/10 sm:max-w-xl print:hidden"
       >
         <div className="flex items-center gap-2">
-          {confirmed ? (
-            // الفاتورة اتأكدت — بيانات العميل اتقفلت معاها
+          {confirmed && !(order && !loading && isOpenState(order.state)) ? (
+            // خلصت أو اتلغت (أو لسه بتتجاب) — الرأس مبيتفتحش
             <div className="min-w-0 flex-1 px-2 py-1">
               <span className="block truncate text-sm font-bold leading-tight">{buyerLabel(sale)}</span>
-              <span
-                role="status"
-                className={`block truncate text-[11px] font-semibold leading-tight ${order?.state === 'cancelled' ? 'text-red-700 dark:text-red-300' : 'text-accent-700 dark:text-accent-300'}`}
-              >
+              <span role="status" className={`block truncate text-[11px] font-semibold leading-tight ${order && !loading ? stageColor(order).text : 'text-gray-500'}`}>
                 {order && !loading ? `فاتورة رقم ${order.number} — ${stageLabel(order)}` : 'بنجيب الفاتورة…'}
               </span>
             </div>
+          ) : confirmed && order ? (
+            // رسالة العميل ٦ أكتوبر: «اكسباند الجزء اللي فيه مستخدم غير مسجل… وأعدّل الهيدر زي زمان» —
+            // من ٢ أكتوبر كان بيتقفل مع «تأكيد». بصلاحية «تعديل بيانات فاتورة البيع»
+            <button
+              type="button"
+              aria-expanded={false}
+              aria-label={`بيانات الفاتورة: ${buyerLabel(sale)} — فتح`}
+              onClick={() => {
+                if (!business) return;
+                if (!can(business, PERMISSIONS.invoiceHeader)) {
+                  setError(deniedMessage(PERMISSIONS.invoiceHeader));
+                  return;
+                }
+                setError('');
+                openDialog(business, sale);
+              }}
+              className="flex min-w-0 flex-1 items-center gap-1.5 rounded-xl px-2 py-1 text-start transition hover:bg-brand-100/70 dark:hover:bg-brand-500/15"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-bold leading-tight">{buyerLabel(sale)}</span>
+                <span role="status" className={`block truncate text-[11px] font-semibold leading-tight ${stageColor(order).text}`}>
+                  {`فاتورة رقم ${order.number} — ${stageLabel(order)}`}
+                </span>
+              </span>
+              <Chevron />
+            </button>
           ) : (
             <button
               type="button"
@@ -326,7 +360,23 @@ function Chevron({ up = false }: { up?: boolean }) {
  *   - البائع: دلوقتي اللي فاتح بس
  *   - الاسم الأدبي والموبايل، واستلام ولا توصيل — والتوصيل عنوان كتابة
  */
-function SalesForm({ business, editing, currentShopId }: { business: Business; editing: SalesSession | null; currentShopId: string }) {
+function SalesForm({
+  business,
+  editing,
+  returnTo,
+  currentShopId,
+  confirmedOrder,
+  onOrder,
+}: {
+  business: Business;
+  editing: SalesSession | null;
+  /** الصفحة اللي «مبيعات» اتفتحت منها — «إلغاء» بيرجّع لها */
+  returnTo: string;
+  currentShopId: string;
+  /** فاتورة مؤكدة رأسها بيتعدّل (رسالة العميل ٦ أكتوبر) — «حفظ» بيبعته للسيرفر */
+  confirmedOrder: Order | null;
+  onOrder: (order: Order) => void;
+}) {
   const { closeDialog, start, update } = useSales();
   const { user, withToken } = useAuth();
   const navigate = useNavigate();
@@ -347,7 +397,12 @@ function SalesForm({ business, editing, currentShopId }: { business: Business; e
   const [method, setMethod] = useState<ReceivingMethod>('pickup');
   const [address, setAddress] = useState('');
   const [shopId, setShopId] = useState('');
+  /** ميعاد التسليم وملاحظاته — الافتراضي «دلوقتي» مع كل بيعة جديدة */
+  const [delivery, setDelivery] = useState<Delivery>({ deliveryAt: null, deliveryNotes: '' });
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  /** طلب من المعرض: العميل هو اللي طلبه، فمبيتغيّرش */
+  const online = Boolean(confirmedOrder && confirmedOrder.sale == null);
 
   // كل فتحة: البيعة اللي بتتعدّل، وإلا فورم فاضي على «مستخدم غير مسجل»
   useEffect(() => {
@@ -356,6 +411,7 @@ function SalesForm({ business, editing, currentShopId }: { business: Business; e
     setPhone(editing?.phone ?? '');
     setMethod(editing?.method ?? 'pickup');
     setAddress(editing?.address ?? '');
+    setDelivery({ deliveryAt: editing?.deliveryAt ?? nowMinute(), deliveryNotes: editing?.deliveryNotes ?? '' });
     const choices = stores.map((p) => p.id);
     // الصفحة دايماً على متجر من متاجر النشاط (FollowSalesPanel) — هو اللي البائع واقف فيه
     setShopId([currentShopId, editing?.shopId, lastSalesShop(business.accountId)].find((id) => id && choices.includes(id)) ?? choices[0] ?? '');
@@ -426,9 +482,9 @@ function SalesForm({ business, editing, currentShopId }: { business: Business; e
     setError('');
   }
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!buyer) return;
+    if (!buyer || saving) return;
     const cleanedPhone = cleanPhone(phone);
     if (!/^\+?\d{0,15}$/.test(cleanedPhone)) {
       setError('رقم الموبايل أرقام بس.');
@@ -449,8 +505,24 @@ function SalesForm({ business, editing, currentShopId }: { business: Business; e
       sellerName,
       method,
       address: method === 'delivery' ? address.trim() : '',
+      deliveryAt: delivery.deliveryAt,
+      deliveryNotes: delivery.deliveryNotes.trim(),
       shopId: shopId || undefined,
     };
+    // فاتورة مؤكدة: الرأس بيتحفظ في السيرفر الأول، ولو اترفض الأكورديون بيفضل مفتوح بالسبب
+    if (confirmedOrder) {
+      setSaving(true);
+      try {
+        const { shopId: _shop, accountId: _acc, businessName: _name, ...header } = draft;
+        onOrder(await withToken((token) => putOrderHeader(token, confirmedOrder.id, header)));
+      } catch (err) {
+        setSaving(false);
+        if (err instanceof ApiError && err.status === 403) setError(deniedMessage(PERMISSIONS.invoiceHeader));
+        else if (err instanceof ApiError && err.status === 409) setError(closedMessage(confirmedOrder.state === 'cancelled' ? 'cancelled' : 'done'));
+        else setError(err instanceof ApiError ? err.message : 'مقدرناش نحفظ بيانات الفاتورة.');
+        return;
+      }
+    }
     if (shopId) rememberSalesShop(business.accountId, shopId);
     if (editing) update(draft);
     else start(draft);
@@ -485,7 +557,7 @@ function SalesForm({ business, editing, currentShopId }: { business: Business; e
         <div className={`grid gap-2.5 ${stores.length > 0 ? 'grid-cols-2' : ''}`}>
           {stores.length > 0 && (
             <label className="relative block min-w-0">
-              <select className={compactFieldClass} value={shopId} onChange={(e) => setShopId(e.target.value)}>
+              <select className={compactFieldClass} value={shopId} disabled={Boolean(confirmedOrder)} onChange={(e) => setShopId(e.target.value)}>
                 {stores.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
@@ -509,6 +581,8 @@ function SalesForm({ business, editing, currentShopId }: { business: Business; e
             type="button"
             aria-haspopup="listbox"
             aria-expanded={pickerOpen}
+            disabled={online}
+            title={online ? 'طلب من المعرض — العميل هو اللي طلبه' : undefined}
             onClick={() => setPickerOpen((v) => !v)}
             className={`${compactFieldClass} flex items-center gap-2 text-start ${pickerOpen ? 'border-brand-500 ring-1 ring-inset ring-brand-500' : ''}`}
           >
@@ -587,6 +661,7 @@ function SalesForm({ business, editing, currentShopId }: { business: Business; e
               }}
               placeholder="مثال: الحاج محمود"
               maxLength={80}
+              disabled={online}
             />
             <Notch compact>الاسم الأدبي</Notch>
           </label>
@@ -607,6 +682,16 @@ function SalesForm({ business, editing, currentShopId }: { business: Business; e
             <Notch compact>رقم الموبايل</Notch>
           </label>
         </div>
+
+        {/* رسالة العميل ٦ أكتوبر: ميعاد التسليم وملاحظاته قبل «استلام ولا توصيل» */}
+        <DeliveryFields
+          notched
+          value={delivery}
+          onChange={(next) => {
+            setDelivery(next);
+            setError('');
+          }}
+        />
 
         <div>
           <div className="flex items-center gap-3">
@@ -657,14 +742,19 @@ function SalesForm({ business, editing, currentShopId }: { business: Business; e
       <div className="mt-4 flex flex-wrap gap-3 border-t border-gray-200 pt-3.5 dark:border-white/10">
         <button
           type="submit"
-          disabled={!buyer}
+          disabled={!buyer || saving}
           className="rounded-xl bg-brand-500 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-70"
         >
-          {editing ? 'حفظ' : 'ابدأ البيع'}
+          {saving ? 'بنحفظ…' : editing ? 'حفظ' : 'ابدأ البيع'}
         </button>
         <button
           type="button"
-          onClick={closeDialog}
+          onClick={() => {
+            closeDialog();
+            // رسالة العميل ٦ أكتوبر: «الغاء» في بيعة جديدة مبيدخلش على الأصناف — بيرجع للصفحة اللي كان
+            // فيها، أو الرئيسية لو كان على متجر. في التعديل بيرجع للفاتورة زي ما هي
+            if (!editing) navigate(returnTo.startsWith('/store/') ? '/' : returnTo);
+          }}
           className="rounded-xl border border-gray-300 px-6 py-2.5 text-sm font-medium transition hover:border-gray-400 dark:border-white/15"
         >
           إلغاء
