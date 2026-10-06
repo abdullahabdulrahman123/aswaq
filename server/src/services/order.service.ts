@@ -69,18 +69,29 @@ function detailOf(item: Item, unit: Item['units'][number], quantity: number, fie
 
 type LineRef = Pick<LineInput, 'itemId' | 'unitName'>;
 
-/** الصنف والوحدة من أصناف المتجر — رسالة الخطأ لو مش موجودين */
-function unitOf(items: Item[], line: LineRef) {
+/**
+ * الصنف والوحدة من أصناف المتجر — رسالة الخطأ لو مش موجودين. field: الوحدة لازم كمان
+ * تكون بتتباع في المنفذ ده (تشيكات كارت الصنف، مكالمة ٦ أكتوبر). من غيره = سطر كان
+ * في الأوردر قبل ما المنفذ يتقفل، فبيفضل زي ما هو
+ */
+function unitOf(items: Item[], line: LineRef, field?: PriceField) {
   const item = items.find((i) => i.id === line.itemId);
   const unit = item?.units.find((u) => u.name === line.unitName);
-  return item && unit ? { item, unit } : `Item ${line.itemId} / ${line.unitName} is not in this store`;
+  if (!item || !unit) return `Item ${line.itemId} / ${line.unitName} is not in this store`;
+  if (field && (unit.hiddenIn ?? []).includes(field)) return `Item ${line.itemId} / ${line.unitName} is not sold here`;
+  return { item, unit };
 }
 
-/** pricedBySeller: «مبيعات» — السعر اللي في السطر بيتاخد. غير كده بيتجاهل والسعر من المتجر */
-export function buildDetails(items: Item[], lines: DraftInput['lines'], field: PriceField, pricedBySeller = false): OrderDetail[] | string {
+const sameLine = (line: LineRef) => (d: OrderDetail) => d.itemId === line.itemId && d.unit === line.unitName;
+
+/**
+ * pricedBySeller: «مبيعات» — السعر اللي في السطر بيتاخد. غير كده بيتجاهل والسعر من المتجر.
+ * kept: سطور المسودة المحفوظة — وحدة فيها بتعدّي حتى لو منفذها اتقفل بعدها
+ */
+export function buildDetails(items: Item[], lines: DraftInput['lines'], field: PriceField, pricedBySeller = false, kept: OrderDetail[] = []): OrderDetail[] | string {
   const details: OrderDetail[] = [];
   for (const line of lines) {
-    const found = unitOf(items, line);
+    const found = unitOf(items, line, kept.some(sameLine(line)) ? undefined : field);
     if (typeof found === 'string') return found;
     details.push(detailOf(found.item, found.unit, line.quantity, field, pricedBySeller ? line.price : undefined));
   }
@@ -92,9 +103,9 @@ export function buildDetails(items: Item[], lines: DraftInput['lines'], field: P
  * الآخر، أو بيتشال لو الكمية صفر. الباقي زي ما هو.
  */
 export function withLine(details: OrderDetail[], items: Item[], line: LineInput, field: PriceField, pricedBySeller = false): OrderDetail[] | string {
-  const same = (d: OrderDetail) => d.itemId === line.itemId && d.unit === line.unitName;
+  const same = sameLine(line);
   if (line.quantity === 0) return details.filter((d) => !same(d));
-  const found = unitOf(items, line);
+  const found = unitOf(items, line, details.some(same) ? undefined : field);
   if (typeof found === 'string') return found;
   const detail = detailOf(found.item, found.unit, line.quantity, field, pricedBySeller ? line.price : undefined);
   return details.some(same) ? details.map((d) => (same(d) ? detail : d)) : [...details, detail];
@@ -108,11 +119,11 @@ export function withLine(details: OrderDetail[], items: Item[], line: LineInput,
  * الكمية صفر بتشيل السطر.
  */
 export function withConfirmedLine(details: OrderDetail[], items: Item[], line: LineInput, field: PriceField, soldPrice?: number): OrderDetail[] | string {
-  const same = (d: OrderDetail) => d.itemId === line.itemId && d.unit === line.unitName;
+  const same = sameLine(line);
   if (line.quantity === 0) return details.filter((d) => !same(d));
   const existing = details.find(same);
   if (existing) return details.map((d) => (same(d) ? rescaled(d, line.quantity, soldPrice ?? d.price) : d));
-  const found = unitOf(items, line);
+  const found = unitOf(items, line, field);
   if (typeof found === 'string') return found;
   const detail = detailOf(found.item, found.unit, line.quantity, field, soldPrice);
   if (detail.unpriced) return `Item ${line.itemId} / ${line.unitName} has no price yet`;

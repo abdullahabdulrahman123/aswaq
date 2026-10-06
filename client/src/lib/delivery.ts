@@ -1,3 +1,5 @@
+import type { Order } from './aswaqApi';
+
 /**
  * ميعاد التسليم وملاحظاته (رسالة العميل ٦ أكتوبر): «واحد طالب دلوقتي بس عايزها يوم
  * السبت» — تاريخ وساعة بيتحفظوا DateTime، وخانة «ملاحظات التسليم» للسواق. الافتراضي
@@ -39,6 +41,29 @@ const labelFormat = new Intl.DateTimeFormat('ar-EG', { weekday: 'long', day: 'nu
 
 /** «السبت ١١ أكتوبر، ٢:٣٠ م» */
 export const deliveryLabel = (iso: string) => labelFormat.format(new Date(iso));
+
+const dayParts = new Intl.DateTimeFormat('ar-EG-u-nu-latn', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+/**
+ * خانة التاريخ (رسالة العميل ٦ أكتوبر): «اليوم موجود بشكل نصي مع التاريخ» — الموبايل
+ * بيكتبها 2026/10/06 بس. «الثلاثاء 6 أكتوبر»، والسنة لو مش السنة دي. day = 2026-10-06
+ */
+export function dayFieldLabel(day: string, now = new Date()): string {
+  const [y, m, d] = day.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  if (Number.isNaN(date.getTime())) return day;
+  const part = (type: Intl.DateTimeFormatPartTypes) => dayParts.formatToParts(date).find((p) => p.type === type)?.value ?? '';
+  return [part('weekday'), part('day'), part('month'), y === now.getFullYear() ? '' : part('year')].filter(Boolean).join(' ');
+}
+
+/** اللي «مهامي» بترتّب بيه: ميعاد التسليم، واللي من غير ميعاد بساعة تأكيده — نفس الميعاد اللي ظاهر على الصف */
+const dueAt = (order: Pick<Order, 'deliveryAt' | 'checkedOutAt' | 'updatedAt'>) => new Date(order.deliveryAt ?? order.checkedOutAt ?? order.updatedAt).getTime();
+
+/**
+ * ترتيب الطلبات الواردة (رسالة العميل ٦ أكتوبر): «بيوم التسليم وبعدين الساعة» — الأقرب
+ * فوق، واللي ميعاده فات أول واحد. نفس الميعاد: الفاتورة الأقدم الأول.
+ */
+export const byDueTime = (a: Order, b: Order) => dueAt(a) - dueAt(b) || (a.number ?? 0) - (b.number ?? 0);
 
 /**
  * اللي المشتري اختاره في متجر (لنفسه) — بيتحفظ على الجهاز زي طريقة الاستلام، عشان

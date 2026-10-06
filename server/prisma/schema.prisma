@@ -296,6 +296,49 @@ model Permission {
   @@map("permissions")
 }
 
+/**
+ * مؤشرات البيع (مكالمة ٦ أكتوبر، «بيزنس ميتريكس»): صف لكل نشاط في كل يوم بتوقيت مصر —
+ * «الحجاج يشوفوا احنا بعنا بكام النهاردة، ومعانا قد إيه في العربيات، ومعانا أوردرات
+ * للأيام الجاية قد إيه». بيتحدّث مع كل حركة في الأوردرات (src/services/metrics.service.ts):
+ *   achieved  — المحققة: الفواتير اللي اتعملها «إتمام» في اليوم ده
+ *   inProcess — في الطريق: عدّت «مؤكد» ولسه مخلصتش (بتتنقل من المستقبلية)
+ *   future    — المستقبلية: «مؤكد» بس
+ * المبلغ بيتنقل من خانة للتانية مع المرحلة، مبيتحسبش في التلاتة. inProcess وfuture
+ * من غير تاريخ في الحقيقة: صف اليوم بيشيل قيمتهم ساعة آخر حركة فيه.
+ * premises نفس التلاتة لكل مقر. sr7…sr365 معدلات البيع — لسه طريقة حسابها هتتحدد.
+ * كل الفلوس بالقرش، من إجمالي الفاتورة (netTotal).
+ */
+model BusinessMetric {
+  id        String            @id @default(auto()) @map("_id") @db.ObjectId
+  /** id حساب النشاط في وصلة */
+  accountId String            @db.ObjectId
+  /** اليوم بتوقيت مصر — 2026-10-06 */
+  date      String
+  achieved  Int               @default(0)
+  inProcess Int               @default(0)
+  future    Int               @default(0)
+  premises  MetricPremises[]
+  /** معدلات البيع: أسبوع، ٣٠ يوم، ٩١، ١٨٢، ٣٦٥ — فاضية لحد ما الحساب يتحدد */
+  sr7       Float?
+  sr30      Float?
+  sr91      Float?
+  sr182     Float?
+  sr365     Float?
+  updatedAt DateTime          @updatedAt
+
+  @@unique([accountId, date])
+  @@map("business_metrics")
+}
+
+/** مؤشرات مقر واحد جوه صف النشاط — اسمه من آخر أوردر منه */
+type MetricPremises {
+  premisesId String @db.ObjectId
+  name       String
+  achieved   Int
+  inProcess  Int
+  future     Int
+}
+
 /** عدّادات أرقام الفواتير — صف لكل نشاط بائع */
 model Counter {
   id  String @id @map("_id")
@@ -328,6 +371,12 @@ type ItemUnit {
   onLWP       Int?
   /** قطاعي أونلاين */
   onLRP       Int?
+  /**
+   * المنافذ اللي الوحدة دي مبتتباعش فيها (مكالمة ٦ أكتوبر: تشيك تحت كل سعر من الأربعة) —
+   * مفاتيح الأسعار نفسها (onSWP…). «علف من المصنع بس» = الأونلاين مقفول، و«الرجالة
+   * يبيعوا بالشكارة بس» = الكيلو مقفول في المحل. فاضي = بتتباع في كله
+   */
+  hiddenIn    String[]
 }
 
 /**

@@ -12,7 +12,7 @@ import { useCurrentSeller } from '../context/SellerContext';
 import { useCartFocus, useStoreCart, type CartLine } from '../context/StoreCartContext';
 import { fetchOrder, fetchShowroomStore, putConfirmedLine, type Order, type ShowroomStoreDetails } from '../lib/aswaqApi';
 import { deliversTo, distanceKm, formatDistance } from '../lib/buyerLocation';
-import { buyerPriceField, type ReceivingMethod } from '../lib/itemUnits';
+import { buyerPriceField, soldIn, type ReceivingMethod } from '../lib/itemUnits';
 import { useDraftSync } from '../lib/draftSync';
 import { newDelivery, rememberDelivery, rememberedDelivery, type Delivery } from '../lib/delivery';
 import { closedMessage, isOpenState } from '../lib/orderFlow';
@@ -289,8 +289,19 @@ export function StorePage() {
     : session && confirmedOrderId
       ? []
       : undefined;
-  const onInvoice = new Set((fixedLines ?? linesOf(store.id)).map((l) => l.itemId));
-  const shown = session && onlyInvoice ? details.items.filter((item) => onInvoice.has(item.id)) : details.items;
+  const lines = fixedLines ?? linesOf(store.id);
+  const onInvoice = new Set(lines.map((l) => l.itemId));
+  /**
+   * تشيكات كارت الصنف (مكالمة ٦ أكتوبر): الوحدة اللي منفذها مقفول (أونلاين ولا محل، جملة
+   * ولا قطاعي) مبتظهرش — إلا لو كانت في السلة أو الفاتورة قبل ما يتقفل. والصنف اللي
+   * مفضلش منه ولا وحدة بيختفي
+   */
+  const onLine = new Set(lines.map((l) => `${l.itemId}|${l.unitName}`));
+  const sellable = details.items.flatMap((item) => {
+    const units = item.units.filter((u) => soldIn(u, priceField) || onLine.has(`${item.id}|${u.name}`));
+    return units.length > 0 ? [{ ...item, units }] : [];
+  });
+  const shown = session && onlyInvoice ? sellable.filter((item) => onInvoice.has(item.id)) : sellable;
 
   /** ليه التوصيل مقفول — بيظهر تحت الاختيار */
   const noDeliveryReason =
@@ -384,7 +395,7 @@ export function StorePage() {
       <div className="mt-4 print:hidden">
         {newSale ? null : shown.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500 dark:border-white/15 dark:text-gray-400">
-            {details.items.length === 0 ? 'لسه مفيش أصناف في المتجر ده.' : 'لسه مفيش أصناف في الفاتورة.'}
+            {sellable.length === 0 ? 'لسه مفيش أصناف في المتجر ده.' : 'لسه مفيش أصناف في الفاتورة.'}
           </p>
         ) : (
           <ul aria-label="أصناف المتجر" className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">

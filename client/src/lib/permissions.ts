@@ -16,6 +16,8 @@ export const PERMISSIONS = {
   invoiceCancel: 'sales.invoice.cancel',
   /** رأس فاتورة مؤكدة — العميل والاستلام وميعاد التسليم (رسالة العميل ٦ أكتوبر) */
   invoiceHeader: 'sales.invoice.header',
+  /** صفحة «مؤشرات المبيعات» (مكالمة ٦ أكتوبر) */
+  salesMetrics: 'sales.metrics',
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -27,6 +29,7 @@ export const PERMISSION_NAMES: Record<PermissionKey, string> = {
   'sales.invoice.add_item': 'إضافة صنف مش موجود في فاتورة البيع',
   'sales.invoice.cancel': 'إلغاء فاتورة بيع',
   'sales.invoice.header': 'تعديل بيانات فاتورة البيع',
+  'sales.metrics': 'مؤشرات المبيعات',
 };
 
 export const isOwner = (business: Pick<Business, 'job'> | undefined) => (business?.job ?? 'owner') === 'owner';

@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSales } from '../context/SalesContext';
 import { useTheme } from '../context/ThemeContext';
 import { pathAfterSwitch } from '../lib/businessRoutes';
+import { PERMISSIONS, can } from '../lib/permissions';
 import { hasUnsavedWork } from '../lib/unsavedWork';
 import { useDropdown } from '../lib/useDropdown';
 import { Avatar, personInitial } from './Avatar';
@@ -348,6 +349,12 @@ export function IdentityMenu() {
                   >
                     مبيعات
                   </button>
+                  {/* مكالمة ٦ أكتوبر: اتباع بكام النهارده وفي الطريق والطلبات الجاية — لصاحب الشركة واللي معاه الصلاحية */}
+                  {can(selectedBusiness, PERMISSIONS.salesMetrics) && (
+                    <Link role="menuitem" to={`/business/${selectedBusiness.accountId}/metrics`} onClick={close} className={itemClass}>
+                      مؤشرات المبيعات
+                    </Link>
+                  )}
                   <Link role="menuitem" to={`/business/${selectedBusiness.accountId}/items`} onClick={close} className={itemClass}>
                     الأصناف
                   </Link>

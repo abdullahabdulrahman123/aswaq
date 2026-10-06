@@ -11,8 +11,9 @@
  *   /business/:id/store-items       إدارة أصناف المتاجر
  *   /business/:id/employees         الموظفين
  *   /business/:id/settings          الإعدادات
+ *   /business/:id/metrics           مؤشرات المبيعات
  */
-const BUSINESS_PATH = /^\/business\/([^/]+)(\/store-items|\/employees|\/settings|\/items(?:\/(new|[^/]+\/edit))?)?\/?$/;
+const BUSINESS_PATH = /^\/business\/([^/]+)(\/store-items|\/employees|\/settings|\/metrics|\/items(?:\/(new|[^/]+\/edit))?)?\/?$/;
 
 /** النشاط اللي الصفحة دي بتاعته — null لو مش صفحة نشاط */
 export function businessInPath(pathname: string): string | null {
@@ -39,6 +40,7 @@ export function pathAfterSwitch(pathname: string, accountId: string | null): str
   // الموظفين: موظفين النشاط الجديد
   if (section === '/employees') return `${base}/employees`;
   if (section === '/settings') return `${base}/settings`;
+  if (section === '/metrics') return `${base}/metrics`;
   // إضافة صنف: فورم فاضي للنشاط الجديد. تعديل صنف: الصنف بتاع النشاط القديم، فنروح لأصناف الجديد
   return itemPage === 'new' ? `${base}/items/new` : `${base}/items`;
 }

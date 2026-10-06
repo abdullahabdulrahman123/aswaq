@@ -41,6 +41,12 @@ export const PRICE_GROUPS: { label: string; fields: { field: PriceField; label: 
   },
 ];
 
+/**
+ * الوحدة بتتباع في المنفذ ده؟ (مكالمة ٦ أكتوبر: «التشيك يمنع ظهور الوحدة» — علف بيتباع من
+ * المصنع بس، أو الرجالة يبيعوا بالشكارة مش بالكيلو). المنفذ هو نفسه مفتاح السعر
+ */
+export const soldIn = (unit: { hiddenIn?: PriceField[] }, field: PriceField) => !(unit.hiddenIn ?? []).includes(field);
+
 /** طريقة الاستلام — استلام من المتجر أو توصيل لعنوان */
 export type ReceivingMethod = 'pickup' | 'delivery';
 

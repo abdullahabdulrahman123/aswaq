@@ -47,8 +47,17 @@ export function findItem(accountId: string, itemId: string) {
   return prisma.item.findFirst({ where: { id: itemId, accountId } });
 }
 
+/**
+ * وحدات الصنف زي ما هتتحفظ: الوحدة اللي جاية من غير تشيكات (فورم الصنف) بتاخد
+ * المحفوظة لنفس الاسم، والجديدة بتتباع في كله
+ */
+function withHiddenIn(units: CreateItemInput['units'], current: Item['units'] = []): Item['units'] {
+  const saved = new Map(current.map((u) => [u.name, u.hiddenIn ?? []]));
+  return units.map((u) => ({ ...u, hiddenIn: u.hiddenIn ?? saved.get(u.name) ?? [] }));
+}
+
 export function createItem(accountId: string, input: CreateItemInput) {
-  return prisma.item.create({ data: { accountId, shopId: null, ...input } }).catch(rethrowNameTaken);
+  return prisma.item.create({ data: { accountId, shopId: null, ...input, units: withHiddenIn(input.units) } }).catch(rethrowNameTaken);
 }
 
 /**
@@ -107,19 +116,40 @@ export async function updateItem(accountId: string, itemId: string, input: Updat
     return prisma.item.update({ where: { id: itemId }, data: { ...followSource(source, prices), rate: input.rate } });
   }
 
-  const saved = await prisma.item.update({ where: { id: itemId }, data: input }).catch(rethrowNameTaken);
-  if (current.shopId === null) {
-    const copies = await prisma.item.findMany({ where: { sourceItemId: itemId } });
-    for (const copy of copies) {
-      await prisma.item.update({ where: { id: copy.id }, data: followSource(saved, copy) }).catch((err) => {
-        // اسم الأصل الجديد موجود قبل كده كصنف تاني في المتجر ده — النسخة دي بتفضل باسمها القديم
-        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-          return prisma.item.update({ where: { id: copy.id }, data: { ...followSource(saved, copy), name: copy.name } });
-        }
-        throw err;
-      });
-    }
+  const saved = await prisma.item
+    .update({ where: { id: itemId }, data: { ...input, units: withHiddenIn(input.units, current.units) } })
+    .catch(rethrowNameTaken);
+  if (current.shopId === null) await syncCopies(saved);
+  return saved;
+}
+
+/** البيانات الأساسية للأصل بتنزل على كل نسخه في المتاجر — والأسعار بتفضل بتاعة كل متجر */
+async function syncCopies(source: Item) {
+  const copies = await prisma.item.findMany({ where: { sourceItemId: source.id } });
+  for (const copy of copies) {
+    await prisma.item.update({ where: { id: copy.id }, data: followSource(source, copy) }).catch((err) => {
+      // اسم الأصل الجديد موجود قبل كده كصنف تاني في المتجر ده — النسخة دي بتفضل باسمها القديم
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        return prisma.item.update({ where: { id: copy.id }, data: { ...followSource(source, copy), name: copy.name } });
+      }
+      throw err;
+    });
   }
+}
+
+/**
+ * تشيكات وحدة في كارت الصنف (مكالمة ٦ أكتوبر): المنافذ اللي مبتتباعش فيها، على صنف
+ * النشاط — وبتنزل على نسخه في كل المتاجر زي الاسم والوحدات. null = الصنف أو الوحدة
+ * مش موجودين، أو ده نسخة متجر (التشيكات من الأصل بس).
+ */
+export async function setUnitHiddenIn(accountId: string, itemId: string, unitName: string, hiddenIn: string[]) {
+  const current = await findItem(accountId, itemId);
+  if (!current || current.shopId !== null || !current.units.some((u) => u.name === unitName)) return null;
+  const saved = await prisma.item.update({
+    where: { id: itemId },
+    data: { units: current.units.map((u) => (u.name === unitName ? { ...u, hiddenIn } : { ...u, hiddenIn: u.hiddenIn ?? [] })) },
+  });
+  await syncCopies(saved);
   return saved;
 }
 

@@ -8,6 +8,16 @@ import { objectIdSchema } from './common.js';
  */
 const money = z.number().int().min(0).max(2_147_483_647);
 
+/** مفاتيح الأسعار الأربعة — وهي نفسها مفاتيح منافذ البيع */
+export const PRICE_KEYS = ['onSWP', 'onSRP', 'onLWP', 'onLRP'] as const;
+export type PriceKey = (typeof PRICE_KEYS)[number];
+
+/** المنافذ المقفولة للوحدة (مكالمة ٦ أكتوبر) — من غير تكرار */
+const hiddenInSchema = z
+  .array(z.enum(PRICE_KEYS))
+  .max(PRICE_KEYS.length)
+  .transform((keys) => PRICE_KEYS.filter((k) => keys.includes(k)));
+
 const unitSchema = z.object({
   name: z.string().trim().min(1).max(40),
   /** كل الوحدات بالعدد: كام من أصغر وحدة */
@@ -22,6 +32,11 @@ const unitSchema = z.object({
   onSRP: money.nullable().default(null),
   onLWP: money.nullable().default(null),
   onLRP: money.nullable().default(null),
+  /**
+   * من غيرها (فورم الصنف) الوحدة بتفضل على تشيكاتها المحفوظة — بالاسم. التشيكات
+   * نفسها بتتغيّر من كارت الصنف (unitVisibilitySchema)
+   */
+  hiddenIn: hiddenInSchema.optional(),
 });
 
 const unitsSchema = z
@@ -57,6 +72,15 @@ const itemFields = {
 export const createItemSchema = z.object(itemFields);
 
 export const updateItemSchema = z.object(itemFields);
+
+/**
+ * تشيكات وحدة واحدة في كارت الصنف (مكالمة ٦ أكتوبر): المنافذ اللي مبتتباعش فيها —
+ * بتتحفظ أول ما التشيك يتداس
+ */
+export const unitVisibilitySchema = z.object({
+  unit: z.string().trim().min(1).max(40),
+  hiddenIn: hiddenInSchema,
+});
 
 /** إضافة صنف من أصناف النشاط لمتجر */
 export const storeItemSchema = z.object({ itemId: objectIdSchema });

@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import type { Item } from '@prisma/client';
-import { createItemSchema, storeItemSchema, updateItemSchema } from '../schemas/item.schema.js';
+import { createItemSchema, storeItemSchema, unitVisibilitySchema, updateItemSchema } from '../schemas/item.schema.js';
 import { ensureStore } from './store.helpers.js';
 import {
   copyItemToStore,
@@ -10,6 +10,7 @@ import {
   ItemNameTakenError,
   listItems,
   listItemsNotInStore,
+  setUnitHiddenIn,
   updateItem,
 } from '../services/item.service.js';
 
@@ -30,7 +31,8 @@ function toItemView(item: Item) {
     avgCost: item.avgCost,
     rate: item.rate,
     isOwner: item.isOwner,
-    units: item.units,
+    // الصنف اللي قبل التشيكات (٦ أكتوبر) ملوش hiddenIn = بيتباع في كله
+    units: item.units.map((u) => ({ ...u, hiddenIn: u.hiddenIn ?? [] })),
   };
 }
 
@@ -90,6 +92,25 @@ export async function update(req: Request, res: Response) {
   } catch (err) {
     handleItemError(err, res);
   }
+}
+
+/**
+ * PUT /items/:itemId/visibility — `{ unit, hiddenIn }`: تشيكات وحدة في كارت الصنف (مكالمة ٦
+ * أكتوبر). hiddenIn = المنافذ اللي الوحدة مبتتباعش فيها (مفاتيح الأسعار)، والمعرض و«مبيعات»
+ * بيخفوها فيها. على صنف النشاط بس، وبتنزل على نسخه في المتاجر
+ */
+export async function setVisibility(req: Request, res: Response) {
+  const parsed = unitVisibilitySchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ message: 'Invalid input', issues: parsed.error.issues });
+    return;
+  }
+  const item = await setUnitHiddenIn(req.business!.accountId, String(req.params.itemId), parsed.data.unit, parsed.data.hiddenIn);
+  if (!item) {
+    res.status(404).json({ message: 'Item or unit not found' });
+    return;
+  }
+  res.json({ item: toItemView(item) });
 }
 
 export async function remove(req: Request, res: Response) {

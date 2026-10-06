@@ -30,6 +30,11 @@ export interface ItemUnit {
   onSRP: number | null;
   onLWP: number | null;
   onLRP: number | null;
+  /**
+   * المنافذ اللي الوحدة مبتتباعش فيها — مفاتيح الأسعار نفسها (مكالمة ٦ أكتوبر: تشيك تحت
+   * كل سعر في كارت الصنف). فاضي أو مش موجود = بتتباع في كله
+   */
+  hiddenIn?: PriceField[];
 }
 
 export interface Item {
@@ -126,6 +131,15 @@ export async function putItem(
   return item;
 }
 
+/** تشيكات وحدة في كارت الصنف — بتتحفظ أول ما تتداس، وبتنزل على نسخ الصنف في المتاجر */
+export async function putUnitVisibility(token: string, accountId: string, itemId: string, unit: string, hiddenIn: PriceField[]): Promise<Item> {
+  const { item } = await request<{ item: Item }>(`${itemsPath(accountId)}/${encodeURIComponent(itemId)}/visibility`, token, {
+    method: 'PUT',
+    body: JSON.stringify({ unit, hiddenIn }),
+  });
+  return item;
+}
+
 export async function deleteItem(token: string, accountId: string, itemId: string): Promise<void> {
   await request<void>(`${itemsPath(accountId)}/${encodeURIComponent(itemId)}`, token, { method: 'DELETE' });
 }
@@ -211,7 +225,7 @@ export async function putStoreSettings(
  */
 
 /** وحدة الصنف زي ما المشتري بيشوفها — الأسعار الأربعة من غير التكلفة والريت */
-export type ShowroomUnit = Pick<ItemUnit, 'name' | 'unitContent' | 'onSWP' | 'onSRP' | 'onLWP' | 'onLRP'>;
+export type ShowroomUnit = Pick<ItemUnit, 'name' | 'unitContent' | 'onSWP' | 'onSRP' | 'onLWP' | 'onLRP' | 'hiddenIn'>;
 
 export interface ShowroomItem {
   id: string;
@@ -468,6 +482,40 @@ export const orderShopId = (order: Order) => order.shopId ?? order.from.subAcc ?
 export async function fetchIncoming(token: string, accountId: string): Promise<Order[]> {
   const { orders } = await request<{ orders: Order[] }>(`/api/businesses/${encodeURIComponent(accountId)}/incoming`, token);
   return orders;
+}
+
+/** مؤشرات مقر واحد — اسمه من آخر أوردر منه */
+export interface PremisesMetrics {
+  premisesId: string;
+  name: string;
+  achieved: number;
+  inProcess: number;
+  future: number;
+}
+
+/**
+ * «مؤشرات المبيعات» (مكالمة ٦ أكتوبر) — النهارده بتوقيت مصر، بالقرش: المحققة (اتمت
+ * النهارده)، وفي الطريق (عدّت التأكيد ولسه مخلصتش)، والمستقبلية (مؤكدة بس). معدلات
+ * البيع null لحد ما حسابها يتحدد
+ */
+export interface BusinessMetrics {
+  date: string;
+  achieved: number;
+  inProcess: number;
+  future: number;
+  premises: PremisesMetrics[];
+  sr7: number | null;
+  sr30: number | null;
+  sr91: number | null;
+  sr182: number | null;
+  sr365: number | null;
+  updatedAt: string;
+}
+
+/** 403 = «مؤشرات المبيعات» مش مفتوحة للموظف ده */
+export async function fetchMetrics(token: string, accountId: string): Promise<BusinessMetrics> {
+  const { metrics } = await request<{ metrics: BusinessMetrics }>(`/api/businesses/${encodeURIComponent(accountId)}/metrics`, token);
+  return metrics;
 }
 
 export async function fetchOrders(token: string): Promise<Order[]> {

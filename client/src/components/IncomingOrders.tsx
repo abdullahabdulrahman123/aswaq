@@ -28,6 +28,10 @@ const timeFormat = new Intl.DateTimeFormat('ar-EG', { dateStyle: 'medium', timeS
  * بتتحدّث لوحدها (الـsocket.io في IncomingContext). والطلب اللي بيوصل وانت
  * نازل تحت في الليستة مبيزقّش الصفحة: بيطلع زرار «طلبات جديدة ↑» زي
  * Thunderbird، والدوسة عليه بتطلعك فوق.
+ *
+ * رسالة العميل ٦ أكتوبر (التانية): الترتيب بيوم التسليم وبعدين الساعة، الأقرب فوق
+ * (IncomingContext). فالجديد بينزل في مكانه مش فوق على طول — الزرار بيظهر لو
+ * مكانه برا الشاشة، وسهمه لفوق أو لتحت، والدوسة بتوصّلك له وبتعلّم عليه شوية.
  */
 export function IncomingOrders({ business }: { business: Business }) {
   const { accountId } = business;
@@ -41,24 +45,38 @@ export function IncomingOrders({ business }: { business: Business }) {
     if (orders) markSeen();
   }, [orders, markSeen]);
 
-  // «طلبات جديدة ↑»: اللي وصل وانت مش فوق
-  const [above, setAbove] = useState(0);
-  const firstId = useRef<string | null>(null);
+  // «طلب جديد ↑/↓»: اللي وصل ومكانه برا الشاشة ولسه متشافش. السهم لأول واحد فيهم بترتيب الليستة
+  const [fresh, setFresh] = useState<string[]>([]);
+  const [where, setWhere] = useState<'up' | 'down' | null>(null);
+  const [marked, setMarked] = useState<string | null>(null);
+  const known = useRef<Set<string> | null>(null);
   useLayoutEffect(() => {
-    const top = orders?.[0]?.id ?? null;
-    if (firstId.current && top && top !== firstId.current && window.scrollY > 120) {
-      const known = orders!.findIndex((o) => o.id === firstId.current);
-      setAbove((n) => n + (known > 0 ? known : 1));
-    }
-    firstId.current = top;
+    if (!orders) return;
+    const before = known.current;
+    known.current = new Set(orders.map((o) => o.id));
+    const arrived = before ? orders.filter((o) => !before.has(o.id)).map((o) => o.id) : [];
+    if (arrived.length) setFresh((prev) => [...prev, ...arrived]);
   }, [orders]);
+  const waiting = orders?.filter((o) => fresh.includes(o.id)) ?? [];
+  const target = waiting[0]?.id ?? null;
+  // اللي ظهر على الشاشة اتشاف — بيخرج من العداد. بيتشاف تاني مع كل لفّة
+  const locate = useRef<() => void>(() => {});
+  locate.current = () => {
+    const unseen = waiting.filter((o) => placeOf(o.id)).map((o) => o.id);
+    if (unseen.length !== fresh.length) setFresh(unseen);
+    setWhere(unseen.length ? placeOf(unseen[0]) : null);
+  };
+  useLayoutEffect(() => locate.current(), [fresh, orders]);
   useEffect(() => {
-    const onScroll = () => {
-      if (window.scrollY <= 120) setAbove(0);
-    };
+    const onScroll = () => locate.current();
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+  useEffect(() => {
+    if (!marked) return;
+    const off = window.setTimeout(() => setMarked(null), 2500);
+    return () => window.clearTimeout(off);
+  }, [marked]);
 
   return (
     <section aria-labelledby="incoming-title" className="mt-6">
@@ -68,16 +86,17 @@ export function IncomingOrders({ business }: { business: Business }) {
         {live && <span className="ms-1.5 inline-block h-2 w-2 rounded-full bg-accent-500 align-middle" title="بتتحدّث لوحدها" />}
       </p>
 
-      {above > 0 && (
+      {target && where && (
         <button
           type="button"
           onClick={() => {
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-            setAbove(0);
+            rowOf(target)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            setMarked(target);
+            setFresh([]);
           }}
           className="fixed start-1/2 top-20 z-40 -translate-x-1/2 rounded-full bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-card rtl:translate-x-1/2"
         >
-          {above === 1 ? 'طلب جديد' : `${above} طلبات جديدة`} ↑
+          {waiting.length === 1 ? 'طلب جديد' : `${waiting.length} طلبات جديدة`} {where === 'up' ? '↑' : '↓'}
         </button>
       )}
 
@@ -102,12 +121,24 @@ export function IncomingOrders({ business }: { business: Business }) {
         // grid-cols-1 = عمود minmax(0,1fr) — عشان الاسم الطويل يتقص بدل ما الصفحة توسع على الموبايل
         <ul aria-label="الطلبات الواردة" className="mt-5 grid grid-cols-1 gap-2.5">
           {orders.map((order) => (
-            <IncomingRow key={order.id} order={order} onOpen={() => openOnStore(order)} />
+            <IncomingRow key={order.id} order={order} marked={order.id === marked} onOpen={() => openOnStore(order)} />
           ))}
         </ul>
       )}
     </section>
   );
+}
+
+const rowOf = (id: string) => document.querySelector(`[data-order-id="${id}"]`);
+
+/** الصف فوق الشاشة ولا تحتها — null = ظاهر (نصّه بين الشريط اللي فوق واللي تحت) أو مش موجود */
+function placeOf(id: string): 'up' | 'down' | null {
+  const r = rowOf(id)?.getBoundingClientRect();
+  if (!r) return null;
+  const middle = (r.top + r.bottom) / 2;
+  if (middle < 72) return 'up';
+  if (middle > window.innerHeight - 56) return 'down';
+  return null;
 }
 
 /** ١٢٥٠٠ جرام ← «12.5 كجم» */
@@ -121,17 +152,19 @@ const volume = (cm3: number) =>
  * (هوية بصرية، من «الإعدادات»)، وبعده اسم المشتري. والوزن والحجم لو متسجّلين: اللي
  * مش موجود مبيظهرش ومبياخدش مكان. والميعاد ميعاد التسليم لو اتحدد، وإلا ساعة التأكيد.
  */
-function IncomingRow({ order, onOpen }: { order: Order; onOpen: () => void }) {
+function IncomingRow({ order, marked, onOpen }: { order: Order; marked: boolean; onOpen: () => void }) {
   const count = new Set(order.details.map((d) => d.itemId)).size;
   const color = stageColor(order);
   const measures = [order.totalWeight > 0 ? kg(order.totalWeight) : null, order.totalVolume ? volume(order.totalVolume) : null].filter(Boolean);
   return (
-    <li>
+    <li data-order-id={order.id}>
       <button
         type="button"
         onClick={onOpen}
         data-stage-color={order.stateColor ?? ''}
-        className="flex w-full items-center gap-3 rounded-2xl border border-gray-200 bg-white p-4 text-start transition hover:border-brand-400 dark:border-white/10 dark:bg-surface-card"
+        className={`flex w-full items-center gap-3 rounded-2xl border bg-white p-4 text-start transition hover:border-brand-400 dark:bg-surface-card ${
+          marked ? 'border-brand-400 ring-2 ring-brand-300 dark:ring-brand-500/50' : 'border-gray-200 dark:border-white/10'
+        }`}
       >
         <span className="min-w-0 flex-1">
           <span className="flex min-w-0 items-center gap-2">

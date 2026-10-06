@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useLocation } from 'react-router-dom';
 import { io, type Socket } from 'socket.io-client';
 import { aswaqApiConfigured, aswaqApiOrigin, fetchIncoming, type Order } from '../lib/aswaqApi';
+import { byDueTime } from '../lib/delivery';
 import { isOpenState } from '../lib/orderFlow';
 import { useAuth } from './AuthContext';
 
@@ -17,10 +18,12 @@ import { useAuth } from './AuthContext';
  *     الطلبات الواردة نفسها: مفيش تنبيه — الطلب بيظهر في الليستة، زي العميل
  *     ما قال «لو فاتح التطبيق الإشعار ما يجيلكش».
  *   - الطلب اللي المستخدم أكّده بنفسه (بيعة «مبيعات») بيتعد من غير تنبيه.
+ *   - الترتيب (رسالة العميل ٦ أكتوبر): بيوم التسليم وبعدين الساعة، الأقرب فوق —
+ *     كان الأحدث تأكيداً فوق. الطلب اللي بيوصل أو ميعاده بيتعدّل بياخد مكانه.
  */
 
 interface Incoming {
-  /** null = لسه بنجيب، أو مفيش نشاط مختار */
+  /** بميعاد التسليم، الأقرب الأول. null = لسه بنجيب، أو مفيش نشاط مختار */
   orders: Order[] | null;
   /** الفواتير اللي لسه متنفذتش — العداد على «مهامي» */
   pending: number;
@@ -99,17 +102,18 @@ export function IncomingProvider({ children }: { children: ReactNode }) {
   }, [accountId, withToken]);
 
   const markSeen = useCallback(() => setToast(null), []);
+  const sorted = useMemo(() => (orders ? [...orders].sort(byDueTime) : null), [orders]);
 
   const value = useMemo<Incoming>(
     () => ({
-      orders: accountId ? orders : null,
+      orders: accountId ? sorted : null,
       pending: accountId ? (orders ?? []).filter((o) => isOpenState(o.state)).length : 0,
       markSeen,
       toast: accountId ? toast : null,
       dismissToast: () => setToast(null),
       live,
     }),
-    [accountId, orders, markSeen, toast, live],
+    [accountId, orders, sorted, markSeen, toast, live],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

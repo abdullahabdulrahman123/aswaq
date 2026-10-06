@@ -4,6 +4,7 @@ import { currentUser, fetchWaslaStore, findManagedBusiness } from '../middleware
 import { isObjectId } from '../schemas/common.js';
 import { announceIncoming, announceState } from '../realtime.js';
 import { cancelSchema, draftSchema, headerSchema, lineSchema } from '../schemas/order.schema.js';
+import { afterOrderChange } from '../services/metrics.service.js';
 import { flowOf, isFinished, nextIn, salesStagesOf, viewOf, withFlow, withoutCost, type OrderView } from '../services/orderFlow.js';
 import { PERMISSIONS, can } from '../services/permissions.js';
 import {
@@ -105,7 +106,8 @@ export async function putDraft(req: Request, res: Response) {
   // ميعاد التسليم وملاحظاته (رسالة العميل ٦ أكتوبر): من رأس البيعة، وللمشتري من المعرض جنب طريقة الاستلام
   const delivery = input.sale ?? input;
   // السعر اللي في السطر بيتاخد في «مبيعات» بس، وبصلاحية «تغيير سعر صنف في فاتورة البيع» (٢ أكتوبر)
-  const details = buildDetails(await storeItems(input.shopId), input.lines, priceFieldFor(Boolean(input.sale), buyerKind), pricedBySeller);
+  // وحدة منفذها مقفول بتترفض — إلا لو كانت في المسودة قبل ما يتقفل (المشتري اتغيّر مثلاً)
+  const details = buildDetails(await storeItems(input.shopId), input.lines, priceFieldFor(Boolean(input.sale), buyerKind), pricedBySeller, existing?.details ?? []);
   if (typeof details === 'string') {
     res.status(400).json({ message: details });
     return;
@@ -252,8 +254,9 @@ export async function putConfirmedLine(req: Request, res: Response) {
     }
     if (await replaceConfirmedDetails(order, details, { acc: me.accountId, name: me.name })) {
       const view = await viewOf((await findById(id))!);
-      // «مهامي» عند الباقيين بالإجمالي الجديد
+      // «مهامي» عند الباقيين بالإجمالي الجديد، ومؤشرات البيع بالفرق
       await announceState(view).catch(() => undefined);
+      await afterOrderChange(order.from.acc);
       res.json({ order: shownTo(req)(view) });
       return;
     }
@@ -323,8 +326,9 @@ export async function checkout(req: Request, res: Response) {
     return;
   }
   const done = await viewOf(await checkOut(order.id, await nextNumber(order.from.acc)));
-  // «الطلبات الواردة» عند النشاط البائع — لحظة بلحظة
+  // «الطلبات الواردة» عند النشاط البائع — لحظة بلحظة. والفاتورة بتدخل «المستقبلية» في مؤشرات البيع
   await announceIncoming(done).catch(() => undefined);
+  await afterOrderChange(order.from.acc);
   res.json({ order: shownTo(req)(done) });
 }
 
@@ -413,8 +417,9 @@ export async function advance(req: Request, res: Response) {
     return;
   }
   const view = await viewOf(moved);
-  // «مهامي» عند الباقيين بتتحدّث — المكتمل بيخرج منها
+  // «مهامي» عند الباقيين بتتحدّث — المكتمل بيخرج منها. ومؤشرات البيع: في الطريق أو محققة
   await announceState(view).catch(() => undefined);
+  await afterOrderChange(order.from.acc);
   res.json({ order: shownTo(req)(view) });
 }
 
@@ -461,8 +466,9 @@ export async function cancel(req: Request, res: Response) {
     return;
   }
   const view = await viewOf(cancelled);
-  // «مهامي» عند البائع — الملغية بتخرج منها
+  // «مهامي» عند البائع — الملغية بتخرج منها، ومن مؤشرات البيع
   await announceState(view).catch(() => undefined);
+  await afterOrderChange(order.from.acc);
   res.json({ order: shownTo(req)(view) });
 }
 

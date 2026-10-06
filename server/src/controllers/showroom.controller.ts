@@ -19,6 +19,8 @@ function toShowroomItem(item: Item) {
       onSRP: unit.onSRP ?? null,
       onLWP: unit.onLWP ?? null,
       onLRP: unit.onLRP ?? null,
+      /** المنافذ اللي الوحدة مبتتباعش فيها — الواجهة بتخفيها في المنفذ ده (مكالمة ٦ أكتوبر) */
+      hiddenIn: unit.hiddenIn ?? [],
     })),
   };
 }

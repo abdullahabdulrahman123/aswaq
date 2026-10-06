@@ -3,8 +3,8 @@ import { Link, useLocation, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { SessionExpiredNotice } from '../components/SessionExpiredNotice';
 import { ApiError, SessionExpiredError } from '../lib/waslaApi';
-import { aswaqApiConfigured, deleteItem, fetchItems, type Item } from '../lib/aswaqApi';
-import { PRICE_FIELDS, PRICE_LABELS } from '../lib/itemUnits';
+import { aswaqApiConfigured, deleteItem, fetchItems, putUnitVisibility, type Item, type ItemUnit } from '../lib/aswaqApi';
+import { PRICE_FIELDS, PRICE_LABELS, soldIn, type PriceField } from '../lib/itemUnits';
 
 /** بالقرش ← «7.5» — العمود عنوانه فوق، فمن غير «ج.م» */
 const price = (piasters: number | null) => (piasters === null ? '—' : (piasters / 100).toLocaleString('en-EG', { maximumFractionDigits: 2 }));
@@ -19,6 +19,10 @@ const RETURN_KEY = 'aswaq_items_return';
  * رسالة العميل ٦ أكتوبر: الكارت أقصر عشان أصناف أكتر تبان — سطر لكل وحدة فيه اسمها
  * والأربع أسعار جنب بعض، وفوقهم سطر صغير بأسامي الأسعار. التعديل والمسح أيقونتين.
  * وبعد «حفظ» (أو الرجوع) الليستة بتنزل على الصنف اللي كان بيتعدّل بدل أولها.
+ *
+ * مكالمة ٦ أكتوبر: تحت كل سعر تشيك — الوحدة بتتباع في المنفذ ده ولا لأ (الأربع أسعار
+ * = أربع منافذ: جملة وقطاعي، محل وأونلاين). وتحت اسم الوحدة «الكل» للأربعة مرة واحدة.
+ * التشيك بيتحفظ أول ما يتداس، والمعرض و«مبيعات» بيخفوا الوحدة في المنفذ المقفول.
  */
 
 export function ItemsPage() {
@@ -76,6 +80,30 @@ export function ItemsPage() {
       cancelled = true;
     };
   }, [accountId, user, withToken, sessionExpired]);
+
+  /** حفظ التشيكات بالترتيب — دوستين ورا بعض ميوصلوش بالعكس */
+  const visibilitySaves = useRef(Promise.resolve());
+
+  /** التشيكات الجديدة لوحدة: بتظهر على طول، ولو الحفظ فشل بترجع زي ما كانت */
+  function setHiddenIn(item: Item, unit: ItemUnit, hiddenIn: PriceField[]) {
+    const before = unit.hiddenIn ?? [];
+    const apply = (next: PriceField[]) =>
+      setItems((prev) =>
+        (prev ?? []).map((one) =>
+          one.id === item.id ? { ...one, units: one.units.map((u) => (u.name === unit.name ? { ...u, hiddenIn: next } : u)) } : one,
+        ),
+      );
+    apply(hiddenIn);
+    setError('');
+    visibilitySaves.current = visibilitySaves.current.then(async () => {
+      try {
+        await withToken((token) => putUnitVisibility(token, accountId, item.id, unit.name, hiddenIn));
+      } catch (err) {
+        apply(before);
+        if (!(err instanceof SessionExpiredError)) setError('مقدرناش نحفظ التشيك. جرّب تاني.');
+      }
+    });
+  }
 
   async function handleDelete(item: Item) {
     setDeletingId(item.id);
@@ -254,18 +282,53 @@ export function ItemsPage() {
                       ))}
                     </tr>
                   </thead>
-                  <tbody>
-                    {item.units.map((unit) => (
-                      <tr key={unit.name} data-unit={unit.name}>
-                        <td className="truncate py-0.5 text-start font-semibold">{unit.name}</td>
-                        {PRICE_FIELDS.map((field) => (
-                          <td key={field} className={`py-0.5 text-center ${unit[field] === null ? 'text-gray-300 dark:text-gray-600' : ''}`}>
-                            {price(unit[field])}
+                  {item.units.map((unit) => {
+                    const hidden = unit.hiddenIn ?? [];
+                    return (
+                      <tbody key={unit.name} data-unit={unit.name}>
+                        <tr>
+                          <td className="truncate pt-0.5 text-start font-semibold">{unit.name}</td>
+                          {PRICE_FIELDS.map((field) => (
+                            <td
+                              key={field}
+                              className={`pt-0.5 text-center transition ${
+                                unit[field] === null ? 'text-gray-300 dark:text-gray-600' : ''
+                              } ${soldIn(unit, field) ? '' : 'text-gray-300 line-through dark:text-gray-600'}`}
+                            >
+                              {price(unit[field])}
+                            </td>
+                          ))}
+                        </tr>
+                        {/* تشيك تحت كل سعر = الوحدة بتتباع في المنفذ ده، و«الكل» تحت اسمها للأربعة */}
+                        <tr data-checks>
+                          <td className="pb-1 text-start">
+                            <label className="inline-flex cursor-pointer items-center gap-1 text-[11px] text-gray-500 dark:text-gray-400">
+                              <AllCheck
+                                label={`${item.name} — ${unit.name}: الكل`}
+                                checked={hidden.length === 0}
+                                mixed={hidden.length > 0 && hidden.length < PRICE_FIELDS.length}
+                                onChange={(all) => setHiddenIn(item, unit, all ? [] : [...PRICE_FIELDS])}
+                              />
+                              الكل
+                            </label>
                           </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
+                          {PRICE_FIELDS.map((field) => (
+                            <td key={field} className="pb-1 text-center">
+                              <input
+                                type="checkbox"
+                                aria-label={`${item.name} — ${unit.name}: ${PRICE_LABELS[field]}`}
+                                checked={soldIn(unit, field)}
+                                onChange={(e) =>
+                                  setHiddenIn(item, unit, e.target.checked ? hidden.filter((k) => k !== field) : [...hidden, field])
+                                }
+                                className="h-4 w-4 cursor-pointer accent-brand-600 align-middle"
+                              />
+                            </td>
+                          ))}
+                        </tr>
+                      </tbody>
+                    );
+                  })}
                 </table>
               ) : (
                 <p className="mt-1 text-xs text-gray-400">لسه مفيش وحدات</p>
@@ -275,6 +338,24 @@ export function ItemsPage() {
         </ul>
       )}
     </div>
+  );
+}
+
+/** «الكل» — متعلّم لو الأربعة متعلّمين، ونص نص (indeterminate) لو بعضهم */
+function AllCheck({ label, checked, mixed, onChange }: { label: string; checked: boolean; mixed: boolean; onChange: (all: boolean) => void }) {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = mixed;
+  }, [mixed]);
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      aria-label={label}
+      checked={checked}
+      onChange={(e) => onChange(e.target.checked)}
+      className="h-4 w-4 cursor-pointer accent-brand-600"
+    />
   );
 }
 
