@@ -12,7 +12,7 @@ import { PERMISSIONS, can, deniedMessage } from '../lib/permissions';
 import { latinDigits } from '../lib/quantity';
 import { ApiError, searchCustomers, type Customer } from '../lib/waslaApi';
 import { Avatar, personInitial } from './Avatar';
-import { CancelOrderDialog } from './CancelOrderDialog';
+import { CancelOrderDialog, CancellationNote } from './CancelOrderDialog';
 import { InvoiceSheet, type InvoiceView } from './InvoiceSheet';
 import { Notch, compactFieldClass } from './OutlinedField';
 
@@ -255,6 +255,8 @@ export function SalesPanel({
             {error}
           </p>
         )}
+        {/* الطلب اللي بيتفتح من «مهامي» ممكن يتلغي من الناحية التانية — مين لغاه وليه */}
+        {confirmed && order && !loading && <CancellationNote order={order} className="mt-1.5" />}
         {confirmed && business && (
           <div className="mt-1.5 flex justify-end gap-2">
             {order && !loading && isOpenState(order.state) && (

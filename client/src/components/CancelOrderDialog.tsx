@@ -104,11 +104,11 @@ export function CancelOrderDialog({ order, buyer = false, onCancelled, onClose }
 }
 
 /** «اتلغت من البائع (اسمه): السبب» — على الفاتورة الملغية */
-export function CancellationNote({ order }: { order: Order }) {
+export function CancellationNote({ order, className = 'mb-4' }: { order: Order; className?: string }) {
   const c = order.cancellation;
   if (order.state !== 'cancelled' || !c) return null;
   return (
-    <p data-cancellation className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm leading-relaxed text-red-800 dark:bg-red-500/10 dark:text-red-300">
+    <p data-cancellation className={`${className} rounded-xl bg-red-50 px-4 py-3 text-sm leading-relaxed text-red-800 dark:bg-red-500/10 dark:text-red-300`}>
       <span className="font-semibold">
         لغاها {c.by === 'seller' ? 'البائع' : 'المشتري'} ({c.person.name}):
       </span>{' '}

@@ -83,6 +83,12 @@ interface Sales {
    */
   confirmedOrderId: string | null;
   markConfirmed: (orderId: string) => void;
+  /**
+   * فاتورة مؤكدة بتتفتح على متجرها بشكل «مبيعات» (رسالة العميل ٦ أكتوبر: الدوسة
+   * من «مهامي» تفتح الشكل العادي في كل المراحل، حتى المقفولة) — بيعتها بتبقى
+   * الشغالة والفاتورة دي قدامها
+   */
+  openConfirmed: (session: SalesSession, orderId: string) => void;
 }
 
 const KEY = 'aswaq_sales_sessions';
@@ -188,6 +194,11 @@ export function SalesProvider({ children }: { children: ReactNode }) {
       confirmedOrderId: session ? (confirmed[session.id] ?? null) : null,
       markConfirmed: (orderId) => {
         if (session) setConfirmed((prev) => ({ ...prev, [session.id]: orderId }));
+      },
+      openConfirmed: (opened, orderId) => {
+        setSessions((prev) => (prev.some((s) => s.id === opened.id) ? prev : [...prev, opened]));
+        setActiveId(opened.id);
+        setConfirmed((prev) => ({ ...prev, [opened.id]: orderId }));
       },
     }),
     [session, sessions, start, update, drop, dialog, confirmed],

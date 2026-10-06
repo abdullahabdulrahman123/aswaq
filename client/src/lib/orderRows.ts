@@ -33,7 +33,7 @@ export interface OrderRow {
  */
 export function useOrderRows() {
   const { orders: local, restoreLines } = useStoreCart();
-  const { resume, leave, restore } = useSales();
+  const { resume, leave, restore, openConfirmed } = useSales();
   const { user, sessionExpired, withToken } = useAuth();
   const navigate = useNavigate();
   /** اسم الشركة من وصلة — سطور الجهاز فيها اسم المتجر بس */
@@ -136,5 +136,32 @@ export function useOrderRows() {
     navigate(`/store/${row.shopId}`);
   }
 
-  return { rows, open, loading: signedIn && saved === null, signedIn };
+  /**
+   * الطلب الوارد بيتفتح على متجره بشكل «مبيعات» في أي مرحلة (رسالة العميل ٦ أكتوبر)
+   * — مش صفحة الفاتورة. بيعة «مبيعات» بترجع زي ما اتبعتت، وطلب المعرض بيعة
+   * على مقاسه بالمشتري اللي طلبه (بتتمسح لوحدها أول ما البائع يخرج — FollowOrderWorld)
+   */
+  function openOnStore(order: Order) {
+    openConfirmed((order.sale as SalesSession | null) ?? saleOf(order), order.id);
+    navigate(`/store/${orderShopId(order)}`);
+  }
+
+  return { rows, open, openOnStore, loading: signedIn && saved === null, signedIn };
+}
+
+/** طلب من المعرض في صورة بيعة — اسم المشتري ورقمه وطريقة الاستلام من الأوردر نفسه */
+function saleOf(order: Order): SalesSession {
+  return {
+    id: `order-${order.id}`,
+    accountId: order.from.acc,
+    businessName: order.names.business,
+    buyer: { accountId: order.to.acc, kind: order.names.buyerKind, name: order.names.buyer, picture: null, abbreviation: null },
+    walkIn: false,
+    buyerName: '',
+    phone: order.names.buyerPhone,
+    sellerName: order.seller.name,
+    method: order.method,
+    address: order.address,
+    shopId: orderShopId(order),
+  };
 }

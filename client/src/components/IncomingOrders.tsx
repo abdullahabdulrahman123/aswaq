@@ -1,5 +1,4 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
 import type { Business } from '../context/AuthContext';
 import { useIncoming } from '../context/IncomingContext';
 import { egp } from '../data/catalog';
@@ -14,7 +13,8 @@ const timeFormat = new Intl.DateTimeFormat('ar-EG', { dateStyle: 'medium', timeS
 /**
  * «الطلبات الواردة» بطلب العميل (٢٧ سبتمبر): الأوردرات المؤكدة اللي مطلوبة من
  * النشاط ده ولسه مخلصتش — عكس السلة اللي بتجيب اللي أنا طالبه. الأحدث فوق،
- * والدوسة بتفتح الفاتورة.
+ * والدوسة بتفتح الطلب على متجره بشكل «مبيعات» (رسالة العميل ٦ أكتوبر — كانت
+ * بتفتح صفحة الفاتورة).
  *
  * مكالمة ٢٨ سبتمبر: دي صفحة سلة البيع — فوق فواتير «مبيعات» اللي لسه
  * متأكدتش (كانت في «طلباتي» ومتلخبطة مع اللي أنا طالبه)، والدوسة بترجّعك جوّاها.
@@ -30,7 +30,7 @@ const timeFormat = new Intl.DateTimeFormat('ar-EG', { dateStyle: 'medium', timeS
 export function IncomingOrders({ business }: { business: Business }) {
   const { accountId } = business;
   const { orders, markSeen, live } = useIncoming();
-  const { rows, open } = useOrderRows();
+  const { rows, open, openOnStore } = useOrderRows();
   // اللي لسه متأكدتش بس (على الجهاز أو مسودة) — المؤكدة في أي مرحلة تحت مع الواردة، والمكتملة والملغية برا «مهامي»
   const openSales = rows.filter((row) => row.sale?.accountId === accountId && (row.state === null || row.state === 'draft'));
 
@@ -100,7 +100,7 @@ export function IncomingOrders({ business }: { business: Business }) {
         // grid-cols-1 = عمود minmax(0,1fr) — عشان الاسم الطويل يتقص بدل ما الصفحة توسع على الموبايل
         <ul aria-label="الطلبات الواردة" className="mt-5 grid grid-cols-1 gap-2.5">
           {orders.map((order) => (
-            <IncomingRow key={order.id} order={order} />
+            <IncomingRow key={order.id} order={order} onOpen={() => openOnStore(order)} />
           ))}
         </ul>
       )}
@@ -108,12 +108,13 @@ export function IncomingOrders({ business }: { business: Business }) {
   );
 }
 
-function IncomingRow({ order }: { order: Order }) {
+function IncomingRow({ order, onOpen }: { order: Order; onOpen: () => void }) {
   const count = new Set(order.details.map((d) => d.itemId)).size;
   return (
     <li>
-      <Link
-        to={`/invoice/${order.id}`}
+      <button
+        type="button"
+        onClick={onOpen}
         className="flex w-full items-center gap-3 rounded-2xl border border-stone-200 bg-white p-4 text-start transition hover:border-brand-400 dark:border-white/10 dark:bg-surface-card"
       >
         <span className="min-w-0 flex-1">
@@ -132,7 +133,7 @@ function IncomingRow({ order }: { order: Order }) {
           <span className="block text-sm font-bold tabular-nums">{egp(order.netTotal)}</span>
           <span className="block text-xs text-stone-500 dark:text-stone-400">{itemsLabel(count)}</span>
         </span>
-      </Link>
+      </button>
     </li>
   );
 }
