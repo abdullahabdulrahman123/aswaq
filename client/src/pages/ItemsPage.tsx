@@ -271,27 +271,41 @@ export function ItemsPage() {
               </div>
 
               {item.units.length > 0 ? (
+                /*
+                 * رسالة العميل ٧ أكتوبر: «الوحدة» فوق العمود اتشالت واسم الوحدة واخد مكانها —
+                 * سطرين (سطر العناوين وسطر الأسعار) بدل ما يتقطع بـ«…» («شيكارة 25 كيلو»).
+                 * العناوين في صف أول وحدة عشان اسمها يطلع جنبها؛ اللي بعدها اسمها بينزل في صفها.
+                 */
                 <table className="mt-1 w-full table-fixed text-sm tabular-nums">
-                  <thead>
-                    <tr className="text-[10px] leading-tight text-gray-400">
-                      <th className="w-[22%] pb-0.5 text-start font-normal">الوحدة</th>
-                      {PRICE_FIELDS.map((field) => (
-                        <th key={field} className="pb-0.5 text-center font-normal">
-                          {PRICE_LABELS[field]}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  {item.units.map((unit) => {
+                  <colgroup>
+                    <col className="w-[22%]" />
+                  </colgroup>
+                  {item.units.map((unit, index) => {
                     const hidden = unit.hiddenIn ?? [];
+                    const name = (
+                      <td rowSpan={index === 0 ? 2 : undefined} className="break-words pt-0.5 text-start align-bottom font-semibold leading-tight">
+                        {unit.name}
+                      </td>
+                    );
                     return (
                       <tbody key={unit.name} data-unit={unit.name}>
-                        <tr>
-                          <td className="truncate pt-0.5 text-start font-semibold">{unit.name}</td>
+                        {index === 0 && (
+                          <tr data-labels>
+                            {name}
+                            {PRICE_FIELDS.map((field) => (
+                              <th key={field} scope="col" className="pb-0.5 text-center text-[10px] font-normal leading-tight text-gray-400">
+                                {PRICE_LABELS[field]}
+                              </th>
+                            ))}
+                          </tr>
+                        )}
+                        <tr data-prices>
+                          {index > 0 && name}
                           {PRICE_FIELDS.map((field) => (
                             <td
                               key={field}
-                              className={`pt-0.5 text-center transition ${
+                              data-price={field}
+                              className={`pt-0.5 text-center align-bottom transition ${
                                 unit[field] === null ? 'text-gray-300 dark:text-gray-600' : ''
                               } ${soldIn(unit, field) ? '' : 'text-gray-300 line-through dark:text-gray-600'}`}
                             >

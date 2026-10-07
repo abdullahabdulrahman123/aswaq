@@ -121,7 +121,8 @@ export function PriceDialog({ item, note, onSaved, onClose }: { item: Item; note
           <tbody>
             {item.units.map((u) => (
               <tr key={u.name}>
-                <th scope="row" className="truncate text-start text-sm font-semibold" title={u.name}>
+                {/* الاسم كامل على سطرين بدل «…» — زي كارت الصنف (رسالة العميل ٧ أكتوبر) */}
+                <th scope="row" className="break-words text-start text-sm font-semibold leading-tight">
                   {u.name}
                 </th>
                 {PRICE_GROUPS.flatMap((group) => group.fields).map(({ field }) => (
