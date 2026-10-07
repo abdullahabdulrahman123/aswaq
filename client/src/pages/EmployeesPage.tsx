@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Avatar, personInitial } from "../components/Avatar";
 import { Notch, fieldClass } from "../components/OutlinedField";
@@ -37,6 +37,9 @@ const jobLabel = (e: Employee) => (e.owner ? "صاحب الشركة" : e.job);
  * الصلاحيات (مكالمة ٢ أكتوبر): من رصيد أسواق، متقسمة بالأقسام (مبيعات…). صاحب
  * الشركة بيفتح ويقفل لكل موظف — صلاحية صلاحية أو القسم كله — وبتتحفظ على طول.
  * الموظف الجديد بياخد اللي بيتفتح لوحده (defaultOn): «اللي يعطّل الشغل اعمله true».
+ *
+ * ٧ أكتوبر: الوظيفة لازم تتكتب قبل «إضافة» — كانت فاضية بتتسجّل «موظف». ووصلة
+ * كمان بترفض الفاضية.
  */
 export function EmployeesPage() {
   const { accountId = "" } = useParams<{ accountId: string }>();
@@ -53,6 +56,9 @@ export function EmployeesPage() {
   const [matches, setMatches] = useState<UserMatch[] | "loading" | null>(null);
   const [picked, setPicked] = useState<UserMatch | null>(null);
   const [job, setJob] = useState("");
+  /** داس «إضافة» والوظيفة فاضية */
+  const [jobMissing, setJobMissing] = useState(false);
+  const jobRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
   const [confirmingId, setConfirmingId] = useState("");
   /** رصيد الصلاحيات وأسماء الأقسام — null = لسه بنجيب */
@@ -130,6 +136,11 @@ export function EmployeesPage() {
 
   async function handleAdd() {
     if (!picked || saving) return;
+    if (!job.trim()) {
+      setJobMissing(true);
+      jobRef.current?.focus();
+      return;
+    }
     setSaving(true);
     setError("");
     try {
@@ -296,7 +307,10 @@ export function EmployeesPage() {
                         <button
                           type="button"
                           disabled={already.has(m.accountId)}
-                          onClick={() => setPicked(m)}
+                          onClick={() => {
+                            setPicked(m);
+                            setJobMissing(false);
+                          }}
                           className="flex w-full items-center gap-3 px-3 py-2.5 text-start text-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-white/5"
                         >
                           <Avatar
@@ -336,11 +350,19 @@ export function EmployeesPage() {
                 </div>
                 <label className="relative block w-40">
                   <input
-                    className={fieldClass}
+                    ref={jobRef}
+                    // ! عشان الأحمر يغلب لون التركيز (الخانة بتاخد الفوكس مع الرسالة)
+                    className={`${fieldClass} ${jobMissing ? "!border-red-500 focus:!ring-red-500 dark:!border-red-400" : ""}`}
                     value={job}
-                    onChange={(e) => setJob(e.target.value)}
-                    placeholder="موظف"
+                    onChange={(e) => {
+                      setJob(e.target.value);
+                      setJobMissing(false);
+                    }}
+                    placeholder="مثال: محاسب"
                     maxLength={40}
+                    required
+                    aria-invalid={jobMissing}
+                    aria-describedby={jobMissing ? "job-missing" : undefined}
                   />
                   <Notch>الوظيفة</Notch>
                 </label>
@@ -353,6 +375,11 @@ export function EmployeesPage() {
                   {saving ? "بنضيف…" : "إضافة"}
                 </button>
               </div>
+            )}
+            {picked && jobMissing && (
+              <p id="job-missing" role="alert" className="-mt-2 text-sm text-red-600 dark:text-red-400">
+                اكتب وظيفته الأول — مثلاً «محاسب» أو «بياع».
+              </p>
             )}
           </div>
         </div>
