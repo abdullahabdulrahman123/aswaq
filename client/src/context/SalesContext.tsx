@@ -189,14 +189,23 @@ export function SalesProvider({ children }: { children: ReactNode }) {
 
   const session = sessions.find((s) => s.id === activeId) ?? null;
 
+  /*
+   * رسالة العميل ٧ أكتوبر: فتح «مبيعات» من غير ما يعمل حاجة وبعدين الدوسة على فاتورة
+   * في «مهامي» كانت بتجيب «الهيدر الأخير» — رأس الفاتورة الجديدة كان فاضل مفتوح،
+   * فصفحة المتجر بتعرضه وبتخبّي الأصناف. اختيار فاتورة من الليستة بيقفله.
+   */
   const value = useMemo<Sales>(
     () => ({
       session,
       sessions,
       start,
       update,
-      resume: setActiveId,
+      resume: (id) => {
+        setDialog(null);
+        setActiveId(id);
+      },
       restore: (restored) => {
+        setDialog(null);
         setSessions((prev) => (prev.some((s) => s.id === restored.id) ? prev : [...prev, restored]));
         setActiveId(restored.id);
       },
@@ -210,6 +219,7 @@ export function SalesProvider({ children }: { children: ReactNode }) {
         if (session) setConfirmed((prev) => ({ ...prev, [session.id]: orderId }));
       },
       openConfirmed: (opened, orderId) => {
+        setDialog(null);
         setSessions((prev) => (prev.some((s) => s.id === opened.id) ? prev : [...prev, opened]));
         setActiveId(opened.id);
         setConfirmed((prev) => ({ ...prev, [opened.id]: orderId }));
