@@ -30,7 +30,7 @@ interface UnitDraft extends Record<PriceField, string> {
   /** بالجنيه في الخانة، وبيتبعت بالقرش */
   avgCost: string;
   rate: string;
-  /** بالجرام */
+  /** بالكيلو في الخانة، وبيتبعت بالجرام (رسالة العميل ٦ أكتوبر: «العرف السائد عندنا بالكيلو جرام») */
   weight: string;
   /** بالسنتيمتر المكعب */
   volume: string;
@@ -76,12 +76,15 @@ const toPounds = (piastres: number | null): string =>
 /** أصناف اتحفظت قبل الحقول دي ممكن متكونش فيها خالص، فـ== null مش === null */
 const toText = (value: number | null | undefined): string => (value == null ? '' : String(value));
 
+/** جرام → كيلو للكتابة في الخانة. ١٠٠٠٠ → "10" و٢٥٠ → "0.25" */
+const toKg = (grams: number | null | undefined): string => (grams == null ? '' : String(Math.round(grams) / 1000));
+
 const toDraft = (unit: ItemUnit): UnitDraft => ({
   name: unit.name,
   unitContent: String(unit.unitContent),
   avgCost: toPounds(unit.avgCost ?? null),
   rate: toText(unit.rate),
-  weight: toText(unit.weight),
+  weight: toKg(unit.weight),
   volume: toText(unit.volume),
   onSWP: toPounds(unit.onSWP),
   onSRP: toPounds(unit.onSRP),
@@ -187,8 +190,9 @@ export function ItemFormPage() {
       const rate = rateText ? Number(rateText) : null;
       if (rate !== null && !Number.isFinite(rate)) return `rate في وحدة «${unitName}» مش رقم مظبوط.`;
 
-      const weight = toAmount(unit.weight);
-      if (weight === undefined) return `weight في وحدة «${unitName}» لازم يكون رقم بالجرام.`;
+      const kg = toAmount(unit.weight);
+      if (kg === undefined) return `weight في وحدة «${unitName}» لازم يكون رقم بالكيلو.`;
+      const weight = kg === null ? null : Math.round(kg * 1000);
       const volume = toAmount(unit.volume);
       if (volume === undefined) return `volume في وحدة «${unitName}» لازم يكون رقم بالسنتيمتر المكعب.`;
 
@@ -403,7 +407,7 @@ export function ItemFormPage() {
               <h2 className="font-display text-lg font-bold">الوحدات</h2>
               <HelpHint label="شرح الوحدات">
                 محتوى كل وحدة = كام من أصغر وحدة: الكرتونة فيها 12 قطعة، والدستة ممكن تكون هي أصغر
-                وحدة بمحتوى ١. لازم تكون فيه وحدة محتواها ١. خانة weight بالجرام وخانة volume
+                وحدة بمحتوى ١. لازم تكون فيه وحدة محتواها ١. خانة weight بالكيلو وخانة volume
                 بالسنتيمتر المكعب للوحدة الواحدة. الأسعار وavg بالجنيه، وسيب اللي لسه متحددش فاضي.
               </HelpHint>
             </div>
@@ -485,7 +489,7 @@ export function ItemFormPage() {
                       className={compactFieldClass}
                     />
                     <Notch compact>weight</Notch>
-                    <span className="mt-1 block text-center text-[10px] text-gray-400">بالجرام</span>
+                    <span className="mt-1 block text-center text-[10px] text-gray-400">بالكيلو</span>
                   </label>
 
                   <label className="relative block">

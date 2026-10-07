@@ -59,6 +59,10 @@ const label = `${cell} bg-gray-100 font-semibold dark:bg-white/10 print:bg-gray-
  * صغير تحت الوزن لو فيه صنف وزنه مش متسجّل بدل «الحسابات غير دقيقة». وميعاد التسليم
  * وملاحظاته في الرأس للسواق.
  *
+ * مكالمة ٦ أكتوبر (بعد ملاحظات الشباب): «الحساب السابق» رجع في الورقة المطبوعة بس — سطر فاضي
+ * تحت إجمالي الفاتورة بيتكتب فيه بالقلم. مش خانة في «مبيعات»: الزباين دلوقتي نقدي، ولما
+ * يبقى ليهم حسابات هيتحسب من الفواتير اللي فاتت.
+ *
  * onPrice (للبائع بس): اسم الصنف بيبقى زرار بيفتح «التسعير». في الورقة شكله نص عادي.
  *
  * بيانات الشركة الرسمية (س.ت، ب.ض، رخصة) وسطر آخر الفاتورة لسه مش متسجّلين
@@ -172,6 +176,12 @@ export function InvoiceSheet({ view, onPrice }: { view: InvoiceView; onPrice?: (
             <td className={`${cell} text-center text-base font-bold tabular-nums`} colSpan={2}>
               {egp(view.total)}
             </td>
+          </tr>
+          <tr data-previous-balance className="hidden print:table-row">
+            <td className={`${label} text-center`} colSpan={2}>
+              الحساب السابق
+            </td>
+            <td className={`${cell} h-10`} colSpan={2} />
           </tr>
           <tr>
             <td className={`${label} text-center`} colSpan={2}>
