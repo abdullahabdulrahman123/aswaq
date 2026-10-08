@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Notch, fieldClass } from '../components/OutlinedField';
 import { SessionExpiredNotice } from '../components/SessionExpiredNotice';
 import { useAuth } from '../context/AuthContext';
@@ -14,14 +14,15 @@ import { ApiError, SessionExpiredError } from '../lib/waslaApi';
  *
  *   - من: العميل اللي في الفاتورة، مقفول — حسابه الفرعي فاضي لحد ما يبقى طرف أصيل ويحدده
  *   - إلى: النشاط، في خزنة من الخزن اللي في عهدة اللي بيحصّل (غالباً واحدة)
- *   - المبلغ: اللي فاضل على الفاتورة، ويقدر يحصّل جزء
+ *   - المبلغ: اللي فاضل على الفاتورة، ويقدر يحصّل جزء. رسالة العميل ٨ أكتوبر: أول دوسة
+ *     بتعلّم الرقم كله (يكتب فوقه على طول)، والرقم ده في عنوان الخانة كمرجع كان كام
  *
  * الرجوع (زرار الصفحة أو زرار الموبايل) بيرجّعه مكان ما داس «تحصيل» — الصفحة اللي
  * فتحتها بتبعت from؛ ولو اتفتحت لوحدها بترجع لفاتورتها.
  */
 export function ReceiptPage() {
   const { orderId = '' } = useParams<{ orderId: string }>();
-  const { user, withToken } = useAuth();
+  const { user, businesses, withToken } = useAuth();
   const navigate = useNavigate();
   const from = (useLocation().state as { from?: string } | null)?.from;
 
@@ -37,6 +38,8 @@ export function ReceiptPage() {
   const [saving, setSaving] = useState(false);
   /** آخر إيصال اتحفظ من هنا */
   const [saved, setSaved] = useState<{ number: number; amount: number; safe: string } | null>(null);
+  /** خانة المبلغ لسه واخدة الفوكس — أول دوسة بعده بتعلّم الرقم كله، واللي بعدها بتحط المؤشر عادي */
+  const justFocused = useRef(false);
 
   const loadCollection = useCallback(async () => {
     const c = await withToken((token) => fetchReceipts(token, orderId));
@@ -125,6 +128,13 @@ export function ReceiptPage() {
   }
 
   const cancelled = order.state === 'cancelled';
+  // صاحب الشركة يعمل خزنة لنفسه من «الخزن»، والموظف صاحب الشركة يعملهاله
+  // (لحد ما أنشطته توصل من وصلة بيتعامل كموظف — مش العكس)
+  const membership = businesses.find((b) => b.accountId === order.from.acc);
+  const owner = Boolean(membership) && (membership?.job ?? 'owner') === 'owner';
+  /** الرقم اللي الخانة بتتملي بيه (الباقي على الفاتورة) — من غير «ج.م»، العنوان فيه «جنيه» */
+  const reference = egp(Math.max(0, collection.remaining)).replace(' ج.م', '');
+  const selectAll = (el: HTMLInputElement) => el.setSelectionRange(0, el.value.length);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6">
@@ -190,7 +200,17 @@ export function ReceiptPage() {
               <p className="text-sm text-gray-500 dark:text-gray-400">بنجيب الخزن…</p>
             ) : safes.length === 0 ? (
               <p role="alert" className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
-                مفيش خزنة في عهدتك — صاحب الشركة يعملك واحدة من «الخزن».
+                {owner ? (
+                  <>
+                    مفيش خزنة في عهدتك — اعمل واحدة من{' '}
+                    <Link to={`/business/${order.from.acc}/safes`} className="font-semibold underline underline-offset-2">
+                      «الخزن»
+                    </Link>
+                    .
+                  </>
+                ) : (
+                  'مفيش خزنة في عهدتك — صاحب الشركة يعملك واحدة من «الخزن».'
+                )}
               </p>
             ) : (
               <label className="relative block">
@@ -212,9 +232,25 @@ export function ReceiptPage() {
                   setAmount(moneyInput(e.target.value));
                   setError('');
                 }}
+                onFocus={(e) => {
+                  justFocused.current = true;
+                  const el = e.currentTarget;
+                  requestAnimationFrame(() => selectAll(el));
+                }}
+                // على الموبايل الدوسة نفسها بتحط المؤشر بعد الفوكس فبتشيل التعليم — بنعلّم تاني مرة واحدة
+                onClick={(e) => {
+                  if (!justFocused.current) return;
+                  justFocused.current = false;
+                  selectAll(e.currentTarget);
+                }}
+                onBlur={() => {
+                  justFocused.current = false;
+                }}
                 inputMode="decimal"
               />
-              <Notch>المبلغ (جنيه)</Notch>
+              <Notch>
+                المبلغ (جنيه) · <span data-amount-reference className="tabular-nums">{reference}</span>
+              </Notch>
             </label>
             <label className="relative block">
               <input className={fieldClass} value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={300} placeholder="اختياري" />
