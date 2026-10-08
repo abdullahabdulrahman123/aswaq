@@ -91,6 +91,7 @@ export function SalesPanel({
   /** الورقة اللي بتتطبع — مستخبية على الشاشة */
   const [printView, setPrintView] = useState<InvoiceView | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const navigate = useNavigate();
 
   // الطباعة بعد ما الورقة تترسم
   useEffect(() => {
@@ -293,6 +294,17 @@ export function SalesPanel({
         {confirmed && order && !loading && <CancellationNote order={order} className="mt-1.5" />}
         {confirmed && business && (
           <div className="mt-1.5 flex justify-end gap-2">
+            {/* مكالمة ٧ أكتوبر: «تحصيل» زرار مش مرحلة — إيصال استلام نقدية في صفحة لوحده، والرجوع بيرجّع هنا */}
+            {order && !loading && order.state !== 'cancelled' && (
+              <button
+                type="button"
+                data-collect
+                onClick={() => navigate(`/receipt/${order.id}`, { state: { from: 'store' } })}
+                className="rounded-xl border border-brand-500 px-4 py-1.5 text-xs font-semibold text-brand-700 transition hover:bg-brand-50 dark:text-brand-300 dark:hover:bg-brand-500/10"
+              >
+                تحصيل
+              </button>
+            )}
             {order && !loading && isOpenState(order.state) && (
               <button
                 type="button"

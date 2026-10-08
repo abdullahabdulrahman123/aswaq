@@ -23,6 +23,8 @@ import { StoreItemsPage } from './pages/StoreItemsPage';
 import { EmployeesPage } from './pages/EmployeesPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { MetricsPage } from './pages/MetricsPage';
+import { SafesPage } from './pages/SafesPage';
+import { ReceiptPage } from './pages/ReceiptPage';
 import { StorePage } from './pages/StorePage';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 
@@ -129,6 +131,7 @@ export function App() {
             <Route path="/orders" element={<OrdersPage />} />
             <Route path="/orders/:shopId" element={<InvoicePage />} />
             <Route path="/invoice/:orderId" element={<SavedInvoicePage />} />
+            <Route path="/receipt/:orderId" element={<ReceiptPage />} />
             <Route path="/tasks" element={<TasksPage />} />
             <Route path="/account" element={<AccountPage />} />
             {/* new قبل :id عشان متتقراش كـid لنشاط */}
@@ -141,6 +144,7 @@ export function App() {
             <Route path="/business/:accountId/employees" element={<PerBusiness page={EmployeesPage} />} />
             <Route path="/business/:accountId/settings" element={<PerBusiness page={SettingsPage} />} />
             <Route path="/business/:accountId/metrics" element={<PerBusiness page={MetricsPage} />} />
+            <Route path="/business/:accountId/safes" element={<PerBusiness page={SafesPage} />} />
             {/* الطلبات الواردة بقت في «مهامي» (مكالمة ٣٠ سبتمبر) — اللينك القديم بيوديها */}
             <Route path="/business/:accountId/incoming" element={<Navigate to="/tasks" replace />} />
             <Route path="/auth/wasla/callback" element={<AuthCallbackPage />} />

@@ -371,6 +371,7 @@ export async function putHeader(req: Request, res: Response) {
   }
 
   const delivery = header.method === 'delivery';
+  const editor = { acc: me.accountId, name: me.name };
   const saved = await replaceHeader(order, {
     to: { acc: onsite ? header.buyer.accountId : order.to.acc, subAcc: order.to.subAcc },
     names: {
@@ -385,8 +386,8 @@ export async function putHeader(req: Request, res: Response) {
     deliveryNotes: header.deliveryNotes?.trim() || null,
     // البيعة نفسها بترجع على جهاز تاني بالرأس الجديد
     ...(onsite ? { sale: { ...(order.sale as Prisma.JsonObject), ...header, address: delivery ? header.address : '' } as Prisma.InputJsonValue } : {}),
-    editor: { acc: me.accountId, name: me.name },
-  });
+    editor,
+  }, editor);
   if (!saved) {
     res.status(409).json({ message: 'Order changed while saving, try again' });
     return;
@@ -401,7 +402,8 @@ export async function putHeader(req: Request, res: Response) {
  * POST /api/orders/:orderId/advance — المرحلة اللي بعدها، بطلب العميل (١ أكتوبر):
  * مؤكد ← [مراحل النشاط من إعداداته، ٢ أكتوبر] ← مكتمل («إتمام»). للنشاط البائع
  * بس — المشتري مبيقفلش طلب البائع. المسودة بتتأكد بـcheckout مش من هنا (رقم
- * الفاتورة). 409 = اتنقل من مكان تاني أو آخر مرحلة.
+ * الفاتورة). 409 = اتنقل من مكان تاني أو آخر مرحلة. ومع «تسليم» (أو «إتمام» لو
+ * النشاط مش مفعّلها) الفاتورة بتدخل الجدول الحاكم (مكالمة ٧ أكتوبر).
  */
 export async function advance(req: Request, res: Response) {
   const id = String(req.params.orderId);
@@ -410,8 +412,9 @@ export async function advance(req: Request, res: Response) {
     res.status(404).json({ message: 'Order not found' });
     return;
   }
+  const me = await currentUser(req);
   const to = nextIn(flowOf(await salesStagesOf(order.from.acc)), order.state);
-  const moved = to ? await advanceState(order, to) : null;
+  const moved = to ? await advanceState(order, to, { acc: me.accountId, name: me.name }) : null;
   if (!moved) {
     res.status(409).json({ message: 'Order already moved on' });
     return;

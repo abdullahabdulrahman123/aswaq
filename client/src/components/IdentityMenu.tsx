@@ -364,6 +364,12 @@ export function IdentityMenu() {
                   <Link role="menuitem" to={`/business/${selectedBusiness.accountId}/store-items`} onClick={close} className={itemClass}>
                     إدارة أصناف المتاجر
                   </Link>
+                  {/* مكالمة ٧ أكتوبر: خزن وبنوك النشاط — لصاحب الشركة لحد ما الصلاحيات تكمل */}
+                  {(selectedBusiness.job ?? 'owner') === 'owner' && (
+                    <Link role="menuitem" to={`/business/${selectedBusiness.accountId}/safes`} onClick={close} className={itemClass}>
+                      الخزن
+                    </Link>
+                  )}
                   {/* بطلب العميل (١ أكتوبر): كل موظف بيدخل بحسابه هو */}
                   <Link role="menuitem" to={`/business/${selectedBusiness.accountId}/employees`} onClick={close} className={itemClass}>
                     الموظفين

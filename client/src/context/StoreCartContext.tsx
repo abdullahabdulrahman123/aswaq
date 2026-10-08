@@ -273,6 +273,7 @@ export function useCartFocus(shopId: string | null, minimum: number | null) {
  * «عالم الأوردر» في «مبيعات»، بطلب العميل: اسم المشتري بيظهر وإنت جوه الأوردر
  * بس. أول ما البائع يخرج منه البيعة بتقفل (وسلتها بتفضل محفوظة):
  *   - صفحة المتجر وفاتورته جوه الأوردر
+ *   - و«تحصيل» عليها (مكالمة ٧ أكتوبر): الرجوع منه بيرجّع الفاتورة زي ما كانت
  *   - الرئيسية جوّاه لحد ما يختار متجر ويحط أول صنف، وبعدها الرجوع ليها خروج
  *   - أي صفحة تانية خروج
  * والبيعة اللي اتقفلت وسلتها فاضية بتتمسح — مفيش أوردر يتحفظ.
@@ -290,7 +291,10 @@ export function FollowOrderWorld() {
     judgedPath.current = pathname;
     if (!session) return;
     const inside =
-      pathname.startsWith('/store/') || pathname.startsWith('/orders/') || (pathname === '/' && lines.length === 0);
+      pathname.startsWith('/store/') ||
+      pathname.startsWith('/orders/') ||
+      pathname.startsWith('/receipt/') ||
+      (pathname === '/' && lines.length === 0);
     if (!inside) leave();
   }, [pathname, session, lines.length, leave]);
 

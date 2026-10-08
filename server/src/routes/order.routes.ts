@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import * as financeController from '../controllers/finance.controller.js';
 import * as orderController from '../controllers/order.controller.js';
 
 /**
@@ -17,5 +18,8 @@ router.get('/:orderId', orderController.get);
 router.post('/:orderId/checkout', orderController.checkout);
 router.post('/:orderId/advance', orderController.advance);
 router.post('/:orderId/cancel', orderController.cancel);
+// «تحصيل» على فاتورة البيع (مكالمة ٧ أكتوبر)
+router.get('/:orderId/receipts', financeController.receipts);
+router.post('/:orderId/receipts', financeController.collectReceipt);
 
 export default router;

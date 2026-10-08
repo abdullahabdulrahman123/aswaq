@@ -5,6 +5,7 @@ import * as storeController from '../controllers/store.controller.js';
 import * as orderController from '../controllers/order.controller.js';
 import * as settingsController from '../controllers/settings.controller.js';
 import * as metricsController from '../controllers/metrics.controller.js';
+import * as financeController from '../controllers/finance.controller.js';
 
 /**
  * كل حاجة في أسواق تبع نشاط تجاري، فكل المسارات تحت /api/businesses/:accountId.
@@ -30,6 +31,8 @@ scoped.post('/shops/:shopId/items', itemController.addToStore);
 scoped.get('/shops/settings', storeController.listSettings);
 scoped.get('/incoming', orderController.incoming);
 scoped.get('/metrics', metricsController.get);
+// الخزن ورصيدها (مكالمة ٧ أكتوبر) — الخزن نفسها في وصلة
+scoped.get('/safes', financeController.safes);
 scoped.get('/settings', settingsController.get);
 scoped.put('/settings', settingsController.update);
 scoped.put('/shops/:shopId/settings', storeController.updateSettings);

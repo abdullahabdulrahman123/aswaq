@@ -1,6 +1,7 @@
 import type { Item, Order, OrderDetail, Prisma } from '@prisma/client';
 import { prisma } from '../config/db.js';
 import type { DraftInput, LineInput } from '../schemas/order.schema.js';
+import { isWriteConflict, recordSaleIfReceived, resyncSale, reverseSale } from './ledger.service.js';
 import { CLOSED_STATES } from './orderFlow.js';
 
 type PriceField = 'onSWP' | 'onSRP' | 'onLWP' | 'onLRP';
@@ -213,11 +214,34 @@ export async function replaceDetails(order: Order, details: OrderDetail[], edito
 
 /** زي replaceDetails، لفاتورة اتأكدت: بشرط إنها لسه في نفس المرحلة ومتغيّرتش */
 export async function replaceConfirmedDetails(order: Order, details: OrderDetail[], editor: { acc: string; name: string }) {
-  const { count } = await prisma.order.updateMany({
-    where: { id: order.id, state: order.state, updatedAt: order.updatedAt },
-    data: { details, ...totalsOf(details), editor, updatedAt: new Date() },
-  });
-  return count === 1;
+  return (
+    (await guarded(order, { details, ...totalsOf(details), editor, updatedAt: new Date() }, (tx, saved) => resyncSale(tx, order, saved, editor))) !== null
+  );
+}
+
+/**
+ * تعديل فاتورة مؤكدة بشرط إنها متغيّرتش من ساعة ما اتقرت، وفي نفس العملية اللي
+ * الجدول الحاكم محتاجه (مكالمة ٧ أكتوبر: «يا كله يا مفيش»). null = اتعدّلت أو اتنقلت
+ * من مكان تاني في نفس اللحظة — وكمان لو مونجو وقّف العملية عشان تعارض كتابة.
+ */
+async function guarded(
+  order: Order,
+  data: Prisma.OrderUpdateManyMutationInput,
+  then: (tx: Prisma.TransactionClient, saved: Order) => Promise<void>,
+  where: Prisma.OrderWhereInput = { updatedAt: order.updatedAt },
+): Promise<Order | null> {
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const { count } = await tx.order.updateMany({ where: { id: order.id, state: order.state, ...where }, data });
+      if (count !== 1) return null;
+      const saved = (await tx.order.findUnique({ where: { id: order.id } }))!;
+      await then(tx, saved);
+      return saved;
+    });
+  } catch (err) {
+    if (isWriteConflict(err)) return null;
+    throw err;
+  }
 }
 
 export function deleteOrder(id: string) {
@@ -286,36 +310,31 @@ export function checkOut(id: string, number: number) {
  * المرحلة اللي بعدها — بشرط إن الأوردر لسه في المرحلة اللي الواجهة شافتها،
  * فدوستين في نفس اللحظة مبينقلوش مرحلتين. null = اتغيّر من مكان تاني.
  */
-export async function advanceState(order: Order, to: string) {
-  const { count } = await prisma.order.updateMany({
-    where: { id: order.id, state: order.state },
-    data: { state: to, ...(to === 'done' ? { completedAt: new Date() } : {}) },
-  });
-  return count === 1 ? prisma.order.findUnique({ where: { id: order.id } }) : null;
+export async function advanceState(order: Order, to: string, person: { acc: string; name: string }) {
+  // مكالمة ٧ أكتوبر: الفاتورة اللي العميل استلمها بتدخل الجدول الحاكم مع المرحلة
+  return guarded(order, { state: to, ...(to === 'done' ? { completedAt: new Date() } : {}) }, (tx, saved) => recordSaleIfReceived(tx, saved, person), {});
 }
 
 /**
  * رأس فاتورة مؤكدة (رسالة العميل ٦ أكتوبر) — بشرط إنها متغيّرتش من ساعة ما
- * اتقرت. null = اتعدّلت أو اتنقلت من مكان تاني في نفس اللحظة
+ * اتقرت. null = اتعدّلت أو اتنقلت من مكان تاني في نفس اللحظة. العميل لو اتغيّر
+ * في فاتورة دخلت الجدول الحاكم، حركتها بتتنقل له
  */
-export async function replaceHeader(order: Order, data: Prisma.OrderUpdateManyMutationInput) {
-  const { count } = await prisma.order.updateMany({
-    where: { id: order.id, state: order.state, updatedAt: order.updatedAt },
-    data: { ...data, updatedAt: new Date() },
-  });
-  return count === 1 ? prisma.order.findUnique({ where: { id: order.id } }) : null;
+export async function replaceHeader(order: Order, data: Prisma.OrderUpdateManyMutationInput, editor: { acc: string; name: string }) {
+  return guarded(order, { ...data, updatedAt: new Date() }, (tx, saved) => resyncSale(tx, order, saved, editor));
 }
 
 /**
  * الإلغاء (مكالمة ٥ أكتوبر): من المرحلة اللي الأوردر فيها لـcancelled، مع مين
- * لغى وليه. لو اتنقل أو اتعدّل في نفس اللحظة من جهاز تاني: null
+ * لغى وليه. لو اتنقل أو اتعدّل في نفس اللحظة من جهاز تاني: null. والفاتورة اللي
+ * كانت دخلت الجدول الحاكم بتطلع منه بحركة بالعكس (مكالمة ٧ أكتوبر)
  */
 export async function cancelState(order: Order, by: 'seller' | 'buyer', person: { acc: string; name: string }, reason: string) {
-  const { count } = await prisma.order.updateMany({
-    where: { id: order.id, state: order.state, updatedAt: order.updatedAt },
-    data: { state: 'cancelled', cancellation: { by, person, reason, at: new Date() }, editor: person, updatedAt: new Date() },
-  });
-  return count === 1 ? prisma.order.findUnique({ where: { id: order.id } }) : null;
+  return guarded(
+    order,
+    { state: 'cancelled', cancellation: { by, person, reason, at: new Date() }, editor: person, updatedAt: new Date() },
+    (tx) => reverseSale(tx, order, person),
+  );
 }
 
 /**

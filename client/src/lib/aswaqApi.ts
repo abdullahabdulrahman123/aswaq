@@ -553,6 +553,60 @@ export async function cancelOrder(token: string, orderId: string, reason: string
   return order;
 }
 
+/**
+ * خزنة (مكالمة ٧ أكتوبر) — من وصلة، ورصيدها من أسواق: الافتتاحي + اللي دخلها − اللي
+ * طلع منها. كل المبالغ بالقرش. mine = في عهدة المستخدم ده (التحصيل بيروح لها)
+ */
+export interface Safe {
+  id: string;
+  subAccountId: string;
+  name: string;
+  custodian: { accountId: string; name: string };
+  openingBalance: number;
+  balance: number;
+  mine: boolean;
+  creator: { accountId: string; name: string };
+  createdAt: string;
+}
+
+export async function fetchSafes(token: string, accountId: string): Promise<Safe[]> {
+  const { safes } = await request<{ safes: Safe[] }>(`/api/businesses/${encodeURIComponent(accountId)}/safes`, token);
+  return safes;
+}
+
+/** إيصال استلام نقدية — «تحصيل» على فاتورة بيع (financials، kind receipt) */
+export interface Receipt {
+  id: string;
+  number: number;
+  amount: number;
+  orderId: string;
+  invoiceNumber: number | null;
+  names: { from: string; to: string; safe: string };
+  notes: string | null;
+  creator: { acc: string; name: string };
+  createdAt: string;
+}
+
+export interface Collection {
+  receipts: Receipt[];
+  /** اللي اتحصّل لحد دلوقتي */
+  paid: number;
+  /** إجمالي الفاتورة − اللي اتحصّل */
+  remaining: number;
+}
+
+export async function fetchReceipts(token: string, orderId: string): Promise<Collection> {
+  return request<Collection>(`/api/orders/${encodeURIComponent(orderId)}/receipts`, token);
+}
+
+/** 403 = الخزنة مش في عهدته، 409 = الفاتورة اتلغت، 422 = المبلغ أكبر من الباقي */
+export async function postReceipt(token: string, orderId: string, input: { safeId: string; amount: number; notes?: string }) {
+  return request<{ receipt: Receipt; paid: number; remaining: number }>(`/api/orders/${encodeURIComponent(orderId)}/receipts`, token, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
 export async function checkoutOrder(token: string, orderId: string): Promise<Order> {
   const { order } = await request<{ order: Order }>(`/api/orders/${encodeURIComponent(orderId)}/checkout`, token, {
     method: 'POST',

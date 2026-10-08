@@ -150,6 +150,17 @@ export function SavedInvoicePage() {
         >
           طباعة
         </button>
+        {/* مكالمة ٧ أكتوبر: «تحصيل» للنشاط البائع — إيصال استلام نقدية، والرجوع بيرجّع هنا */}
+        {canPrice && order.state !== 'cancelled' && (
+          <button
+            type="button"
+            data-collect
+            onClick={() => navigate(`/receipt/${order.id}`, { state: { from: 'invoice' } })}
+            className="rounded-xl border border-brand-500 px-6 py-3 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 dark:text-brand-300 dark:hover:bg-brand-500/10"
+          >
+            تحصيل
+          </button>
+        )}
         {(sellerCancel || buyerCancel) && (
           <button
             type="button"

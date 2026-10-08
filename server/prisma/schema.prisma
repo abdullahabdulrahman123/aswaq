@@ -339,7 +339,86 @@ type MetricPremises {
   future     Int
 }
 
-/** عدّادات أرقام الفواتير — صف لكل نشاط بائع */
+/**
+ * المعاملات المالية (مكالمة ٧ أكتوبر، «فاينانشيالز») — كل حركة فلوس من/إلى، زي الأوردر
+ * من غير أصناف. أولها «تحصيل» من فاتورة البيع (receipt): من العميل — حسابه الفرعي فاضي
+ * لحد ما يبقى طرف أصيل ويحدده هو — لخزنة النشاط اللي في عهدة اللي حصّل (الخزن في وصلة).
+ * بعدين: الدفع للمورد، والتأجيل والتقسيط ووعد الدفع، و«طلب صرف» بمراحل زي الأوردر.
+ *
+ * المكتملة بس بتدخل transactions (الجدول الحاكم) — في نفس العملية، يا كله يا مفيش.
+ */
+model Financial {
+  id        String         @id @default(auto()) @map("_id") @db.ObjectId
+  /** رقم الإيصال — مسلسل لكل نشاط، زي رقم الفاتورة */
+  number    Int
+  /** receipt (تحصيل) — والباقي مع المرحلة الجاية */
+  kind      String
+  /** done: التحصيل بيتم على طول. المراحل (في انتظار الموافقة…) مع طلب الصرف بعدين */
+  state     String
+  /** النشاط صاحب المعاملة — في التحصيل اللي استلم الفلوس */
+  accountId String         @db.ObjectId
+  from      OrderParty
+  /** to.subAcc = الحساب الفرعي بتاع الخزنة في وصلة */
+  to        OrderParty
+  /** بالقرش، أكبر من صفر */
+  amount    Int
+  /** الفاتورة اللي التحصيل عليها، ورقمها */
+  orderId   String?        @db.ObjectId
+  invoiceNumber Int?
+  /** للعرض والطباعة: نسخة من الأسامي ساعة المعاملة */
+  names     FinancialNames
+  notes     String?
+  creator   OrderPerson
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@index([orderId])
+  @@index([accountId, number])
+  @@map("financials")
+}
+
+type FinancialNames {
+  /** العميل — الاسم الأدبي من الفاتورة */
+  from String
+  /** النشاط */
+  to   String
+  /** الخزنة */
+  safe String
+}
+
+/**
+ * الجدول الحاكم (مكالمة ٧ أكتوبر، «ترانزاكشنز»): العمليات المكتملة بس، من الأوردرات
+ * والمعاملات المالية — «سنجل سورس أوف تروث للحسابات». مبيهمّوش التفاصيل: من/إلى
+ * والقيمة والمرجع. ومبيتعدّلش — الغلط بيتصلّح بحركة بالعكس:
+ *   sale     — فاتورة بيع العميل استلمها (أول «تسليم» أو «إتمام»): من البائع (متجره) للعميل
+ *   receipt  — تحصيل: من العميل لخزنة النشاط
+ *   reversal — فاتورة دخلت هنا واتلغت أو اتعدّلت: قيمتها القديمة بالعكس (والمعدّلة sale جديدة)
+ * رصيد أي حساب فرعي (خزنة مثلاً) = اللي دخله (to) − اللي طلع منه (from)، والعميل عند
+ * النشاط عليه فواتيره ناقص اللي دفعه — «الحساب السابق» بعدين.
+ */
+model Transaction {
+  id        String      @id @default(auto()) @map("_id") @db.ObjectId
+  kind      String
+  from      OrderParty
+  to        OrderParty
+  /** بالقرش، أكبر من صفر — الاتجاه في from وto */
+  amount    Int
+  /** order | financial */
+  source    String
+  /** id الأوردر أو المعاملة */
+  ref       String      @db.ObjectId
+  creator   OrderPerson
+  createdAt DateTime    @default(now())
+
+  @@index([source, ref])
+  @@index([from.acc])
+  @@index([to.acc])
+  @@index([from.subAcc])
+  @@index([to.subAcc])
+  @@map("transactions")
+}
+
+/** عدّادات أرقام الفواتير والإيصالات — صف لكل نشاط (invoice:… وreceipt:…) */
 model Counter {
   id  String @id @map("_id")
   seq Int
