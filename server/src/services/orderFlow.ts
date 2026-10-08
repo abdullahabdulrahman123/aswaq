@@ -94,6 +94,29 @@ export async function salesStagesOf(businessId: string): Promise<string[]> {
   return row?.salesStages ?? [];
 }
 
+/**
+ * الطلب بيبقى فاتورة مع المرحلة دي (رسالة العميل ٨ أكتوبر: «إعداد إمتى تبقى فاتورة»): اللي
+ * صاحب الشركة اختارها لو لسه من مراحله، وإلا «تسليم» لو مفعّلة، وإلا «إتمام»
+ */
+export function invoiceStageOf(salesStages: string[], chosen: string | null | undefined): string {
+  if (chosen && (chosen === 'done' || salesStages.includes(chosen))) return chosen;
+  return salesStages.includes('delivered') ? 'delivered' : 'done';
+}
+
+/** المرحلة دي وصلت مرحلة الفاتورة أو عدّتها؟ الملغية لأ */
+export function reachesInvoice(flow: string[], state: string, invoiceStage: string): boolean {
+  if (state === 'cancelled') return false;
+  const at = flow.indexOf(state);
+  return state === 'done' || (at >= 0 && at >= flow.indexOf(invoiceStage));
+}
+
+/** مراحل النشاط ومرحلة الفاتورة عنده */
+export async function salesFlowOf(businessId: string): Promise<{ flow: string[]; invoiceStage: string }> {
+  const row = await prisma.businessSettings.findUnique({ where: { businessId } });
+  const stages = row?.salesStages ?? [];
+  return { flow: flowOf(stages), invoiceStage: invoiceStageOf(stages, row?.invoiceStage) };
+}
+
 export type OrderView = Order & {
   /** اسم المرحلة — للمشتري والبائع */
   stateLabel: string;

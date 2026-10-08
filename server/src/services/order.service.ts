@@ -1,7 +1,7 @@
 import type { Item, Order, OrderDetail, Prisma } from '@prisma/client';
 import { prisma } from '../config/db.js';
 import type { DraftInput, LineInput } from '../schemas/order.schema.js';
-import { isWriteConflict, recordSaleIfReceived, resyncSale, reverseSale } from './ledger.service.js';
+import { isWriteConflict, recordSale } from './ledger.service.js';
 import { CLOSED_STATES } from './orderFlow.js';
 
 type PriceField = 'onSWP' | 'onSRP' | 'onLWP' | 'onLRP';
@@ -190,6 +190,24 @@ export function findDraft(creatorAcc: string, ref: string) {
 }
 
 /**
+ * مسودة «مبيعات» بتاعة النشاط البائع (مكالمة ٨ أكتوبر: «ده بيزنس خليها تظهر للجميع»)
+ * — أي حد فيه بيكمّل على نفس المسودة، مش نسخة باسمه. الـref فيه رقم البيعة
+ */
+export function findSaleDraft(sellerAcc: string, ref: string) {
+  return prisma.order.findFirst({ where: { from: { is: { acc: sellerAcc } }, source: 'onsite', ref, state: 'draft' } });
+}
+
+/** مسودات «مبيعات» اللي لسه متأكدتش للأنشطة دي — اللي عملها أي حد فيها */
+export function listSaleDrafts(sellerAccs: string[]) {
+  if (sellerAccs.length === 0) return Promise.resolve([]);
+  return prisma.order.findMany({
+    where: { from: { is: { acc: { in: sellerAccs } } }, source: 'onsite', state: 'draft' },
+    orderBy: { updatedAt: 'desc' },
+    take: 200,
+  });
+}
+
+/**
  * المسودة كلها. القديمة بتتحدّث بشرط إنها لسه مسودة: حفظ متأخر كان بيوصل بعد
  * «تأكيد» ويرجّع الأوردر المؤكد مسودة (state: 'draft') — ظهر مع «تأكيد» من
  * أكورديون «مبيعات» (١ أكتوبر). null = اتأكدت في النص.
@@ -214,34 +232,11 @@ export async function replaceDetails(order: Order, details: OrderDetail[], edito
 
 /** زي replaceDetails، لفاتورة اتأكدت: بشرط إنها لسه في نفس المرحلة ومتغيّرتش */
 export async function replaceConfirmedDetails(order: Order, details: OrderDetail[], editor: { acc: string; name: string }) {
-  return (
-    (await guarded(order, { details, ...totalsOf(details), editor, updatedAt: new Date() }, (tx, saved) => resyncSale(tx, order, saved, editor))) !== null
-  );
-}
-
-/**
- * تعديل فاتورة مؤكدة بشرط إنها متغيّرتش من ساعة ما اتقرت، وفي نفس العملية اللي
- * الجدول الحاكم محتاجه (مكالمة ٧ أكتوبر: «يا كله يا مفيش»). null = اتعدّلت أو اتنقلت
- * من مكان تاني في نفس اللحظة — وكمان لو مونجو وقّف العملية عشان تعارض كتابة.
- */
-async function guarded(
-  order: Order,
-  data: Prisma.OrderUpdateManyMutationInput,
-  then: (tx: Prisma.TransactionClient, saved: Order) => Promise<void>,
-  where: Prisma.OrderWhereInput = { updatedAt: order.updatedAt },
-): Promise<Order | null> {
-  try {
-    return await prisma.$transaction(async (tx) => {
-      const { count } = await tx.order.updateMany({ where: { id: order.id, state: order.state, ...where }, data });
-      if (count !== 1) return null;
-      const saved = (await tx.order.findUnique({ where: { id: order.id } }))!;
-      await then(tx, saved);
-      return saved;
-    });
-  } catch (err) {
-    if (isWriteConflict(err)) return null;
-    throw err;
-  }
+  const { count } = await prisma.order.updateMany({
+    where: { id: order.id, state: order.state, updatedAt: order.updatedAt },
+    data: { details, ...totalsOf(details), editor, updatedAt: new Date() },
+  });
+  return count === 1;
 }
 
 export function deleteOrder(id: string) {
@@ -286,10 +281,6 @@ export function findById(id: string) {
   return prisma.order.findUnique({ where: { id } });
 }
 
-export function findMine(creatorAcc: string, id: string) {
-  return prisma.order.findFirst({ where: { id, creator: { is: { acc: creatorAcc } } } });
-}
-
 /** رقم الفاتورة الجاي للنشاط ده — findAndModify ذري، فطلبين في نفس اللحظة ميخدوش نفس الرقم */
 export async function nextNumber(sellerAcc: string): Promise<number> {
   const res = (await prisma.$runCommandRaw({
@@ -303,38 +294,53 @@ export async function nextNumber(sellerAcc: string): Promise<number> {
 }
 
 export function checkOut(id: string, number: number) {
-  return prisma.order.update({ where: { id }, data: { state: 'order', number, checkedOutAt: new Date() } });
+  return prisma.order.update({ where: { id }, data: { state: 'order', kind: 'order', number, checkedOutAt: new Date() } });
 }
 
 /**
  * المرحلة اللي بعدها — بشرط إن الأوردر لسه في المرحلة اللي الواجهة شافتها،
  * فدوستين في نفس اللحظة مبينقلوش مرحلتين. null = اتغيّر من مكان تاني.
  */
-export async function advanceState(order: Order, to: string, person: { acc: string; name: string }) {
-  // مكالمة ٧ أكتوبر: الفاتورة اللي العميل استلمها بتدخل الجدول الحاكم مع المرحلة
-  return guarded(order, { state: to, ...(to === 'done' ? { completedAt: new Date() } : {}) }, (tx, saved) => recordSaleIfReceived(tx, saved, person), {});
+export async function advanceState(order: Order, to: string, person: { acc: string; name: string }, invoice: boolean) {
+  const data = { state: to, ...(to === 'done' ? { completedAt: new Date() } : {}), ...(invoice ? { kind: 'invoice' } : {}) };
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const { count } = await tx.order.updateMany({ where: { id: order.id, state: order.state }, data });
+      if (count !== 1) return null;
+      const saved = (await tx.order.findUnique({ where: { id: order.id } }))!;
+      // رسالة العميل ٨ أكتوبر: الأوردر بقى فاتورة — حركته بتدخل الجدول الحاكم في نفس العملية
+      if (invoice) await recordSale(tx, saved, person);
+      return saved;
+    });
+  } catch (err) {
+    // دوستين في نفس اللحظة — مونجو وقّف واحدة
+    if (isWriteConflict(err)) return null;
+    throw err;
+  }
 }
 
 /**
  * رأس فاتورة مؤكدة (رسالة العميل ٦ أكتوبر) — بشرط إنها متغيّرتش من ساعة ما
- * اتقرت. null = اتعدّلت أو اتنقلت من مكان تاني في نفس اللحظة. العميل لو اتغيّر
- * في فاتورة دخلت الجدول الحاكم، حركتها بتتنقل له
+ * اتقرت. null = اتعدّلت أو اتنقلت من مكان تاني في نفس اللحظة
  */
-export async function replaceHeader(order: Order, data: Prisma.OrderUpdateManyMutationInput, editor: { acc: string; name: string }) {
-  return guarded(order, { ...data, updatedAt: new Date() }, (tx, saved) => resyncSale(tx, order, saved, editor));
+export async function replaceHeader(order: Order, data: Prisma.OrderUpdateManyMutationInput) {
+  const { count } = await prisma.order.updateMany({
+    where: { id: order.id, state: order.state, updatedAt: order.updatedAt },
+    data: { ...data, updatedAt: new Date() },
+  });
+  return count === 1 ? prisma.order.findUnique({ where: { id: order.id } }) : null;
 }
 
 /**
  * الإلغاء (مكالمة ٥ أكتوبر): من المرحلة اللي الأوردر فيها لـcancelled، مع مين
- * لغى وليه. لو اتنقل أو اتعدّل في نفس اللحظة من جهاز تاني: null. والفاتورة اللي
- * كانت دخلت الجدول الحاكم بتطلع منه بحركة بالعكس (مكالمة ٧ أكتوبر)
+ * لغى وليه. لو اتنقل أو اتعدّل في نفس اللحظة من جهاز تاني: null
  */
 export async function cancelState(order: Order, by: 'seller' | 'buyer', person: { acc: string; name: string }, reason: string) {
-  return guarded(
-    order,
-    { state: 'cancelled', cancellation: { by, person, reason, at: new Date() }, editor: person, updatedAt: new Date() },
-    (tx) => reverseSale(tx, order, person),
-  );
+  const { count } = await prisma.order.updateMany({
+    where: { id: order.id, state: order.state, updatedAt: order.updatedAt },
+    data: { state: 'cancelled', cancellation: { by, person, reason, at: new Date() }, editor: person, updatedAt: new Date() },
+  });
+  return count === 1 ? prisma.order.findUnique({ where: { id: order.id } }) : null;
 }
 
 /**

@@ -3,17 +3,21 @@ import { useParams } from 'react-router-dom';
 import { Notch, fieldClass } from '../components/OutlinedField';
 import { SessionExpiredNotice } from '../components/SessionExpiredNotice';
 import { useAuth } from '../context/AuthContext';
-import { fetchSafes, type Safe } from '../lib/aswaqApi';
+import { fetchSafes, postSafe, postSafeOpening, type Safe } from '../lib/aswaqApi';
 import { egp } from '../lib/money';
-import { moneyInput, toPiastres, toPounds } from '../lib/quantity';
-import { ApiError, SessionExpiredError, fetchEmployees, postSafe, putSafe, type Employee } from '../lib/waslaApi';
+import { moneyInput, toPiastres } from '../lib/quantity';
+import { ApiError, SessionExpiredError, fetchEmployees, putSafe, type Employee } from '../lib/waslaApi';
 
 /**
  * «الخزن» (مكالمة ٧ أكتوبر) — خزن وبنوك النشاط: «الخزنة الرئيسية»، «عهدة متولي»…
  * مش لازم خزنة حقيقية: «ممكن تكون جيب التابلوه بتاع العربية». لكل خزنة اسم، والموظف
- * المسؤول عنها، ورصيد افتتاحي («إحنا ما بننشئش شركة من الصفر»).
+ * المسؤول عنها، ورصيد أول المدة («إحنا ما بننشئش شركة من الصفر»).
  *
- * الخزنة في وصلة (حساب فرعي)، ورصيدها من أسواق: الافتتاحي + اللي دخلها − اللي طلع.
+ * الخزنة في وصلة (حساب فرعي)، ورصيدها من الجدول الحاكم في أسواق: اللي دخلها − اللي طلع.
+ * مكالمة ٨ أكتوبر: رصيد أول المدة «لازم يكون حركة» — بيتسجّل مع «إضافة» من null للخزنة،
+ * و«مع أول حفظ هيتقفل»: التعديل للاسم والمسؤول بس، والغلط بعد كده «قيد تصحيح». لو الحركة
+ * متسجّلتش (النت وقع مثلاً) الخزنة بتقول كده وجنبها «سجّله».
+ *
  * «تحصيل» على فاتورة البيع بيروح لخزنة في عهدة اللي بيحصّل. العمل والتعديل لصاحب
  * الشركة بس لحد ما الصلاحيات تكمل.
  */
@@ -81,10 +85,15 @@ export function SafesPage() {
     setSaving(true);
     setError('');
     try {
-      const body = { name: input.name.trim(), custodianId: input.custodianId, openingBalance: toPiastres(input.opening) ?? 0 };
-      await withToken((token) => (safeId ? putSafe(token, accountId, safeId, body) : postSafe(token, accountId, body)));
-      if (safeId) setEditingId('');
-      else setDraft({ ...EMPTY, custodianId: input.custodianId });
+      const body = { name: input.name.trim(), custodianId: input.custodianId };
+      if (safeId) {
+        await withToken((token) => putSafe(token, accountId, safeId, body));
+        setEditingId('');
+      } else {
+        const { safe } = await withToken((token) => postSafe(token, accountId, { ...body, openingBalance: toPiastres(input.opening) ?? 0 }));
+        setDraft({ ...EMPTY, custodianId: input.custodianId });
+        if (!safe.openingRecorded) setError(`«${safe.name}» اتعملت بس رصيد أول المدة متسجّلش — دوس «سجّله» جنبها.`);
+      }
       await load();
     } catch (err) {
       if (err instanceof SessionExpiredError) return;
@@ -92,6 +101,23 @@ export function SafesPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  /** رصيد أول المدة لخزنة اتعملت وحركتها متسجّلتش */
+  async function recordOpening(safe: Safe) {
+    if (saving) return;
+    setSaving(true);
+    setError('');
+    try {
+      await withToken((token) => postSafeOpening(token, accountId, safe.id));
+    } catch (err) {
+      if (err instanceof SessionExpiredError) return;
+      // 409 = اتسجّل من جهاز تاني — الليستة الجاية بتقول كده
+      if (!(err instanceof ApiError && err.status === 409)) setError(err instanceof ApiError ? err.message : 'مقدرناش نسجّل رصيد أول المدة.');
+    } finally {
+      setSaving(false);
+    }
+    await load();
   }
 
   if (!user) {
@@ -126,6 +152,17 @@ export function SafesPage() {
         <section aria-label="خزنة جديدة" className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-white/10 dark:bg-surface-card">
           <h2 className="mb-5 font-display text-base font-bold">خزنة جديدة</h2>
           <SafeFields draft={draft} employees={employees} onChange={setDraft} />
+          <label className="relative mt-5 block">
+            <input
+              className={`${fieldClass} tabular-nums`}
+              value={draft.opening}
+              onChange={(e) => setDraft({ ...draft, opening: moneyInput(e.target.value) })}
+              inputMode="decimal"
+              placeholder="0"
+            />
+            <Notch>رصيد أول المدة (جنيه)</Notch>
+          </label>
+          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">بيتسجّل حركة مع «إضافة» ومبيتعدّلش بعدها.</p>
           <div className="mt-5 flex justify-end">
             <button
               type="button"
@@ -155,6 +192,9 @@ export function SafesPage() {
               {editingId === s.id ? (
                 <>
                   <SafeFields draft={editDraft} employees={employees} onChange={setEditDraft} />
+                  <p className="mt-3 text-xs text-gray-500 dark:text-gray-400 tabular-nums">
+                    رصيد أول المدة {egp(s.openingBalance)} — اتقفل مع أول حفظ، والتصحيح بقيد تصحيح.
+                  </p>
                   <div className="mt-4 flex justify-end gap-2">
                     <button type="button" onClick={() => setEditingId('')} className="rounded-lg px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
                       رجوع
@@ -178,7 +218,7 @@ export function SafesPage() {
                         type="button"
                         aria-label={`تعديل ${s.name}`}
                         onClick={() => {
-                          setEditDraft({ name: s.name, custodianId: s.custodian.accountId, opening: toPounds(s.openingBalance) });
+                          setEditDraft({ name: s.name, custodianId: s.custodian.accountId, opening: '' });
                           setEditingId(s.id);
                           setError('');
                         }}
@@ -194,7 +234,7 @@ export function SafesPage() {
                         في عهدة {s.custodian.name || '—'}
                         {s.mine && ' (أنت)'}
                       </span>
-                      <span className="mt-0.5 block text-gray-400 tabular-nums">الرصيد الافتتاحي {egp(s.openingBalance)}</span>
+                      <span className="mt-0.5 block text-gray-400 tabular-nums">رصيد أول المدة {egp(s.openingBalance)}</span>
                     </span>
                     <span className="shrink-0 text-end">
                       <span className="block text-[11px] text-gray-400">الرصيد</span>
@@ -203,6 +243,21 @@ export function SafesPage() {
                       </span>
                     </span>
                   </div>
+                  {!s.openingRecorded && (
+                    <div data-opening-missing className="mt-2 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
+                      <span className="min-w-0 flex-1">رصيد أول المدة لسه متسجّلش حركة.</span>
+                      {isOwner && (
+                        <button
+                          type="button"
+                          onClick={() => recordOpening(s)}
+                          disabled={saving}
+                          className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 font-semibold text-white transition hover:bg-amber-700 disabled:opacity-60"
+                        >
+                          سجّله
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </>
               )}
             </li>
@@ -213,7 +268,7 @@ export function SafesPage() {
   );
 }
 
-/** اسم الخزنة والمسؤول عنها ورصيدها الافتتاحي — للجديدة وللتعديل */
+/** اسم الخزنة والمسؤول عنها — للجديدة وللتعديل. رصيد أول المدة للجديدة بس */
 function SafeFields({ draft, employees, onChange }: { draft: Draft; employees: Employee[]; onChange: (d: Draft) => void }) {
   return (
     <div className="grid gap-5">
@@ -238,16 +293,6 @@ function SafeFields({ draft, employees, onChange }: { draft: Draft; employees: E
           ))}
         </select>
         <Notch>المسؤول عنها</Notch>
-      </label>
-      <label className="relative block">
-        <input
-          className={`${fieldClass} tabular-nums`}
-          value={draft.opening}
-          onChange={(e) => onChange({ ...draft, opening: moneyInput(e.target.value) })}
-          inputMode="decimal"
-          placeholder="0"
-        />
-        <Notch>الرصيد الافتتاحي (جنيه)</Notch>
       </label>
     </div>
   );

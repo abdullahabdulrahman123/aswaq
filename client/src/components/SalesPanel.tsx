@@ -8,7 +8,7 @@ import { nowMinute, type Delivery } from '../lib/delivery';
 import { draftInput, draftRef, rememberDraftId } from '../lib/draftSync';
 import { orderToView } from '../lib/invoiceView';
 import type { ReceivingMethod } from '../lib/itemUnits';
-import { CONFIRM_ACTION, closedMessage, isOpenState, nextActionOf, stageLabel } from '../lib/orderFlow';
+import { CONFIRM_ACTION, closedMessage, isEditable, isOpenState, nextActionOf, stageLabel } from '../lib/orderFlow';
 import { PERMISSIONS, can, deniedMessage } from '../lib/permissions';
 import { latinDigits } from '../lib/quantity';
 import { ApiError, searchCustomers, type Customer } from '../lib/waslaApi';
@@ -200,8 +200,8 @@ export function SalesPanel({
         className="mt-3 rounded-2xl border border-brand-300 bg-brand-50/60 p-1.5 dark:border-brand-500/40 dark:bg-brand-500/10 sm:max-w-xl print:hidden"
       >
         <div className="flex items-center gap-2">
-          {confirmed && !(order && !loading && isOpenState(order.state)) ? (
-            // خلصت أو اتلغت (أو لسه بتتجاب) — الرأس مبيتفتحش
+          {confirmed && !(order && !loading && isEditable(order)) ? (
+            // خلصت أو اتلغت أو بقت فاتورة (أو لسه بتتجاب) — الرأس مبيتفتحش
             <div className="min-w-0 flex-1 px-2 py-1">
               <span className="block truncate text-sm font-bold leading-tight">{buyerLabel(sale)}</span>
               <span role="status" className={`block truncate text-[11px] font-semibold leading-tight ${order && !loading ? stageColor(order).text : 'text-gray-500'}`}>
@@ -305,7 +305,7 @@ export function SalesPanel({
                 تحصيل
               </button>
             )}
-            {order && !loading && isOpenState(order.state) && (
+            {order && !loading && isEditable(order) && (
               <button
                 type="button"
                 aria-disabled={!can(business, PERMISSIONS.invoiceCancel)}
@@ -530,7 +530,8 @@ function SalesForm({
       } catch (err) {
         setSaving(false);
         if (err instanceof ApiError && err.status === 403) setError(deniedMessage(PERMISSIONS.invoiceHeader));
-        else if (err instanceof ApiError && err.status === 409) setError(closedMessage(confirmedOrder.state === 'cancelled' ? 'cancelled' : 'done'));
+        // 409 في فاتورة مفتوحة = بقت فاتورة من جهاز تاني
+        else if (err instanceof ApiError && err.status === 409) setError(closedMessage(isOpenState(confirmedOrder.state) ? { ...confirmedOrder, kind: 'invoice' } : confirmedOrder));
         else setError(err instanceof ApiError ? err.message : 'مقدرناش نحفظ بيانات الفاتورة.');
         return;
       }

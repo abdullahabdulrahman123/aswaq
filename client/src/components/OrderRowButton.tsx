@@ -6,7 +6,8 @@ import { stageColor } from '../lib/stageColors';
 
 /**
  * صف أوردر في «طلباتي» أو في بيعات «الطلبات الواردة» اللي لسه متأكدتش: الشركة
- * (أو مشتري البيعة) والمتجر، ومسودة ولا فاتورة برقمها، والإجمالي.
+ * (أو مشتري البيعة) والمتجر، ومسودة ولا فاتورة برقمها، والإجمالي — واسم اللي
+ * عمل المسودة لو زميل في الشركة.
  */
 export function OrderRowButton({ row, onOpen, title }: { row: OrderRow; onOpen: () => void; title: string }) {
   return (
@@ -32,6 +33,8 @@ export function OrderRowButton({ row, onOpen, title }: { row: OrderRow; onOpen: 
           <span className="mt-0.5 block truncate text-sm text-gray-500 dark:text-gray-400">
             {row.store}
             {row.buyer && row.buyer !== title && <> · بيع لـ{row.buyer}</>}
+            {/* مسودة زميل في الشركة (مكالمة ٨ أكتوبر) */}
+            {row.by && <span data-created-by> · عملها {row.by}</span>}
           </span>
         </span>
         <span className="shrink-0 text-end">

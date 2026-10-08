@@ -2,7 +2,20 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { currentUser, findManagedBusiness } from '../middleware/auth.js';
 import { isObjectId } from '../schemas/common.js';
-import { NotCollectableError, OverpaymentError, collect, fetchWaslaSafes, paidOf, receiptsOf } from '../services/finance.service.js';
+import {
+  NotCollectableError,
+  OpeningExistsError,
+  OverpaymentError,
+  WaslaSafeError,
+  collect,
+  createWaslaSafe,
+  fetchWaslaSafes,
+  openingsOf,
+  paidOf,
+  receiptsOf,
+  recordOpening,
+  type WaslaSafe,
+} from '../services/finance.service.js';
 import { movementOf } from '../services/ledger.service.js';
 import { findById } from '../services/order.service.js';
 
@@ -13,16 +26,102 @@ import { findById } from '../services/order.service.js';
  */
 
 /**
- * GET /api/businesses/:accountId/safes — خزن النشاط ورصيد كل واحدة: الافتتاحي + اللي
- * دخلها − اللي طلع منها. mine = في عهدة المستخدم ده (التحصيل بيروح لها)
+ * GET /api/businesses/:accountId/safes — خزن النشاط ورصيد كل واحدة من الجدول الحاكم بس: اللي
+ * دخلها − اللي طلع منها، ورصيد أول المدة أول حركة فيها (مكالمة ٨ أكتوبر). mine = في عهدة
+ * المستخدم ده (التحصيل بيروح لها)، openingRecorded = رصيد أول المدة اتسجّل حركة (أو صفر)
  */
 export async function safes(req: Request, res: Response) {
   const me = await currentUser(req);
   const list = await fetchWaslaSafes(req.waslaToken!, req.business!.accountId);
-  const moved = await movementOf(list.map((s) => s.subAccountId));
+  const subAccs = list.map((s) => s.subAccountId);
+  const moved = await movementOf(subAccs);
+  const opened = await openingsOf(subAccs);
   res.json({
-    safes: list.map((s) => ({ ...s, balance: s.openingBalance + (moved.get(s.subAccountId) ?? 0), mine: s.custodian.accountId === me.accountId })),
+    safes: list.map((s) => ({
+      ...s,
+      balance: moved.get(s.subAccountId) ?? 0,
+      mine: s.custodian.accountId === me.accountId,
+      openingRecorded: s.openingBalance === 0 || opened.has(s.subAccountId),
+    })),
   });
+}
+
+const isOwner = (req: Request) => (req.business!.job ?? 'owner') === 'owner';
+
+const safeSchema = z.object({
+  name: z.string().trim().min(1).max(60),
+  custodianId: z.string().trim().min(1),
+  /** بالقرش */
+  openingBalance: z.number().int().min(0).max(1_000_000_000_00).default(0),
+});
+
+/**
+ * POST /api/businesses/:accountId/safes — خزنة جديدة (مكالمة ٨ أكتوبر): بتتعمل في وصلة (الحساب
+ * الفرعي وجدول الخزن، والرصيد مكتوب فيها «كبيان»)، وبعدها رصيد أول المدة حركة هنا. الاتنين في
+ * قاعدتين، فلو التانية وقعت الخزنة بترجع openingRecorded: false والصفحة بتعرض «سجّله».
+ */
+export async function addSafe(req: Request, res: Response) {
+  if (!isOwner(req)) {
+    res.status(403).json({ message: 'Only the business owner manages safes' });
+    return;
+  }
+  const parsed = safeSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ message: 'Invalid input', issues: parsed.error.issues });
+    return;
+  }
+  let safe: WaslaSafe;
+  try {
+    safe = await createWaslaSafe(req.waslaToken!, req.business!.accountId, parsed.data);
+  } catch (err) {
+    if (err instanceof WaslaSafeError) {
+      res.status(err.status).json({ message: err.message });
+      return;
+    }
+    throw err;
+  }
+  const me = await currentUser(req);
+  let openingRecorded = safe.openingBalance === 0;
+  if (!openingRecorded) {
+    try {
+      await recordOpening(req.business!.accountId, req.business!.name, safe, { acc: me.accountId, name: me.name });
+      openingRecorded = true;
+    } catch (err) {
+      console.error('Opening balance not recorded', err);
+    }
+  }
+  res.status(201).json({ safe: { ...safe, openingRecorded } });
+}
+
+/**
+ * POST /api/businesses/:accountId/safes/:safeId/opening — رصيد أول المدة لخزنة اتعملت ورصيدها
+ * متسجّلش حركة. مرة واحدة: 409 لو اتسجّل، و422 لو الرصيد صفر
+ */
+export async function recordSafeOpening(req: Request, res: Response) {
+  if (!isOwner(req)) {
+    res.status(403).json({ message: 'Only the business owner manages safes' });
+    return;
+  }
+  const safe = (await fetchWaslaSafes(req.waslaToken!, req.business!.accountId)).find((s) => s.id === String(req.params.safeId));
+  if (!safe) {
+    res.status(404).json({ message: 'Safe not found' });
+    return;
+  }
+  if (safe.openingBalance === 0) {
+    res.status(422).json({ message: 'The opening balance is zero' });
+    return;
+  }
+  const me = await currentUser(req);
+  try {
+    await recordOpening(req.business!.accountId, req.business!.name, safe, { acc: me.accountId, name: me.name });
+  } catch (err) {
+    if (err instanceof OpeningExistsError) {
+      res.status(409).json({ message: 'The opening balance is already recorded' });
+      return;
+    }
+    throw err;
+  }
+  res.status(201).json({ safe: { ...safe, openingRecorded: true } });
 }
 
 /** فاتورة بيع مؤكدة للنشاط البائع — null = مش موجودة أو مش بتاعته (404) */

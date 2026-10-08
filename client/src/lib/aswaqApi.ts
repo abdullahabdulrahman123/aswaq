@@ -308,6 +308,11 @@ export interface Order {
   number: number | null;
   /** draft | order | [مراحل النشاط] | done | cancelled — lib/orderFlow */
   state: 'draft' | 'order' | 'done' | 'cancelled' | string;
+  /**
+   * الطلب بيمر بتلات حالات غير المراحل (رسالة العميل ٨ أكتوبر): draft ← order ← invoice — مع
+   * المرحلة اللي النشاط اختارها. الفاتورة مبتتعدّلش ولا بتتلغي
+   */
+  kind?: 'draft' | 'order' | 'invoice' | null;
   /** اسم المرحلة من السيرفر (مكالمة ٢ أكتوبر: المراحل من إعدادات النشاط البائع) */
   stateLabel?: string;
   /** لون المرحلة من إعدادات النشاط البائع (رسالة العميل ٦ أكتوبر) — مفتاح في lib/stageColors */
@@ -437,6 +442,11 @@ export interface BusinessSettings {
   salesStages: string[];
   /** لون كل مرحلة من القالب (رسالة العميل ٦ أكتوبر) — مفتاح المرحلة ← مفتاح اللون */
   stageColors: Record<string, string>;
+  /**
+   * الطلب بيبقى فاتورة مع المرحلة دي (رسالة العميل ٨ أكتوبر): مفتاح من salesStages أو done.
+   * السيرفر بيرجّع اللي بيتطبّق فعلاً — الافتراضي «تسليم» لو مفعّلة، وإلا «إتمام»
+   */
+  invoiceStage?: string;
 }
 
 /** الإعدادات ومعاها القالب والألوان المتاحة والثابتة (مؤكد ومكتمل وملغية) */
@@ -518,9 +528,13 @@ export async function fetchMetrics(token: string, accountId: string): Promise<Bu
   return metrics;
 }
 
-export async function fetchOrders(token: string): Promise<Order[]> {
-  const { orders } = await request<{ orders: Order[] }>('/api/orders', token);
-  return orders;
+/**
+ * أوردراتي، ومعاها مسودات «مبيعات» بتاعة أنشطتي اللي عملها غيري (مكالمة ٨ أكتوبر).
+ * me = حسابي في وصلة — عشان اسم اللي عمل المسودة يظهر لو مش أنا
+ */
+export async function fetchOrders(token: string): Promise<{ orders: Order[]; me: string | null }> {
+  const { orders, me } = await request<{ orders: Order[]; me?: string }>('/api/orders', token);
+  return { orders, me: me ?? null };
 }
 
 /**
@@ -554,24 +568,42 @@ export async function cancelOrder(token: string, orderId: string, reason: string
 }
 
 /**
- * خزنة (مكالمة ٧ أكتوبر) — من وصلة، ورصيدها من أسواق: الافتتاحي + اللي دخلها − اللي
- * طلع منها. كل المبالغ بالقرش. mine = في عهدة المستخدم ده (التحصيل بيروح لها)
+ * خزنة (مكالمة ٧ أكتوبر) — من وصلة، ورصيدها من الجدول الحاكم في أسواق: اللي دخلها − اللي
+ * طلع منها، ورصيد أول المدة أول حركة فيها (مكالمة ٨ أكتوبر). كل المبالغ بالقرش. mine = في
+ * عهدة المستخدم ده (التحصيل بيروح لها)، openingRecorded = رصيد أول المدة اتسجّل حركة (أو صفر)
  */
 export interface Safe {
   id: string;
   subAccountId: string;
   name: string;
   custodian: { accountId: string; name: string };
+  /** رصيد أول المدة زي ما اتكتب — «كبيان» في جدول الخزن */
   openingBalance: number;
   balance: number;
   mine: boolean;
+  openingRecorded: boolean;
   creator: { accountId: string; name: string };
   createdAt: string;
 }
 
+const safesPath = (accountId: string) => `/api/businesses/${encodeURIComponent(accountId)}/safes`;
+
 export async function fetchSafes(token: string, accountId: string): Promise<Safe[]> {
-  const { safes } = await request<{ safes: Safe[] }>(`/api/businesses/${encodeURIComponent(accountId)}/safes`, token);
+  const { safes } = await request<{ safes: Safe[] }>(safesPath(accountId), token);
   return safes;
+}
+
+/**
+ * خزنة جديدة — لصاحب الشركة: بتتعمل في وصلة ورصيد أول المدة بيتسجّل حركة في نفس الطلب.
+ * openingRecorded: false = الخزنة اتعملت والحركة لأ (postSafeOpening). 400 = المسؤول مش موظف
+ */
+export async function postSafe(token: string, accountId: string, input: { name: string; custodianId: string; openingBalance: number }) {
+  return request<{ safe: Safe }>(safesPath(accountId), token, { method: 'POST', body: JSON.stringify(input) });
+}
+
+/** رصيد أول المدة لخزنة اتعملت وحركتها متسجّلتش. 409 = اتسجّل قبل كده */
+export async function postSafeOpening(token: string, accountId: string, safeId: string) {
+  return request<{ safe: Safe }>(`${safesPath(accountId)}/${encodeURIComponent(safeId)}/opening`, token, { method: 'POST' });
 }
 
 /** إيصال استلام نقدية — «تحصيل» على فاتورة بيع (financials، kind receipt) */

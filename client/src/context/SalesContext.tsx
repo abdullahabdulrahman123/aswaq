@@ -67,7 +67,10 @@ interface Sales {
   update: (draft: SalesDraft) => void;
   /** يرجع لبيعة محفوظة */
   resume: (id: string) => void;
-  /** بيعة جاية من أوردر على السيرفر (جهاز تاني مثلاً) — بتتضاف لو مش موجودة وبتبقى الشغالة */
+  /**
+   * بيعة جاية من أوردر على السيرفر (جهاز تاني، أو زميل في الشركة — مكالمة ٨ أكتوبر) —
+   * بتتضاف أو بتاخد مكان اللي على الجهاز بنفس الرقم، وبتبقى الشغالة
+   */
   restore: (session: SalesSession) => void;
   /** يخرج من البيعة الشغالة — بتفضل محفوظة */
   leave: () => void;
@@ -206,7 +209,7 @@ export function SalesProvider({ children }: { children: ReactNode }) {
       },
       restore: (restored) => {
         setDialog(null);
-        setSessions((prev) => (prev.some((s) => s.id === restored.id) ? prev : [...prev, restored]));
+        setSessions((prev) => (prev.some((s) => s.id === restored.id) ? prev.map((s) => (s.id === restored.id ? restored : s)) : [...prev, restored]));
         setActiveId(restored.id);
       },
       leave: () => setActiveId(null),

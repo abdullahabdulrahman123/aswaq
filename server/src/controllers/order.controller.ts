@@ -5,7 +5,7 @@ import { isObjectId } from '../schemas/common.js';
 import { announceIncoming, announceState } from '../realtime.js';
 import { cancelSchema, draftSchema, headerSchema, lineSchema } from '../schemas/order.schema.js';
 import { afterOrderChange } from '../services/metrics.service.js';
-import { flowOf, isFinished, nextIn, salesStagesOf, viewOf, withFlow, withoutCost, type OrderView } from '../services/orderFlow.js';
+import { isFinished, nextIn, reachesInvoice, salesFlowOf, viewOf, withFlow, withoutCost, type OrderView } from '../services/orderFlow.js';
 import { PERMISSIONS, can } from '../services/permissions.js';
 import {
   advanceState,
@@ -15,10 +15,11 @@ import {
   deleteOrder,
   findDraft,
   findById,
-  findMine,
+  findSaleDraft,
   listIncoming,
   listMine,
   listPurchases,
+  listSaleDrafts,
   nextNumber,
   priceFieldFor,
   replaceConfirmedDetails,
@@ -45,8 +46,9 @@ const shownTo = (req: Request) => (view: OrderView) =>
  * بتتحفظ مسودة (لأسباب تسويقية: البائع يقدر يكلّم اللي ما كمّلش)، والنداء ده
  * بيفتح المسودة مع أول صنف، وبيعيد تسعيرها لما الهيدر يتغيّر (طريقة الاستلام
  * أو مشتري البيعة)، وبيطابقها مع الجهاز لما الفاتورة تتفتح. الصنف الواحد بعد
- * كده بيتحفظ لوحده (putLine). مسودة واحدة لكل متجر ومشتري عند المحرّر.
- * سطور فاضية = المسودة تتمسح.
+ * كده بيتحفظ لوحده (putLine). مسودة واحدة لكل متجر ومشتري عند المحرّر —
+ * ومسودة «مبيعات» للنشاط كله (مكالمة ٨ أكتوبر): اللي بيكمّلها من الشركة بيعدّل
+ * نفس المسودة، وصاحبها والبائع فيها زي ما هم. سطور فاضية = المسودة تتمسح.
  */
 export async function putDraft(req: Request, res: Response) {
   const parsed = draftSchema.safeParse(req.body);
@@ -57,7 +59,8 @@ export async function putDraft(req: Request, res: Response) {
   const input = parsed.data;
   const me = await currentUser(req);
   const ref = `${input.sale?.id ?? 'me'}:${input.shopId}`;
-  const existing = await findDraft(me.accountId, ref);
+  const shared = input.sale ? await findManagedBusiness(req, input.sale.accountId) : undefined;
+  const existing = shared ? await findSaleDraft(input.sale!.accountId, ref) : await findDraft(me.accountId, ref);
 
   if (input.lines.length === 0) {
     if (existing) await deleteOrder(existing.id);
@@ -115,10 +118,11 @@ export async function putDraft(req: Request, res: Response) {
 
   const data: Prisma.OrderCreateInput = {
     state: 'draft',
+    kind: 'draft',
     ref,
-    creator: { acc: me.accountId, name: me.name },
+    creator: existing?.creator ?? { acc: me.accountId, name: me.name },
     editor: { acc: me.accountId, name: me.name },
-    seller,
+    seller: existing?.seller ?? seller,
     // الحساب الفرعي بتاع المتجر في وصلة — ووصلة القديمة من غيره: المقر نفسه
     from: { acc: store.business.accountId, subAcc: store.subAccountId ?? input.shopId },
     shopId: input.shopId,
@@ -140,6 +144,16 @@ export async function putDraft(req: Request, res: Response) {
     return;
   }
   res.json({ order: shownTo(req)(await viewOf(order)) });
+}
+
+/**
+ * الأوردر بقى فاتورة (رسالة العميل ٨ أكتوبر) — مبيتعدّلش ولا بيتلغي: «ينفع اعدلها بعد العميل
+ * ما يستلم؟ لا طبعاً»، والتصحيح بعدها «مردود بيع». true = اترد عليه بـ409
+ */
+function lockedInvoice(order: { kind?: string | null }, res: Response): boolean {
+  if (order.kind !== 'invoice') return false;
+  res.status(409).json({ message: 'Order is already an invoice' });
+  return true;
 }
 
 /** كام مرة الصنف بيحاول تاني لو صنف تاني اتحفظ في نفس اللحظة */
@@ -165,7 +179,7 @@ export async function putLine(req: Request, res: Response) {
   let pricedBySeller: boolean | null = null;
 
   for (let attempt = 0; attempt < LINE_RETRIES; attempt++) {
-    const order = isObjectId(id) ? await findMine(me.accountId, id) : null;
+    const order = isObjectId(id) ? await findOwnOrSale(req, me.accountId, id) : null;
     if (!order) {
       res.status(404).json({ message: 'Order not found' });
       return;
@@ -191,7 +205,7 @@ export async function putLine(req: Request, res: Response) {
       return;
     }
     if (await replaceDetails(order, details, { acc: me.accountId, name: me.name })) {
-      res.json({ order: shownTo(req)(await viewOf((await findMine(me.accountId, id))!)) });
+      res.json({ order: shownTo(req)(await viewOf((await findById(id))!)) });
       return;
     }
   }
@@ -229,6 +243,7 @@ export async function putConfirmedLine(req: Request, res: Response) {
       res.status(409).json({ message: order.state === 'cancelled' ? 'Order is cancelled' : 'Order is already completed' });
       return;
     }
+    if (lockedInvoice(order, res)) return;
 
     const current = order.details.find((d) => d.itemId === line.itemId && d.unit === line.unitName);
     const needed = [
@@ -264,9 +279,27 @@ export async function putConfirmedLine(req: Request, res: Response) {
   res.status(409).json({ message: 'Order changed while saving, try again' });
 }
 
+/**
+ * أوردرات المستخدم، ومعاها مسودات «مبيعات» بتاعة الأنشطة اللي هو فيها حتى اللي عملها
+ * غيره (مكالمة ٨ أكتوبر: «ده بيزنس خليها تظهر للجميع»). me = حسابه، عشان الواجهة تكتب
+ * اسم اللي عمل المسودة لو مش هو
+ */
 export async function list(req: Request, res: Response) {
   const me = await currentUser(req);
-  res.json({ orders: (await withFlow(await listMine(me.accountId))).map(shownTo(req)) });
+  const [mine, shared] = await Promise.all([listMine(me.accountId), listSaleDrafts((req.waslaBusinesses ?? []).map((b) => b.accountId))]);
+  const orders = [...mine, ...shared.filter((o) => o.creator.acc !== me.accountId)];
+  res.json({ me: me.accountId, orders: (await withFlow(orders)).map(shownTo(req)) });
+}
+
+/**
+ * الأوردر لو المستخدم عامله — أو أوردر «مبيعات» لنشاط هو فيه (مكالمة ٨ أكتوبر): مسودة
+ * البيع بتاعة الشركة كلها، ومسودة الطلب لنفسي لصاحبها بس
+ */
+async function findOwnOrSale(req: Request, meAcc: string, id: string) {
+  const order = await findById(id);
+  if (!order) return null;
+  if (order.creator.acc === meAcc) return order;
+  return order.source === 'onsite' && (await findManagedBusiness(req, order.from.acc)) ? order : null;
 }
 
 /**
@@ -287,12 +320,13 @@ export async function purchases(req: Request, res: Response) {
 /**
  * الأوردر لصاحبه (المحرّر) — وللنشاط البائع كمان لو اتأكد: «الطلبات الواردة»
  * بتفتح فاتورته. وللمشتري (هو أو نشاط بيديره) لو اتأكد: «طلباتي» بتجيب اللي
- * المشتري فيه الحساب المختار حتى لو حد تاني اللي عمله. المسودة للمحرّر بس.
+ * المشتري فيه الحساب المختار حتى لو حد تاني اللي عمله. المسودة للمحرّر بس — غير
+ * مسودة «مبيعات»: لكل اللي في النشاط البائع (مكالمة ٨ أكتوبر).
  */
 export async function get(req: Request, res: Response) {
   const id = String(req.params.orderId);
   const me = await currentUser(req);
-  let order = isObjectId(id) ? await findMine(me.accountId, id) : null;
+  let order = isObjectId(id) ? await findOwnOrSale(req, me.accountId, id) : null;
   if (!order && isObjectId(id)) {
     const sold = await findById(id);
     const allowed =
@@ -312,7 +346,7 @@ export async function get(req: Request, res: Response) {
 export async function checkout(req: Request, res: Response) {
   const id = String(req.params.orderId);
   const me = await currentUser(req);
-  const order = isObjectId(id) ? await findMine(me.accountId, id) : null;
+  const order = isObjectId(id) ? await findOwnOrSale(req, me.accountId, id) : null;
   if (!order) {
     res.status(404).json({ message: 'Order not found' });
     return;
@@ -360,6 +394,7 @@ export async function putHeader(req: Request, res: Response) {
     res.status(409).json({ message: order.state === 'cancelled' ? 'Order is cancelled' : 'Order is already completed' });
     return;
   }
+  if (lockedInvoice(order, res)) return;
   if (!can(seller, PERMISSIONS.invoiceHeader)) {
     res.status(403).json({ message: 'Permission required', permission: PERMISSIONS.invoiceHeader });
     return;
@@ -371,7 +406,6 @@ export async function putHeader(req: Request, res: Response) {
   }
 
   const delivery = header.method === 'delivery';
-  const editor = { acc: me.accountId, name: me.name };
   const saved = await replaceHeader(order, {
     to: { acc: onsite ? header.buyer.accountId : order.to.acc, subAcc: order.to.subAcc },
     names: {
@@ -386,8 +420,8 @@ export async function putHeader(req: Request, res: Response) {
     deliveryNotes: header.deliveryNotes?.trim() || null,
     // البيعة نفسها بترجع على جهاز تاني بالرأس الجديد
     ...(onsite ? { sale: { ...(order.sale as Prisma.JsonObject), ...header, address: delivery ? header.address : '' } as Prisma.InputJsonValue } : {}),
-    editor,
-  }, editor);
+    editor: { acc: me.accountId, name: me.name },
+  });
   if (!saved) {
     res.status(409).json({ message: 'Order changed while saving, try again' });
     return;
@@ -402,8 +436,8 @@ export async function putHeader(req: Request, res: Response) {
  * POST /api/orders/:orderId/advance — المرحلة اللي بعدها، بطلب العميل (١ أكتوبر):
  * مؤكد ← [مراحل النشاط من إعداداته، ٢ أكتوبر] ← مكتمل («إتمام»). للنشاط البائع
  * بس — المشتري مبيقفلش طلب البائع. المسودة بتتأكد بـcheckout مش من هنا (رقم
- * الفاتورة). 409 = اتنقل من مكان تاني أو آخر مرحلة. ومع «تسليم» (أو «إتمام» لو
- * النشاط مش مفعّلها) الفاتورة بتدخل الجدول الحاكم (مكالمة ٧ أكتوبر).
+ * الفاتورة). 409 = اتنقل من مكان تاني أو آخر مرحلة. ومع مرحلة الفاتورة اللي النشاط
+ * اختارها الأوردر بيبقى invoice وبيدخل الجدول الحاكم (رسالة العميل ٨ أكتوبر).
  */
 export async function advance(req: Request, res: Response) {
   const id = String(req.params.orderId);
@@ -413,8 +447,11 @@ export async function advance(req: Request, res: Response) {
     return;
   }
   const me = await currentUser(req);
-  const to = nextIn(flowOf(await salesStagesOf(order.from.acc)), order.state);
-  const moved = to ? await advanceState(order, to, { acc: me.accountId, name: me.name }) : null;
+  const { flow, invoiceStage } = await salesFlowOf(order.from.acc);
+  const to = nextIn(flow, order.state);
+  // بيبقى فاتورة مع المرحلة اللي النشاط اختارها (رسالة العميل ٨ أكتوبر) — مرة واحدة
+  const invoice = to !== null && order.kind !== 'invoice' && reachesInvoice(flow, to, invoiceStage);
+  const moved = to ? await advanceState(order, to, { acc: me.accountId, name: me.name }, invoice) : null;
   if (!moved) {
     res.status(409).json({ message: 'Order already moved on' });
     return;
@@ -455,6 +492,7 @@ export async function cancel(req: Request, res: Response) {
     res.status(409).json({ message: order.state === 'cancelled' ? 'Order is already cancelled' : 'Order is already completed' });
     return;
   }
+  if (lockedInvoice(order, res)) return;
   if (seller && !can(seller, PERMISSIONS.invoiceCancel)) {
     res.status(403).json({ message: 'Permission required', permission: PERMISSIONS.invoiceCancel });
     return;

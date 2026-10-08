@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { Notch, fieldClass } from '../components/OutlinedField';
 import { SessionExpiredNotice } from '../components/SessionExpiredNotice';
 import { useAuth } from '../context/AuthContext';
 import { fetchSettings, saveSettings, type StageTemplate } from '../lib/aswaqApi';
@@ -36,6 +37,9 @@ export function SettingsPage() {
   /** لون كل مرحلة في القالب، والمحفوظ منه */
   const [colors, setColors] = useState<Record<string, string>>({});
   const [savedColors, setSavedColors] = useState<Record<string, string>>({});
+  /** الطلب بيبقى فاتورة مع المرحلة دي (رسالة العميل ٨ أكتوبر)، والمحفوظ منها */
+  const [invoiceStage, setInvoiceStage] = useState('done');
+  const [savedInvoiceStage, setSavedInvoiceStage] = useState('done');
   /** الألوان اللي المراحل بتختار منها، وألوان مؤكد ومكتمل وملغية */
   const [choices, setChoices] = useState<string[]>([]);
   const [fixed, setFixed] = useState<Record<string, string>>({});
@@ -56,6 +60,8 @@ export function SettingsPage() {
         setSaved(settings.salesStages);
         setColors(settings.stageColors);
         setSavedColors(settings.stageColors);
+        setInvoiceStage(settings.invoiceStage ?? 'done');
+        setSavedInvoiceStage(settings.invoiceStage ?? 'done');
         setChoices(stageColorChoices);
         setFixed(fixedColors);
       })
@@ -84,7 +90,7 @@ export function SettingsPage() {
   const byKey = new Map((template ?? []).map((s) => [s.key, s]));
   /** المختار بالترتيب، وبعده الباقي بترتيب القالب */
   const rows = [...chosen.flatMap((k) => byKey.get(k) ?? []), ...(template ?? []).filter((s) => !chosen.includes(s.key))];
-  const dirty = chosen.join() !== saved.join() || chosen.some((k) => colors[k] !== savedColors[k]);
+  const dirty = chosen.join() !== saved.join() || chosen.some((k) => colors[k] !== savedColors[k]) || invoiceStage !== savedInvoiceStage;
   /** اللون واخداه مرحلة تانية من اللي الشركة شغالة بيها */
   const takenBy = (color: string, except: string) => chosen.find((k) => k !== except && colors[k] === color);
 
@@ -93,6 +99,8 @@ export function SettingsPage() {
     if (chosen.includes(key)) {
       setChosen((prev) => prev.filter((k) => k !== key));
       if (picking === key) setPicking(null);
+      // مرحلة الفاتورة اتشالت: الافتراضي — «تسليم» لو لسه مفعّلة، وإلا «إتمام»
+      if (invoiceStage === key) setInvoiceStage(key !== 'delivered' && chosen.includes('delivered') ? 'delivered' : 'done');
       return;
     }
     // مرحلة بتتضاف ولونها مع مرحلة تانية: تاخد أول لون فاضي
@@ -124,11 +132,13 @@ export function SettingsPage() {
     setSaving(true);
     setError('');
     try {
-      const { settings } = await withToken((token) => saveSettings(token, accountId, { salesStages: chosen, stageColors: colors }));
+      const { settings } = await withToken((token) => saveSettings(token, accountId, { salesStages: chosen, stageColors: colors, invoiceStage }));
       setChosen(settings.salesStages);
       setSaved(settings.salesStages);
       setColors(settings.stageColors);
       setSavedColors(settings.stageColors);
+      setInvoiceStage(settings.invoiceStage ?? 'done');
+      setSavedInvoiceStage(settings.invoiceStage ?? 'done');
       setNotice('اتحفظت. الفواتير الجاية والمفتوحة بتمشي على المراحل دي.');
     } catch (err) {
       if (!(err instanceof SessionExpiredError)) setError(err instanceof ApiError ? err.message : 'مقدرناش نحفظ الإعدادات.');
@@ -265,6 +275,36 @@ export function SettingsPage() {
               <span className="text-gray-500 dark:text-gray-400">الفاتورة بتمشي كده: </span>
               <span className="font-semibold">{flow.join(' ← ')}</span>
             </p>
+
+            {/*
+              رسالة العميل ٨ أكتوبر: الطلب بيمر بتلات حالات غير المراحل — مسودة ← طلب ← فاتورة —
+              و«إمتى تبقى فاتورة» إعداد («المنطقي للهلال مع التسليم»). الفاتورة بتدخل الحسابات
+              ومبتتعدّلش ولا بتتلغي: «ينفع اعدلها بعد العميل ما يستلم؟ لا طبعاً»
+            */}
+            <div className="mt-6 border-t border-gray-100 pt-5 dark:border-white/5">
+              <label className="relative block">
+                <select
+                  className={fieldClass}
+                  value={invoiceStage}
+                  disabled={!owner}
+                  onChange={(e) => {
+                    setNotice('');
+                    setInvoiceStage(e.target.value);
+                  }}
+                >
+                  {chosen.map((k) => (
+                    <option key={k} value={k}>
+                      {byKey.get(k)?.label ?? k}
+                    </option>
+                  ))}
+                  <option value="done">مكتمل («إتمام»)</option>
+                </select>
+                <Notch>الطلب يبقى فاتورة مع</Notch>
+              </label>
+              <p className="mt-2 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+                الطلب بيمر بتلات حالات: مسودة ← طلب (بعد «تأكيد») ← فاتورة. من المرحلة دي الفاتورة بتدخل الحسابات ومبتتعدّلش ولا بتتلغي — التصحيح بعدها «مردود بيع».
+              </p>
+            </div>
 
             {owner ? (
               <div className="mt-5 flex flex-wrap items-center gap-3">

@@ -322,19 +322,11 @@ export async function putVehicle(token: string, accountId: string, vehicle: Vehi
   return saved;
 }
 
-/** خزنة زي ما بتتبعت لوصلة (مكالمة ٧ أكتوبر) — الرصيد الافتتاحي بالقرش */
-export interface SafeInput {
-  name: string;
-  custodianId: string;
-  openingBalance: number;
-}
-
-/** الخزنة وحسابها الفرعي بيتعملوا مع بعض — لصاحب النشاط. 400 = المسؤول مش موظف في النشاط */
-export async function postSafe(token: string, accountId: string, safe: SafeInput): Promise<void> {
-  await request(`${businessPath(accountId)}/safes`, token, { method: 'POST', body: JSON.stringify(safe) });
-}
-
-export async function putSafe(token: string, accountId: string, safeId: string, safe: SafeInput): Promise<void> {
+/**
+ * تعديل خزنة في وصلة — الاسم والمسؤول بس: رصيد أول المدة «مع أول حفظ هيتقفل» (مكالمة ٨ أكتوبر).
+ * الخزنة الجديدة من أسواق (postSafe في aswaqApi) عشان رصيدها يتسجّل حركة معاها
+ */
+export async function putSafe(token: string, accountId: string, safeId: string, safe: { name: string; custodianId: string }): Promise<void> {
   await request(`${businessPath(accountId)}/safes/${encodeURIComponent(safeId)}`, token, { method: 'PUT', body: JSON.stringify(safe) });
 }
 

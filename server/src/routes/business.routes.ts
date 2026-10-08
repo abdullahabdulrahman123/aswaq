@@ -33,6 +33,8 @@ scoped.get('/incoming', orderController.incoming);
 scoped.get('/metrics', metricsController.get);
 // الخزن ورصيدها (مكالمة ٧ أكتوبر) — الخزن نفسها في وصلة
 scoped.get('/safes', financeController.safes);
+scoped.post('/safes', financeController.addSafe);
+scoped.post('/safes/:safeId/opening', financeController.recordSafeOpening);
 scoped.get('/settings', settingsController.get);
 scoped.put('/settings', settingsController.update);
 scoped.put('/shops/:shopId/settings', storeController.updateSettings);

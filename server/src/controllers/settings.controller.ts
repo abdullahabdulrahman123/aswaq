@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../config/db.js';
-import { FIXED_COLORS, STAGE_COLOR_CHOICES, STAGE_TEMPLATE, stageColorsOf } from '../services/orderFlow.js';
+import { FIXED_COLORS, STAGE_COLOR_CHOICES, STAGE_TEMPLATE, invoiceStageOf, stageColorsOf } from '../services/orderFlow.js';
 import { CATEGORIES, listPermissions } from '../services/permissions.js';
 
 /**
@@ -17,6 +17,15 @@ const settingsSchema = z
       .refine((keys) => new Set(keys).size === keys.length, 'Each stage once'),
     /** لون كل مرحلة (رسالة العميل ٦ أكتوبر) — اللي مش مبعوت بيفضل زي ما هو */
     stageColors: z.record(stageKey, z.enum(STAGE_COLOR_CHOICES as [string, ...string[]])).optional(),
+    /**
+     * الطلب بيبقى فاتورة مع المرحلة دي (رسالة العميل ٨ أكتوبر): مرحلة من اللي اختارها أو done.
+     * null = الافتراضي («تسليم» لو مفعّلة، وإلا «إتمام»)، ومش مبعوت = زي ما هو
+     */
+    invoiceStage: z.union([stageKey, z.literal('done')]).nullable().optional(),
+  })
+  .refine(({ salesStages, invoiceStage }) => !invoiceStage || invoiceStage === 'done' || salesStages.includes(invoiceStage), {
+    message: 'The invoice stage must be one of the chosen stages',
+    path: ['invoiceStage'],
   })
   // «ميبقاش لونين زي بعض»: المراحل اللي الشركة شغالة بيها، كل واحدة بلون
   .refine(
@@ -27,10 +36,14 @@ const settingsSchema = z
     { message: 'Each stage needs its own color', path: ['stageColors'] },
   );
 
-/** الإعدادات زي ما الواجهة بتعرضها: المراحل، ولون كل مرحلة، والألوان المتاحة والثابتة */
-function settingsView(row: { salesStages: string[]; stageColors: unknown } | null) {
+/**
+ * الإعدادات زي ما الواجهة بتعرضها: المراحل، ولون كل مرحلة، ومرحلة الفاتورة (اللي بتتطبّق
+ * فعلاً — المختارة لو لسه من المراحل، وإلا الافتراضي)، والألوان المتاحة والثابتة
+ */
+function settingsView(row: { salesStages: string[]; stageColors: unknown; invoiceStage?: string | null } | null) {
+  const salesStages = row?.salesStages ?? [];
   return {
-    settings: { salesStages: row?.salesStages ?? [], stageColors: stageColorsOf(row?.stageColors ?? null) },
+    settings: { salesStages, stageColors: stageColorsOf(row?.stageColors ?? null), invoiceStage: invoiceStageOf(salesStages, row?.invoiceStage) },
     stageTemplate: STAGE_TEMPLATE,
     stageColorChoices: STAGE_COLOR_CHOICES,
     fixedColors: FIXED_COLORS,
@@ -60,10 +73,11 @@ export async function update(req: Request, res: Response) {
     res.status(400).json({ message: 'Each stage needs its own color' });
     return;
   }
+  const invoiceStage = parsed.data.invoiceStage === undefined ? (current?.invoiceStage ?? null) : parsed.data.invoiceStage;
   const row = await prisma.businessSettings.upsert({
     where: { businessId },
-    create: { businessId, salesStages: parsed.data.salesStages, stageColors },
-    update: { salesStages: parsed.data.salesStages, stageColors },
+    create: { businessId, salesStages: parsed.data.salesStages, stageColors, invoiceStage },
+    update: { salesStages: parsed.data.salesStages, stageColors, invoiceStage },
   });
   res.json(settingsView(row));
 }

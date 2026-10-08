@@ -15,7 +15,7 @@ import { deliversTo, distanceKm, formatDistance } from '../lib/buyerLocation';
 import { buyerPriceField, soldIn, type ReceivingMethod } from '../lib/itemUnits';
 import { useDraftSync } from '../lib/draftSync';
 import { newDelivery, rememberDelivery, rememberedDelivery, type Delivery } from '../lib/delivery';
-import { closedMessage, isOpenState } from '../lib/orderFlow';
+import { closedMessage, isEditable } from '../lib/orderFlow';
 import { PERMISSIONS, can, deniedMessage } from '../lib/permissions';
 import { ApiError, SessionExpiredError, fetchStore, type ShowroomStore } from '../lib/waslaApi';
 
@@ -246,8 +246,9 @@ export function StorePage() {
   /** الفاتورة المؤكدة في «مبيعات»: الكروت بتعرض سطورها، والتعديل بالصلاحيات */
   const confirmedOrder = session && confirmedOrderId && saleOrder?.id === confirmedOrderId ? saleOrder : null;
   const selling = session ? businesses.find((b) => b.accountId === session.accountId) : undefined;
-  const editable = confirmedOrder !== null && isOpenState(confirmedOrder.state);
-  const closed = confirmedOrder ? closedMessage(confirmedOrder.state) : '';
+  // رسالة العميل ٨ أكتوبر: الفاتورة (بعد المرحلة اللي النشاط اختارها) مبتتعدّلش
+  const editable = confirmedOrder !== null && isEditable(confirmedOrder);
+  const closed = confirmedOrder ? closedMessage(confirmedOrder) : '';
   const lockQty = !editable ? closed : can(selling, PERMISSIONS.invoiceQuantity) ? null : deniedMessage(PERMISSIONS.invoiceQuantity);
   const lockAdd = !editable ? closed : can(selling, PERMISSIONS.invoiceAddItem) ? null : deniedMessage(PERMISSIONS.invoiceAddItem);
   const priceLocked = session && !can(selling, PERMISSIONS.invoicePrice) ? deniedMessage(PERMISSIONS.invoicePrice) : null;

@@ -32,5 +32,19 @@ export const CONFIRM_ACTION = FIXED_NEXT.draft;
 /** «مهامي»: المفتوح — اتأكد ولسه متمش ولا اتلغى، في أي مرحلة */
 export const isOpenState = (state: string) => state !== 'draft' && state !== 'done' && state !== 'cancelled';
 
+/**
+ * الطلب بقى فاتورة (رسالة العميل ٨ أكتوبر: draft ← order ← invoice) — دخلت الحسابات ومبتتعدّلش
+ * ولا بتتلغي: «ينفع اعدلها بعد العميل ما يستلم؟ لا طبعاً». التصحيح بعدها «مردود بيع»
+ */
+export const isInvoice = (order: Pick<Order, 'kind'>) => order.kind === 'invoice';
+
+/** الفاتورة المؤكدة لسه بتتعدّل وبتتلغي: مفتوحة ولسه مبقتش فاتورة */
+export const isEditable = (order: Pick<Order, 'state' | 'kind'>) => isOpenState(order.state) && !isInvoice(order);
+
 /** ليه الفاتورة المؤكدة مبقتش بتتعدّل */
-export const closedMessage = (state: string) => (state === 'cancelled' ? 'الفاتورة دي اتلغت ومبقتش بتتعدّل.' : 'الفاتورة دي خلصت ومبقتش بتتعدّل.');
+export const closedMessage = (order: Pick<Order, 'state' | 'kind'>) =>
+  order.state === 'cancelled'
+    ? 'الفاتورة دي اتلغت ومبقتش بتتعدّل.'
+    : isOpenState(order.state) && isInvoice(order)
+      ? 'دي بقت فاتورة ومبقتش بتتعدّل ولا بتتلغي — التصحيح بعد كده «مردود بيع».'
+      : 'الفاتورة دي خلصت ومبقتش بتتعدّل.';

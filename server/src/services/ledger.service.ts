@@ -1,21 +1,17 @@
 import { Prisma, type Order } from '@prisma/client';
 import { prisma } from '../config/db.js';
+import { flowOf, invoiceStageOf, reachesInvoice } from './orderFlow.js';
 
 /**
- * الجدول الحاكم (transactions، مكالمة ٧ أكتوبر) — اللي بيكتب فيه: فاتورة البيع لما العميل
- * يستلمها، والتحصيل، والعكس لما فاتورة دخلت تتلغي أو تتعدّل. كل كتابة هنا في نفس
- * العملية مع الجدول التاني (الأوردر أو المعاملة المالية) — «يا كله يا مفيش».
+ * الجدول الحاكم (transactions، مكالمة ٧ أكتوبر) — اللي بيكتب فيه من ناحية الأوردرات: الأوردر
+ * لما يبقى فاتورة (رسالة العميل ٨ أكتوبر: draft ← order ← invoice، مع المرحلة اللي النشاط
+ * اختارها). الكتابة هنا في نفس العملية مع الأوردر — «يا كله يا مفيش». والفاتورة بعدها
+ * مبتتعدّلش ولا بتتلغي («احنا مش هنخترع محاسبة جديدة») — التصحيح «مردود بيع» بعدين.
  */
 type Tx = Prisma.TransactionClient;
 type Person = { acc: string; name: string };
 
-/**
- * الفاتورة بتدخل لما العميل يستلمها: «تسليم» لو النشاط مفعّلها، وإلا «إتمام». اللي
- * يوصل الأول فيهم — والتاني مبيكتبش تاني.
- */
-export const RECEIVED_STATES = ['delivered', 'done'];
-
-/** الفاتورة دي داخلة الجدول دلوقتي؟ (حركات البيع أكتر من العكسية) */
+/** الفاتورة دي داخلة الجدول؟ (حركات البيع أكتر من العكسية — العكسية من قبل ٨ أكتوبر) */
 async function saleRecorded(tx: Tx, orderId: string): Promise<boolean> {
   const entries = await tx.transaction.findMany({ where: { source: 'order', ref: orderId }, select: { kind: true } });
   return entries.filter((e) => e.kind === 'sale').length > entries.filter((e) => e.kind === 'reversal').length;
@@ -32,61 +28,47 @@ const saleOf = (order: Order, creator: Person) => ({
   creator,
 });
 
-/** نفس الفاتورة بالعكس — بقيمتها وأطرافها ساعة ما دخلت */
-const reversalOf = (order: Order, creator: Person) => ({
-  ...saleOf(order, creator),
-  kind: 'reversal',
-  from: { acc: order.to.acc, subAcc: order.to.subAcc ?? null },
-  to: { acc: order.from.acc, subAcc: order.from.subAcc ?? null },
-});
-
-/** الفاتورة وصلت مرحلة الاستلام — بتدخل لو لسه مدخلتش */
-export async function recordSaleIfReceived(tx: Tx, order: Order, creator: Person) {
-  if (!RECEIVED_STATES.includes(order.state) || (await saleRecorded(tx, order.id))) return;
-  await tx.transaction.create({ data: saleOf(order, creator) });
-}
-
-/** الفاتورة اتلغت — لو كانت دخلت، بتطلع بحركة بالعكس */
-export async function reverseSale(tx: Tx, order: Order, creator: Person) {
-  if (await saleRecorded(tx, order.id)) await tx.transaction.create({ data: reversalOf(order, creator) });
+/** الأوردر بقى فاتورة — حركته بتدخل لو لسه مدخلتش */
+export async function recordSale(tx: Tx, order: Order, creator: Person) {
+  if (!(await saleRecorded(tx, order.id))) await tx.transaction.create({ data: saleOf(order, creator) });
 }
 
 /**
- * فاتورة دخلت واتعدّلت (كمية أو سعر أو العميل نفسه) — القديمة بالعكس والجديدة sale،
- * عشان الجدول يفضل بيقول الحقيقة من غير ما حركة تتمسح
+ * الأوردرات اللي قبل خانة kind (٨ أكتوبر) — مرة واحدة ساعة ما السيرفر يقوم: المسودة draft،
+ * واللي وصل مرحلة الفاتورة عند نشاطه invoice (وحركته في الجدول الحاكم لو مكانتش دخلت، بتاريخ
+ * «إتمام»)، والباقي order — ومنه الملغي. updatedAt زي ما هو عشان ترتيب الليستات ميتلخبطش.
  */
-export async function resyncSale(tx: Tx, before: Order, after: Order, creator: Person) {
-  if (before.netTotal === after.netTotal && before.to.acc === after.to.acc) return;
-  if (!(await saleRecorded(tx, before.id))) return;
-  await tx.transaction.create({ data: reversalOf(before, creator) });
-  await tx.transaction.create({ data: saleOf(after, creator) });
-}
+export async function backfillInvoices(): Promise<number> {
+  await prisma.$runCommandRaw({ update: 'orders', updates: [{ q: { state: 'draft', kind: null }, u: { $set: { kind: 'draft' } }, multi: true }] });
+  const pending = await prisma.order.findMany({
+    where: { state: { not: 'draft' }, OR: [{ kind: null }, { kind: { isSet: false } }] },
+    select: { id: true, state: true, from: true },
+  });
+  const sellers = [...new Set(pending.map((o) => o.from.acc))];
+  const settings = sellers.length ? await prisma.businessSettings.findMany({ where: { businessId: { in: sellers } } }) : [];
+  const flows = new Map(settings.map((s) => [s.businessId, { flow: flowOf(s.salesStages), invoiceStage: invoiceStageOf(s.salesStages, s.invoiceStage) }]));
+  const plain = { flow: flowOf([]), invoiceStage: 'done' };
 
-/**
- * الفواتير اللي العميل استلمها قبل الجدول الحاكم (قبل ٧ أكتوبر) — بتدخل مرة واحدة ساعة ما
- * السيرفر يقوم، بتاريخ «إتمام» (وإلا آخر تعديل)، عشان التحصيل عليها ميطلّعش العميل دافع
- * من غير فاتورة. اللي دخلت قبل كده مبتتكررش.
- */
-export async function backfillSaleEntries(): Promise<number> {
-  const received = await prisma.order.findMany({ where: { state: { in: RECEIVED_STATES } }, select: { id: true } });
-  if (!received.length) return 0;
-  const seen = await prisma.transaction.findMany({ where: { source: 'order', ref: { in: received.map((o) => o.id) } }, select: { ref: true } });
-  const recorded = new Set(seen.map((t) => t.ref));
-  let added = 0;
-  for (const { id } of received) {
-    if (recorded.has(id)) continue;
+  let invoices = 0;
+  for (const o of pending) {
+    const { flow, invoiceStage } = flows.get(o.from.acc) ?? plain;
+    if (!reachesInvoice(flow, o.state, invoiceStage)) continue;
     try {
       await prisma.$transaction(async (tx) => {
-        const order = await tx.order.findUnique({ where: { id } });
-        if (!order || !RECEIVED_STATES.includes(order.state) || (await saleRecorded(tx, id))) return;
-        await tx.transaction.create({ data: { ...saleOf(order, order.editor ?? order.creator), createdAt: order.completedAt ?? order.updatedAt } });
-        added++;
+        const order = await tx.order.findUnique({ where: { id: o.id } });
+        if (!order || order.kind) return;
+        await tx.order.update({ where: { id: o.id }, data: { kind: 'invoice', updatedAt: order.updatedAt } });
+        if (!(await saleRecorded(tx, o.id))) {
+          await tx.transaction.create({ data: { ...saleOf(order, order.editor ?? order.creator), createdAt: order.completedAt ?? order.updatedAt } });
+        }
+        invoices++;
       });
     } catch (err) {
       if (!isWriteConflict(err)) throw err;
     }
   }
-  return added;
+  await prisma.$runCommandRaw({ update: 'orders', updates: [{ q: { state: { $ne: 'draft' }, kind: null }, u: { $set: { kind: 'order' } }, multi: true }] });
+  return invoices;
 }
 
 /** نفس المستند اتكتب من عمليتين في نفس اللحظة — مونجو بيوقّف واحدة (P2034) */

@@ -3,7 +3,7 @@ import { createApp } from './app.js';
 import { env } from './config/env.js';
 import { attachRealtime } from './realtime.js';
 import { linkStoreCopiesToSources } from './services/item.service.js';
-import { backfillSaleEntries } from './services/ledger.service.js';
+import { backfillInvoices } from './services/ledger.service.js';
 import { backfillOrderSources } from './services/order.service.js';
 import { syncPermissions } from './services/permissions.js';
 
@@ -19,10 +19,11 @@ backfillOrderSources()
   .then((n) => n > 0 && console.log(`Set the source of ${n} older orders`))
   .catch((err) => console.error('Order source backfill failed', err));
 
-// الفواتير اللي اتسلّمت قبل الجدول الحاكم (مكالمة ٧ أكتوبر) بتدخله مرة واحدة
-backfillSaleEntries()
-  .then((n) => n > 0 && console.log(`Entered ${n} received invoices into transactions`))
-  .catch((err) => console.error('Transactions backfill failed', err));
+// الأوردرات اللي قبل خانة kind (رسالة العميل ٨ أكتوبر): draft / order / invoice، والفاتورة
+// اللي حركتها مكانتش في الجدول الحاكم بتدخله مرة واحدة
+backfillInvoices()
+  .then((n) => n > 0 && console.log(`Marked ${n} older orders as invoices`))
+  .catch((err) => console.error('Invoice backfill failed', err));
 
 // رصيد الصلاحيات في الداتابيز زي الكود (مكالمة ٢ أكتوبر)
 syncPermissions().catch((err) => console.error('Permissions sync failed', err));

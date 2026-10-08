@@ -6,7 +6,7 @@ import { PriceDialogFor } from '../components/PriceDialog';
 import { useAuth } from '../context/AuthContext';
 import { rememberSalesShop, useSales } from '../context/SalesContext';
 import { advanceOrder, fetchOrder, orderShopId, type Order } from '../lib/aswaqApi';
-import { isOpenState, nextActionOf, stageLabel } from '../lib/orderFlow';
+import { isEditable, nextActionOf, stageLabel } from '../lib/orderFlow';
 import { PERMISSIONS, can, deniedMessage } from '../lib/permissions';
 import { orderToView } from '../lib/invoiceView';
 import { ApiError } from '../lib/waslaApi';
@@ -84,7 +84,7 @@ export function SavedInvoicePage() {
   const nextAction = canPrice ? nextActionOf(order) : undefined;
   const selling = businesses.find((b) => b.accountId === order.from.acc);
   // الإلغاء: البائع لحد ما تخلص، والمشتري (اللي عامل الطلب من المعرض) وهو لسه «مؤكد» بس
-  const sellerCancel = canPrice && isOpenState(order.state);
+  const sellerCancel = canPrice && isEditable(order);
   const buyerCancel = !canPrice && order.sale == null && order.state === 'order';
   const cancelAllowed = buyerCancel || can(selling, PERMISSIONS.invoiceCancel);
 

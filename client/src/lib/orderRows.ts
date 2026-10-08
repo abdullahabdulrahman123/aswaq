@@ -21,6 +21,8 @@ export interface OrderRow {
   local: boolean;
   /** «طلباتي»: سلة المشتري على الجهاز، أو أوردر المشتري فيه الحساب المختار */
   buying: boolean;
+  /** اسم اللي عمل مسودة «مبيعات» لو حد تاني في الشركة (مكالمة ٨ أكتوبر) — null = أنا */
+  by: string | null;
   sale: SalesSession | null;
   order: Order | null;
 }
@@ -36,9 +38,11 @@ export interface OrderRow {
  * رسالة العميل ٦ أكتوبر: «الباسكت اللي فوق بتكويري بدون شرط… محتاج where orders.from =
  * انا او البيزنس اللي انا فاتحه» — أوردرات «طلباتي» من السيرفر بقت اللي المشتري فيها
  * الحساب المختار (fetchPurchases)، مش كل اللي المستخدم عمله لنفسه بأي حساب.
+ *
+ * مكالمة ٨ أكتوبر: مسودات «مبيعات» بتاعة الشركة بتظهر لكل اللي فيها، باسم اللي عملها.
  */
 export function useOrderRows() {
-  const { orders: local, restoreLines } = useStoreCart();
+  const { orders: local, restoreLines, clearShop } = useStoreCart();
   const { resume, leave, restore, openConfirmed } = useSales();
   const { user, sessionExpired, selectedBusiness, withToken } = useAuth();
   const navigate = useNavigate();
@@ -46,6 +50,8 @@ export function useOrderRows() {
   const [stores, setStores] = useState<Map<string, ShowroomStore>>(new Map());
   /** null = لسه بنجيب أو مفيش حساب */
   const [saved, setSaved] = useState<Order[] | null>(null);
+  /** حسابي في وصلة — من السيرفر مع الأوردرات */
+  const [me, setMe] = useState<string | null>(null);
   /** «طلباتي» للحساب المختار — null = لسه بنجيب */
   const [purchases, setPurchases] = useState<Order[] | null>(null);
   const buyerAccount = selectedBusiness?.accountId ?? null;
@@ -67,8 +73,10 @@ export function useOrderRows() {
     if (!signedIn) return;
     let cancelled = false;
     withToken(fetchOrders)
-      .then((list) => {
-        if (!cancelled) setSaved(list);
+      .then(({ orders, me: account }) => {
+        if (cancelled) return;
+        setSaved(orders);
+        setMe(account);
       })
       .catch(() => {
         if (!cancelled) setSaved([]);
@@ -94,7 +102,21 @@ export function useOrderRows() {
     };
   }, [signedIn, withToken, buyerAccount]);
 
-  const rows: OrderRow[] = local.map((o) => ({
+  /**
+   * بيعات اتأكدت من جهاز تاني أو من زميل في الشركة (مكالمة ٨ أكتوبر) — سلتها اللي فاضلة
+   * على الجهاز ده قديمة: متظهرش مسودة، ومتتبعتش تاني فتعمل مسودة مكررة. رقم البيعة
+   * مبيتكررش، بعكس سلة «طلباتي» (me:<متجر>) اللي بتتعمل تاني لنفس المتجر
+   */
+  const confirmedSales = new Set((saved ?? []).filter((o) => o.sale != null && o.state !== 'draft').map((o) => o.ref));
+  const leftovers = local.filter((o) => o.sale && confirmedSales.has(o.key));
+  const leftoverKeys = leftovers.map((o) => o.key).join();
+  useEffect(() => {
+    for (const o of leftovers) clearShop(o.sale?.id ?? null, o.shopId);
+    // leftoverKeys بدل leftovers: الليستة بتتعمل جديدة مع كل رسمة
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leftoverKeys, clearShop]);
+
+  const rows: OrderRow[] = local.filter((o) => !leftovers.includes(o)).map((o) => ({
     key: o.key,
     shopId: o.shopId,
     business: stores.get(o.shopId)?.business.name ?? '',
@@ -106,6 +128,7 @@ export function useOrderRows() {
     number: null,
     local: true,
     buying: !o.sale,
+    by: null,
     sale: o.sale,
     order: null,
   }));
@@ -114,6 +137,10 @@ export function useOrderRows() {
     ...(saved ?? []).filter((o) => o.sale != null).map((o): [Order, boolean] => [o, false]),
     ...(purchases ?? []).map((o): [Order, boolean] => [o, true]),
   ];
+  /** اسم اللي عمل المسودة لو مش أنا */
+  const createdBy = (order: Order) => (me && order.creator.acc !== me ? order.creator.name : null);
+  /** حد تاني في الشركة آخر واحد عدّلها — نسخة السيرفر أحدث من اللي على الجهاز */
+  const editedElsewhere = (order: Order) => Boolean(me && (order.editor?.acc ?? order.creator.acc) !== me);
   const seen = new Set<string>();
   for (const [order, buying] of sources) {
     if (seen.has(order.id)) continue;
@@ -122,6 +149,11 @@ export function useOrderRows() {
     if (onDevice) {
       onDevice.state = 'draft';
       onDevice.order = order;
+      onDevice.by = createdBy(order);
+      if (editedElsewhere(order)) {
+        onDevice.count = new Set(order.details.map((d) => d.itemId)).size;
+        onDevice.total = order.netTotal;
+      }
       continue;
     }
     const sale = (order.sale as SalesSession | null) ?? null;
@@ -137,6 +169,7 @@ export function useOrderRows() {
       number: order.number,
       local: false,
       buying,
+      by: createdBy(order),
       sale,
       order,
     });
@@ -147,8 +180,11 @@ export function useOrderRows() {
       navigate(`/invoice/${row.order.id}`);
       return;
     }
-    // مسودة من جهاز تاني: سطورها بترجع للجهاز الأول
-    if (!row.local && row.order) {
+    // مسودة من جهاز تاني: سطورها بترجع للجهاز الأول. ولو حد تاني في الشركة آخر واحد
+    // عدّلها (مكالمة ٨ أكتوبر) نسخة السيرفر هي اللي بتتفتح، مش اللي فاضلة على الجهاز
+    const newer = Boolean(row.order && editedElsewhere(row.order));
+    if (row.order && (!row.local || newer)) {
+      if (row.local) clearShop(row.sale?.id ?? null, row.shopId);
       restoreLines(
         row.sale?.id ?? null,
         row.order.details.map((d) => ({
@@ -165,8 +201,8 @@ export function useOrderRows() {
       );
     }
     if (row.sale) {
-      if (row.local) resume(row.sale.id);
-      else restore(row.sale);
+      if (row.local && !newer) resume(row.sale.id);
+      else restore((row.order?.sale as SalesSession | null) ?? row.sale);
     } else leave();
     navigate(`/store/${row.shopId}`);
   }
