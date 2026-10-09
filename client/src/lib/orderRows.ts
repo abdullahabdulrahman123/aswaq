@@ -204,7 +204,8 @@ export function useOrderRows() {
       if (row.local && !newer) resume(row.sale.id);
       else restore((row.order?.sale as SalesSession | null) ?? row.sale);
     } else leave();
-    navigate(`/store/${row.shopId}`);
+    // البيعة اللي بتتفتح من الليستة بتيجي على أصناف فاتورتها بس (مكالمة ٨ أكتوبر)
+    navigate(`/store/${row.shopId}`, { state: { filtered: true } satisfies StoreOpening });
   }
 
   /**
@@ -214,10 +215,15 @@ export function useOrderRows() {
    */
   function openOnStore(order: Order) {
     openConfirmed((order.sale as SalesSession | null) ?? saleOf(order), order.id);
-    navigate(`/store/${orderShopId(order)}`);
+    navigate(`/store/${orderShopId(order)}`, { state: { filtered: true } satisfies StoreOpening });
   }
 
   return { rows, open, openOnStore, loading: signedIn && (saved === null || purchases === null), signedIn };
+}
+
+/** صفحة المتجر اتفتحت من «مهامي» على فاتورة موجودة — فلتر «أصناف الفاتورة بس» شغال من الأول */
+export interface StoreOpening {
+  filtered?: boolean;
 }
 
 /** طلب من المعرض في صورة بيعة — اسم المشتري ورقمه وطريقة الاستلام من الأوردر نفسه */

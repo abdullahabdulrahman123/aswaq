@@ -8,7 +8,7 @@ import { nowMinute, type Delivery } from '../lib/delivery';
 import { draftInput, draftRef, rememberDraftId } from '../lib/draftSync';
 import { orderToView } from '../lib/invoiceView';
 import type { ReceivingMethod } from '../lib/itemUnits';
-import { CONFIRM_ACTION, closedMessage, isEditable, isOpenState, nextActionOf, stageLabel } from '../lib/orderFlow';
+import { CONFIRM_ACTION, closedMessage, isEditable, isOpenState, nextActionOf, serialTag, stageLabel, stateNumber } from '../lib/orderFlow';
 import { PERMISSIONS, can, deniedMessage } from '../lib/permissions';
 import { latinDigits } from '../lib/quantity';
 import { ApiError, searchCustomers, type Customer } from '../lib/waslaApi';
@@ -16,6 +16,7 @@ import { Avatar, personInitial } from './Avatar';
 import { stageColor } from '../lib/stageColors';
 import { CancelOrderDialog, CancellationNote } from './CancelOrderDialog';
 import { DeliveryFields } from './DeliveryFields';
+import { FilterIcon } from './FilterIcon';
 import { InvoiceSheet, type InvoiceView } from './InvoiceSheet';
 import { Notch, compactFieldClass } from './OutlinedField';
 
@@ -205,7 +206,7 @@ export function SalesPanel({
             <div className="min-w-0 flex-1 px-2 py-1">
               <span className="block truncate text-sm font-bold leading-tight">{buyerLabel(sale)}</span>
               <span role="status" className={`block truncate text-[11px] font-semibold leading-tight ${order && !loading ? stageColor(order).text : 'text-gray-500'}`}>
-                {order && !loading ? `فاتورة رقم ${order.number} — ${stageLabel(order)}` : 'بنجيب الفاتورة…'}
+                {order && !loading ? headline(order) : 'بنجيب الفاتورة…'}
               </span>
             </div>
           ) : confirmed && order ? (
@@ -229,7 +230,7 @@ export function SalesPanel({
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-bold leading-tight">{buyerLabel(sale)}</span>
                 <span role="status" className={`block truncate text-[11px] font-semibold leading-tight ${stageColor(order).text}`}>
-                  {`فاتورة رقم ${order.number} — ${stageLabel(order)}`}
+                  {headline(order)}
                 </span>
               </span>
               <Chevron />
@@ -343,14 +344,6 @@ export function SalesPanel({
         </div>
       )}
     </>
-  );
-}
-
-function FilterIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 5h16l-6 7.5V19l-4-2v-4.5L4 5Z" />
-    </svg>
   );
 }
 
@@ -775,4 +768,10 @@ function SalesForm({
       </div>
     </form>
   );
+}
+
+/** سطر الحالة تحت اسم المشتري (مكالمة ٨ أكتوبر): رقم الحالة اللي هو فيها، والمرحلة، والمرجع الكبير */
+function headline(order: Order): string {
+  const tag = serialTag(order);
+  return `${stateNumber(order, true)} — ${stageLabel(order)}${tag ? ` · ${tag}` : ''}`;
 }

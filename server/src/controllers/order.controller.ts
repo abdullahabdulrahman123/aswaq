@@ -20,7 +20,9 @@ import {
   listMine,
   listPurchases,
   listSaleDrafts,
+  nextDraftNumber,
   nextNumber,
+  nextOrderSerial,
   priceFieldFor,
   replaceConfirmedDetails,
   replaceDetails,
@@ -119,6 +121,9 @@ export async function putDraft(req: Request, res: Response) {
   const data: Prisma.OrderCreateInput = {
     state: 'draft',
     kind: 'draft',
+    // المرجع الكبير ورقم المسودة من مسلسلات النشاط البائع من أول ما تتعمل (مكالمة ٨ أكتوبر)، وبيفضلوا معاها
+    serial: existing?.serial ?? (await nextOrderSerial(store.business.accountId)),
+    draftNumber: existing?.draftNumber ?? (await nextDraftNumber(store.business.accountId)),
     ref,
     creator: existing?.creator ?? { acc: me.accountId, name: me.name },
     editor: { acc: me.accountId, name: me.name },

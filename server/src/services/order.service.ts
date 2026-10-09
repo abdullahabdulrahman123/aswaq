@@ -1,7 +1,7 @@
 import type { Item, Order, OrderDetail, Prisma } from '@prisma/client';
 import { prisma } from '../config/db.js';
 import type { DraftInput, LineInput } from '../schemas/order.schema.js';
-import { isWriteConflict, recordSale } from './ledger.service.js';
+import { isWriteConflict, nextInvoiceNumber, recordSale } from './ledger.service.js';
 import { CLOSED_STATES } from './orderFlow.js';
 
 type PriceField = 'onSWP' | 'onSRP' | 'onLWP' | 'onLRP';
@@ -281,17 +281,29 @@ export function findById(id: string) {
   return prisma.order.findUnique({ where: { id } });
 }
 
-/** رقم الفاتورة الجاي للنشاط ده — findAndModify ذري، فطلبين في نفس اللحظة ميخدوش نفس الرقم */
-export async function nextNumber(sellerAcc: string): Promise<number> {
+/** الرقم الجاي من عدّاد — findAndModify ذري، فطلبين في نفس اللحظة ميخدوش نفس الرقم */
+async function nextSerial(counter: string): Promise<number> {
   const res = (await prisma.$runCommandRaw({
     findAndModify: 'counters',
-    query: { _id: `invoice:${sellerAcc}` },
+    query: { _id: counter },
     update: { $inc: { seq: 1 } },
     upsert: true,
     new: true,
   })) as { value: { seq: number } };
   return res.value.seq;
 }
+
+/** رقم الطلب الجاي للنشاط ده — مع «تأكيد». العدّاد اسمه invoice:… من قبل مسلسل الفواتير */
+export const nextNumber = (sellerAcc: string) => nextSerial(`invoice:${sellerAcc}`);
+
+/** المرجع الكبير الجاي للنشاط البائع (مكالمة ٨ أكتوبر: «البيج سيريال») — مع أول حفظ للأوردر */
+export const nextOrderSerial = (sellerAcc: string) => nextSerial(`serial:${sellerAcc}`);
+
+/**
+ * رقم المسودة الجاي للنشاط البائع (مكالمة ٨ أكتوبر: «درافتات ملهاش أرقام… عشان يكون لها
+ * هوية»). المسودة اللي بتتمسح رقمها مبيرجعش — المتصل المهم مسلسل الفواتير
+ */
+export const nextDraftNumber = (sellerAcc: string) => nextSerial(`draft:${sellerAcc}`);
 
 export function checkOut(id: string, number: number) {
   return prisma.order.update({ where: { id }, data: { state: 'order', kind: 'order', number, checkedOutAt: new Date() } });
@@ -303,19 +315,25 @@ export function checkOut(id: string, number: number) {
  */
 export async function advanceState(order: Order, to: string, person: { acc: string; name: string }, invoice: boolean) {
   const data = { state: to, ...(to === 'done' ? { completedAt: new Date() } : {}), ...(invoice ? { kind: 'invoice' } : {}) };
-  try {
-    return await prisma.$transaction(async (tx) => {
-      const { count } = await tx.order.updateMany({ where: { id: order.id, state: order.state }, data });
-      if (count !== 1) return null;
-      const saved = (await tx.order.findUnique({ where: { id: order.id } }))!;
-      // رسالة العميل ٨ أكتوبر: الأوردر بقى فاتورة — حركته بتدخل الجدول الحاكم في نفس العملية
-      if (invoice) await recordSale(tx, saved, person);
-      return saved;
-    });
-  } catch (err) {
-    // دوستين في نفس اللحظة — مونجو وقّف واحدة
-    if (isWriteConflict(err)) return null;
-    throw err;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await prisma.$transaction(async (tx) => {
+        const { count } = await tx.order.updateMany({ where: { id: order.id, state: order.state }, data });
+        if (count !== 1) return null;
+        if (!invoice) return (await tx.order.findUnique({ where: { id: order.id } }))!;
+        // رسالة العميل ٨ أكتوبر: الأوردر بقى فاتورة — رقمها من مسلسل الفواتير (بعد ما النقلة
+        // اتأكدت، فالعدّاد مبيزيدش على نقلة اترفضت) وحركته بتدخل الجدول الحاكم، في نفس العملية
+        const saved = await tx.order.update({ where: { id: order.id }, data: { invoiceNumber: await nextInvoiceNumber(tx, order.from.acc) } });
+        await recordSale(tx, saved, person);
+        return saved;
+      });
+    } catch (err) {
+      // مونجو وقّف عملية: نفس الأوردر اتداس مرتين، أو فاتورتين في نفس اللحظة على عدّاد الفواتير.
+      // العملية رجعت كلها فبنعيدها: الأوردر اللي اتنقل خلاص بيرجع null (409)، والتاني بياخد الرقم اللي بعده
+      if (isWriteConflict(err) && attempt < SERIAL_RETRIES) continue;
+      if (isWriteConflict(err)) return null;
+      throw err;
+    }
   }
 }
 
@@ -357,4 +375,78 @@ export async function backfillOrderSources(): Promise<number> {
     n += res.nModified ?? 0;
   }
   return n;
+}
+
+/** كام مرة الرقم بيحاول تاني لو المستند اتكتب من مكان تاني في نفس اللحظة */
+const SERIAL_RETRIES = 5;
+
+/** رقم من العدّاد ده للأوردر ده لو لسه ملوش — في عملية واحدة، فالعدّاد مبيزيدش على الفاضي */
+async function numberOnce(id: string, field: 'invoiceNumber' | 'draftNumber' | 'serial', next: (tx: Prisma.TransactionClient, sellerAcc: string) => Promise<number>) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await prisma.$transaction(async (tx) => {
+        const order = await tx.order.findUnique({ where: { id } });
+        if (!order || order[field] != null) return false;
+        await tx.order.update({ where: { id }, data: { [field]: await next(tx, order.from.acc), updatedAt: order.updatedAt } });
+        return true;
+      });
+    } catch (err) {
+      if (isWriteConflict(err) && attempt < SERIAL_RETRIES) continue;
+      throw err;
+    }
+  }
+}
+
+/**
+ * المسلسلات (مكالمة ٨ أكتوبر) للأوردرات اللي قبلها — ساعة ما السيرفر يقوم، بعد ما الفواتير
+ * تاخد kind: كل أوردر بمرجعه الكبير بترتيب ما اتعمل، والفاتورة برقم فاتورة بترتيب ما بقت
+ * فاتورة (حركة البيع بتاعتها في الجدول الحاكم)، والمسودة برقم مسودة بترتيب ما اتعملت.
+ * الطلبات بأرقامها زي ما هي، وupdatedAt زي ما هو. اللي اترقّم مبيترقّمش تاني
+ */
+export async function backfillSerials(): Promise<{ serials: number; invoices: number; drafts: number }> {
+  const unserialed = await prisma.order.findMany({
+    where: { OR: [{ serial: null }, { serial: { isSet: false } }] },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true },
+  });
+
+  const invoices = await prisma.order.findMany({
+    where: { kind: 'invoice', OR: [{ invoiceNumber: null }, { invoiceNumber: { isSet: false } }] },
+    select: { id: true, completedAt: true, updatedAt: true },
+  });
+  const sales = invoices.length
+    ? await prisma.transaction.findMany({ where: { kind: 'sale', source: 'order', ref: { in: invoices.map((o) => o.id) } }, select: { ref: true, createdAt: true } })
+    : [];
+  const invoicedAt = new Map<string, number>();
+  for (const t of sales) invoicedAt.set(t.ref, Math.min(invoicedAt.get(t.ref) ?? Infinity, t.createdAt.getTime()));
+  const at = (o: (typeof invoices)[number]) => invoicedAt.get(o.id) ?? (o.completedAt ?? o.updatedAt).getTime();
+  invoices.sort((a, b) => at(a) - at(b));
+
+  const drafts = await prisma.order.findMany({
+    where: { state: 'draft', OR: [{ draftNumber: null }, { draftNumber: { isSet: false } }] },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true },
+  });
+
+  let serials = 0;
+  for (const o of unserialed) if (await numberOnce(o.id, 'serial', nextSerialCounter)) serials++;
+  let numberedInvoices = 0;
+  for (const o of invoices) if (await numberOnce(o.id, 'invoiceNumber', nextInvoiceNumber)) numberedInvoices++;
+  let numberedDrafts = 0;
+  for (const d of drafts) if (await numberOnce(d.id, 'draftNumber', nextDraftCounter)) numberedDrafts++;
+  return { serials, invoices: numberedInvoices, drafts: numberedDrafts };
+}
+
+/** عدّاد المرجع الكبير جوه عملية — نفس عدّاد nextOrderSerial */
+async function nextSerialCounter(tx: Prisma.TransactionClient, sellerAcc: string): Promise<number> {
+  const id = `serial:${sellerAcc}`;
+  const { seq } = await tx.counter.upsert({ where: { id }, create: { id, seq: 1 }, update: { seq: { increment: 1 } } });
+  return seq;
+}
+
+/** عدّاد المسودات جوه عملية — نفس عدّاد nextDraftNumber */
+async function nextDraftCounter(tx: Prisma.TransactionClient, sellerAcc: string): Promise<number> {
+  const id = `draft:${sellerAcc}`;
+  const { seq } = await tx.counter.upsert({ where: { id }, create: { id, seq: 1 }, update: { seq: { increment: 1 } } });
+  return seq;
 }

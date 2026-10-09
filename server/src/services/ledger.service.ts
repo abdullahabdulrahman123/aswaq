@@ -28,6 +28,17 @@ const saleOf = (order: Order, creator: Person) => ({
   creator,
 });
 
+/**
+ * رقم الفاتورة الجاي (مكالمة ٨ أكتوبر: مسلسل للفواتير لوحده) — جوه نفس العملية اللي الطلب
+ * بيبقى فيها فاتورة، فلو العملية وقفت العدّاد بيرجع معاها: مسلسل متصل من غير فجوات عشان
+ * قفل اليوم مع التحصيلات
+ */
+export async function nextInvoiceNumber(tx: Tx, sellerAcc: string): Promise<number> {
+  const id = `sale-invoice:${sellerAcc}`;
+  const { seq } = await tx.counter.upsert({ where: { id }, create: { id, seq: 1 }, update: { seq: { increment: 1 } } });
+  return seq;
+}
+
 /** الأوردر بقى فاتورة — حركته بتدخل لو لسه مدخلتش */
 export async function recordSale(tx: Tx, order: Order, creator: Person) {
   if (!(await saleRecorded(tx, order.id))) await tx.transaction.create({ data: saleOf(order, creator) });

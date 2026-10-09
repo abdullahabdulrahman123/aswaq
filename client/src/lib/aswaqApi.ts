@@ -304,8 +304,14 @@ export interface OrderDetail {
 
 export interface Order {
   id: string;
-  /** رقم الفاتورة — null في المسودة */
+  /** رقم الطلب — مع «تأكيد»، null في المسودة. كان «رقم الفاتورة» لحد مكالمة ٨ أكتوبر */
   number: number | null;
+  /** رقم المسودة — من أول ما تتعمل (مكالمة ٨ أكتوبر). الأوردرات اللي قبلها من غيره */
+  draftNumber?: number | null;
+  /** رقم الفاتورة — مسلسل لوحده لما الطلب يبقى فاتورة (مكالمة ٨ أكتوبر). null قبلها */
+  invoiceNumber?: number | null;
+  /** المرجع الكبير («البيج سيريال») — ثابت من أول ما الأوردر يتعمل أياً كانت حالته */
+  serial?: number | null;
   /** draft | order | [مراحل النشاط] | done | cancelled — lib/orderFlow */
   state: 'draft' | 'order' | 'done' | 'cancelled' | string;
   /**
@@ -612,6 +618,8 @@ export interface Receipt {
   number: number;
   amount: number;
   orderId: string;
+  /** رقم الطلب ساعة التحصيل، ورقم الفاتورة لو كان بقى فاتورة (مكالمة ٨ أكتوبر) */
+  orderNumber?: number | null;
   invoiceNumber: number | null;
   names: { from: string; to: string; safe: string };
   notes: string | null;

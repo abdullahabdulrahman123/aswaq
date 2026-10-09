@@ -38,6 +38,27 @@ export const isOpenState = (state: string) => state !== 'draft' && state !== 'do
  */
 export const isInvoice = (order: Pick<Order, 'kind'>) => order.kind === 'invoice';
 
+type Numbered = Pick<Order, 'state' | 'kind' | 'number' | 'draftNumber' | 'invoiceNumber'>;
+
+/**
+ * الأوردر بحالته ورقمها (مكالمة ٨ أكتوبر: مسلسل لكل حالة) — مسودة ← طلب ← فاتورة. الرقم
+ * null = مسودة قبل المسلسلات (أو على الجهاز بس)
+ */
+export function stateNumberOf(order: Numbered): { label: 'مسودة' | 'طلب' | 'فاتورة'; number: number | null } {
+  if (order.state === 'draft') return { label: 'مسودة', number: order.draftNumber ?? null };
+  if (isInvoice(order) && order.invoiceNumber != null) return { label: 'فاتورة', number: order.invoiceNumber };
+  return { label: 'طلب', number: order.number };
+}
+
+/** «فاتورة 25» / «طلب 20» / «مسودة 7» — و«رقم» في النص: «فاتورة رقم 25» */
+export function stateNumber(order: Numbered, withWord = false): string {
+  const { label, number } = stateNumberOf(order);
+  return number == null ? label : `${label} ${withWord ? 'رقم ' : ''}${number}`;
+}
+
+/** المرجع الكبير («البيج سيريال») — «#1727». null = لسه ملوش */
+export const serialTag = (order: Pick<Order, 'serial'>) => (order.serial != null ? `#${order.serial}` : null);
+
 /** الفاتورة المؤكدة لسه بتتعدّل وبتتلغي: مفتوحة ولسه مبقتش فاتورة */
 export const isEditable = (order: Pick<Order, 'state' | 'kind'>) => isOpenState(order.state) && !isInvoice(order);
 

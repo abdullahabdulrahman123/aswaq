@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import { Avatar } from '../components/Avatar';
 import { DeliveryFields } from '../components/DeliveryFields';
 import { LocationBar } from '../components/LocationBar';
@@ -16,6 +16,7 @@ import { buyerPriceField, soldIn, type ReceivingMethod } from '../lib/itemUnits'
 import { useDraftSync } from '../lib/draftSync';
 import { newDelivery, rememberDelivery, rememberedDelivery, type Delivery } from '../lib/delivery';
 import { closedMessage, isEditable } from '../lib/orderFlow';
+import type { StoreOpening } from '../lib/orderRows';
 import { PERMISSIONS, can, deniedMessage } from '../lib/permissions';
 import { ApiError, SessionExpiredError, fetchStore, type ShowroomStore } from '../lib/waslaApi';
 
@@ -69,8 +70,18 @@ export function StorePage() {
   const [delivery, setDelivery] = useState<Delivery>(() => (linesOf(storeId).length > 0 ? rememberedDelivery(storeId) : null) ?? newDelivery());
   /** «مبيعات»: الفاتورة اللي اتأكدت هنا وفاضلة قدام البائع */
   const [saleOrder, setSaleOrder] = useState<Order | null>(null);
-  /** فلتر «مبيعات»: أصناف الفاتورة بس */
-  const [onlyInvoice, setOnlyInvoice] = useState(false);
+  /**
+   * فلتر «مبيعات»: أصناف الفاتورة بس. مكالمة ٨ أكتوبر: الفاتورة اللي بتتفتح من «مهامي» بتيجي
+   * متفلترة من الأول، والبيعة الجديدة («فاتورة جديدة») بتبدأ من غيره عشان أصناف المتجر تبان
+   */
+  const opening = useLocation().state as StoreOpening | null;
+  const [onlyInvoice, setOnlyInvoice] = useState(opening?.filtered === true);
+  const openedSale = useRef(session?.id ?? null);
+  useEffect(() => {
+    if ((session?.id ?? null) === openedSale.current) return;
+    openedSale.current = session?.id ?? null;
+    setOnlyInvoice(false);
+  }, [session?.id]);
   /** رسالة تحت الأكورديون: صلاحية مقفولة، أو تعديل الفاتورة المؤكدة ما نفعش */
   const [denied, setDenied] = useState('');
   /** تعديلات الفاتورة المؤكدة واحد ورا التاني — دوستين (+) ورا بعض متتلخبطش */

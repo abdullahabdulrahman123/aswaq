@@ -5,12 +5,36 @@ import { egp } from '../lib/money';
 import type { Order } from '../lib/aswaqApi';
 import { useOrderRows } from '../lib/orderRows';
 import { deliveryLabel } from '../lib/delivery';
-import { stageLabel } from '../lib/orderFlow';
+import { serialTag, stageLabel, stateNumberOf } from '../lib/orderFlow';
 import { itemsLabel } from '../lib/quantity';
 import { stageColor } from '../lib/stageColors';
+import { FilterIcon } from './FilterIcon';
 import { OrderRowButton } from './OrderRowButton';
 
 const timeFormat = new Intl.DateTimeFormat('ar-EG', { dateStyle: 'medium', timeStyle: 'short' });
+
+/** حالات عملية البيع (مكالمة ٨ أكتوبر) — فلتر «مهامي» */
+type Kind = 'draft' | 'order' | 'invoice';
+const KINDS: { key: Kind; label: string }[] = [
+  { key: 'draft', label: 'مسودة' },
+  { key: 'order', label: 'طلب' },
+  { key: 'invoice', label: 'فاتورة' },
+];
+const KINDS_KEY = 'aswaq_tasks_kinds';
+
+/** الفلتر اللي المستخدم اختاره آخر مرة على الجهاز ده — من غيره الكل */
+function readKinds(): Set<Kind> {
+  try {
+    const saved: unknown = JSON.parse(localStorage.getItem(KINDS_KEY) ?? 'null');
+    if (Array.isArray(saved)) return new Set(KINDS.map((k) => k.key).filter((k) => saved.includes(k)));
+  } catch {
+    // الجهاز رافض — الكل
+  }
+  return new Set(KINDS.map((k) => k.key));
+}
+
+/** الطلب المؤكد في أنهي حالة: فاتورة ولا لسه طلب */
+const kindOf = (order: Order): Kind => (order.kind === 'invoice' ? 'invoice' : 'order');
 
 /**
  * «الطلبات الواردة» بطلب العميل (٢٧ سبتمبر): الأوردرات المؤكدة اللي مطلوبة من
@@ -25,6 +49,9 @@ const timeFormat = new Intl.DateTimeFormat('ar-EG', { dateStyle: 'medium', timeS
  * مكالمة ٣٠ سبتمبر: مبقتش سلة ولا صفحة لوحدها — جوه «مهامي» (TasksPage)،
  * للنشاط المختار. العداد الأحمر على أيقونة «مهامي» اللي تحت.
  *
+ * مكالمة ٨ أكتوبر: فلتر بحالات عملية البيع (مسودة / طلب / فاتورة) — مربعات اختيار، يختار
+ * أكتر من واحدة مع بعض. المراحل جوه كل حالة فلتر منبثق منها بعدين.
+ *
  * بتتحدّث لوحدها (الـsocket.io في IncomingContext). والطلب اللي بيوصل وانت
  * نازل تحت في الليستة مبيزقّش الصفحة: بيطلع زرار «طلبات جديدة ↑» زي
  * Thunderbird، والدوسة عليه بتطلعك فوق.
@@ -37,8 +64,24 @@ export function IncomingOrders({ business }: { business: Business }) {
   const { accountId } = business;
   const { orders, markSeen, live } = useIncoming();
   const { rows, open, openOnStore } = useOrderRows();
+  const [kinds, setKinds] = useState<Set<Kind>>(readKinds);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const toggleKind = (key: Kind) =>
+    setKinds((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      try {
+        localStorage.setItem(KINDS_KEY, JSON.stringify([...next]));
+      } catch {
+        // الجهاز رافض — الفلتر للصفحة دي بس
+      }
+      return next;
+    });
+  const filtered = kinds.size < KINDS.length;
   // اللي لسه متأكدتش بس (على الجهاز أو مسودة) — المؤكدة في أي مرحلة تحت مع الواردة، والمكتملة والملغية برا «مهامي»
-  const openSales = rows.filter((row) => row.sale?.accountId === accountId && (row.state === null || row.state === 'draft'));
+  const openSales = kinds.has('draft') ? rows.filter((row) => row.sale?.accountId === accountId && (row.state === null || row.state === 'draft')) : [];
+  const shownOrders = orders?.filter((o) => kinds.has(kindOf(o))) ?? null;
 
   // الصفحة مفتوحة = التنبيه يختفي (ومع كل طلب بيوصل وهي مفتوحة). العداد بيفضل لحد ما الفاتورة تخلص
   useEffect(() => {
@@ -80,11 +123,43 @@ export function IncomingOrders({ business }: { business: Business }) {
 
   return (
     <section aria-labelledby="incoming-title" className="mt-6">
-      <h2 id="incoming-title" className="font-display text-lg font-bold">الطلبات الواردة</h2>
-      <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
-        الطلبات المطلوبة من {business.name}، وفواتير «مبيعات».
-        {live && <span className="ms-1.5 inline-block h-2 w-2 rounded-full bg-accent-500 align-middle" title="بتتحدّث لوحدها" />}
-      </p>
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <h2 id="incoming-title" className="font-display text-lg font-bold">الطلبات الواردة</h2>
+          <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
+            الطلبات المطلوبة من {business.name}، وفواتير «مبيعات».
+            {live && <span className="ms-1.5 inline-block h-2 w-2 rounded-full bg-accent-500 align-middle" title="بتتحدّث لوحدها" />}
+          </p>
+        </div>
+        <button
+          type="button"
+          aria-label="فلتر الحالات"
+          aria-expanded={filterOpen}
+          aria-controls="tasks-kinds"
+          onClick={() => setFilterOpen((v) => !v)}
+          className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl border transition ${
+            filtered ? 'border-brand-600 bg-brand-600 text-white' : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400 dark:border-white/15 dark:bg-transparent dark:text-gray-300'
+          }`}
+        >
+          <FilterIcon />
+        </button>
+      </div>
+      {filterOpen && (
+        <fieldset id="tasks-kinds" className="mt-3 flex flex-wrap gap-2 rounded-2xl border border-gray-200 bg-white p-3 dark:border-white/10 dark:bg-surface-card">
+          <legend className="sr-only">الحالات</legend>
+          {KINDS.map((k) => (
+            <label
+              key={k.key}
+              className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition ${
+                kinds.has(k.key) ? 'border-brand-600 bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-200' : 'border-gray-300 text-gray-500 dark:border-white/15'
+              }`}
+            >
+              <input type="checkbox" checked={kinds.has(k.key)} onChange={() => toggleKind(k.key)} className="h-4 w-4 accent-brand-600" />
+              {k.label}
+            </label>
+          ))}
+        </fieldset>
+      )}
 
       {target && where && (
         <button
@@ -111,16 +186,22 @@ export function IncomingOrders({ business }: { business: Business }) {
         </section>
       )}
 
-      {orders === null ? (
+      {shownOrders === null ? (
         <p className="mt-6 text-sm text-gray-500 dark:text-gray-400">بنجيب الطلبات…</p>
-      ) : orders.length === 0 ? (
-        <p className="mt-6 rounded-xl border border-dashed border-gray-300 px-4 py-8 text-center text-sm text-gray-400 dark:border-white/15">
-          {openSales.length > 0 ? 'مفيش طلبات مؤكدة لسه.' : 'مفيش طلبات واردة لسه. أول ما حد يأكد طلب من متاجرك هيظهر هنا على طول.'}
-        </p>
+      ) : shownOrders.length === 0 ? (
+        !(filtered && openSales.length > 0) && (
+          <p className="mt-6 rounded-xl border border-dashed border-gray-300 px-4 py-8 text-center text-sm text-gray-400 dark:border-white/15">
+            {filtered
+              ? 'مفيش حاجة بالحالات اللي اخترتها.'
+              : openSales.length > 0
+                ? 'مفيش طلبات مؤكدة لسه.'
+                : 'مفيش طلبات واردة لسه. أول ما حد يأكد طلب من متاجرك هيظهر هنا على طول.'}
+          </p>
+        )
       ) : (
         // grid-cols-1 = عمود minmax(0,1fr) — عشان الاسم الطويل يتقص بدل ما الصفحة توسع على الموبايل
         <ul aria-label="الطلبات الواردة" className="mt-5 grid grid-cols-1 gap-2.5">
-          {orders.map((order) => (
+          {shownOrders.map((order) => (
             <IncomingRow key={order.id} order={order} marked={order.id === marked} onOpen={() => openOnStore(order)} />
           ))}
         </ul>
@@ -155,6 +236,8 @@ const volume = (cm3: number) =>
 function IncomingRow({ order, marked, onOpen }: { order: Order; marked: boolean; onOpen: () => void }) {
   const count = new Set(order.details.map((d) => d.itemId)).size;
   const color = stageColor(order);
+  const state = stateNumberOf(order);
+  const tag = serialTag(order);
   const measures = [order.totalWeight > 0 ? kg(order.totalWeight) : null, order.totalVolume ? volume(order.totalVolume) : null].filter(Boolean);
   return (
     <li data-order-id={order.id}>
@@ -168,10 +251,9 @@ function IncomingRow({ order, marked, onOpen }: { order: Order; marked: boolean;
       >
         <span className="min-w-0 flex-1">
           <span className="flex min-w-0 items-center gap-2">
-            <span className={`shrink-0 rounded-md px-1.5 py-0.5 font-display text-sm font-bold leading-snug tabular-nums ${color.box}`}>
-              {/* «فاتورة» للقارئ الصوتي ولنسخ النص — مش sr-only عشان النص يفضل «فاتورة 3» في سطر واحد */}
-              <span className="text-[0px]">فاتورة </span>
-              {order.number}
+            {/* مكالمة ٨ أكتوبر: رقم الحالة اللي الطلب فيها — «طلب 20» لحد ما يبقى «فاتورة 25» */}
+            <span data-state-number className={`shrink-0 rounded-md px-1.5 py-0.5 font-display text-sm font-bold leading-snug tabular-nums ${color.box}`}>
+              <span className="text-[11px] font-semibold">{state.label}</span> {state.number}
             </span>
             <span className="truncate font-display font-bold">{order.names.buyer}</span>
           </span>
@@ -179,6 +261,8 @@ function IncomingRow({ order, marked, onOpen }: { order: Order; marked: boolean;
             <span className={`font-semibold ${color.text}`}>{stageLabel(order)}</span> · {order.names.store} · {order.method === 'delivery' ? 'توصيل' : 'استلام'}
           </span>
           <span className="mt-0.5 block truncate text-xs text-gray-400">
+            {/* المرجع الكبير («البيج سيريال») — ثابت أياً كانت الحالة */}
+            {tag && <span className="tabular-nums" data-serial>{tag} · </span>}
             {order.deliveryAt ? `تسليم ${deliveryLabel(order.deliveryAt)}` : timeFormat.format(new Date(order.checkedOutAt ?? order.updatedAt))}
             {measures.length > 0 && <span className="tabular-nums" data-measures> · {measures.join(' · ')}</span>}
           </span>

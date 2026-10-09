@@ -27,7 +27,7 @@ export function IncomingToast() {
     <div role="status" className="fixed inset-x-3 bottom-16 z-50 mx-auto max-w-sm print:hidden">
       <div className="flex items-center gap-3 rounded-2xl bg-gray-900 px-4 py-3 text-white shadow-card dark:bg-white dark:text-gray-900">
         <Link to="/tasks" onClick={dismissToast} className="min-w-0 flex-1">
-          <span className="block text-sm font-bold">طلب وارد جديد · فاتورة {toast.number}</span>
+          <span className="block text-sm font-bold">طلب وارد جديد رقم {toast.number}</span>
           <span className="block truncate text-xs opacity-80">
             {toast.names.buyer} · {toast.names.store} · {egp(toast.netTotal)}
           </span>

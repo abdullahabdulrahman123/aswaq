@@ -4,7 +4,8 @@ import { env } from './config/env.js';
 import { attachRealtime } from './realtime.js';
 import { linkStoreCopiesToSources } from './services/item.service.js';
 import { backfillInvoices } from './services/ledger.service.js';
-import { backfillOrderSources } from './services/order.service.js';
+import { backfillOrderSources, backfillSerials } from './services/order.service.js';
+import { syncOrderKinds } from './services/orderFlow.js';
 import { syncPermissions } from './services/permissions.js';
 
 // سيرفر http واحد للـAPI والـsocket.io (الطلبات الواردة لحظة بلحظة) على نفس البورت
@@ -20,10 +21,16 @@ backfillOrderSources()
   .catch((err) => console.error('Order source backfill failed', err));
 
 // الأوردرات اللي قبل خانة kind (رسالة العميل ٨ أكتوبر): draft / order / invoice، والفاتورة
-// اللي حركتها مكانتش في الجدول الحاكم بتدخله مرة واحدة
+// اللي حركتها مكانتش في الجدول الحاكم بتدخله مرة واحدة. وبعدها المسلسلات (مكالمة ٨ أكتوبر):
+// الفواتير برقم فاتورة والمسودات برقم مسودة
 backfillInvoices()
   .then((n) => n > 0 && console.log(`Marked ${n} older orders as invoices`))
+  .then(() => backfillSerials())
+  .then(({ serials, invoices, drafts }) => (serials || invoices || drafts) && console.log(`Numbered ${serials} orders, ${invoices} invoices and ${drafts} drafts`))
   .catch((err) => console.error('Invoice backfill failed', err));
+
+// جدول حالات عملية البيع (مكالمة ٨ أكتوبر)
+syncOrderKinds().catch((err) => console.error('Order kinds sync failed', err));
 
 // رصيد الصلاحيات في الداتابيز زي الكود (مكالمة ٢ أكتوبر)
 syncPermissions().catch((err) => console.error('Permissions sync failed', err));

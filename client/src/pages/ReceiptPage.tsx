@@ -5,6 +5,7 @@ import { SessionExpiredNotice } from '../components/SessionExpiredNotice';
 import { useAuth } from '../context/AuthContext';
 import { fetchOrder, fetchReceipts, fetchSafes, postReceipt, type Collection, type Order, type Safe } from '../lib/aswaqApi';
 import { egp } from '../lib/money';
+import { serialTag, stateNumber } from '../lib/orderFlow';
 import { moneyInput, toPiastres, toPounds } from '../lib/quantity';
 import { ApiError, SessionExpiredError } from '../lib/waslaApi';
 
@@ -146,7 +147,9 @@ export function ReceiptPage() {
       </button>
       <h1 className="font-display text-2xl font-bold sm:text-3xl">إيصال استلام نقدية</h1>
       <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-        تحصيل على فاتورة رقم <span className="font-semibold text-gray-700 dark:text-gray-200">{order.number}</span>
+        {/* رقم الفاتورة لو بقت فاتورة، وإلا رقم الطلب (مكالمة ٨ أكتوبر) */}
+        تحصيل على <span className="font-semibold text-gray-700 dark:text-gray-200">{stateNumber(order, true)}</span>
+        {serialTag(order) && <span className="text-gray-400"> · {serialTag(order)}</span>}
       </p>
 
       <div className="mt-5">

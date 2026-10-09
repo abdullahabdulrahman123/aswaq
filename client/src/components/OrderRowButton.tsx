@@ -1,6 +1,6 @@
 import { egp } from '../lib/money';
 import type { OrderRow } from '../lib/orderRows';
-import { stageLabel } from '../lib/orderFlow';
+import { serialTag, stageLabel, stateNumber } from '../lib/orderFlow';
 import { itemsLabel } from '../lib/quantity';
 import { stageColor } from '../lib/stageColors';
 
@@ -22,15 +22,16 @@ export function OrderRowButton({ row, onOpen, title }: { row: OrderRow; onOpen: 
             <span className="truncate font-display font-bold">{title}</span>
             {row.state && row.state !== 'draft' ? (
               <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-medium ${stageColor(row.order ?? { state: row.state }).chip}`}>
-                فاتورة {row.number} · {row.order ? stageLabel(row.order) : stageLabel({ state: row.state })}
+                {row.order ? `${stateNumber(row.order)} · ${stageLabel(row.order)}` : `طلب ${row.number} · ${stageLabel({ state: row.state })}`}
               </span>
             ) : (
               <span className="shrink-0 rounded-md bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
-                مسودة
+                {row.order ? stateNumber(row.order) : 'مسودة'}
               </span>
             )}
           </span>
           <span className="mt-0.5 block truncate text-sm text-gray-500 dark:text-gray-400">
+            {row.order && serialTag(row.order) && <span className="tabular-nums" data-serial>{serialTag(row.order)} · </span>}
             {row.store}
             {row.buyer && row.buyer !== title && <> · بيع لـ{row.buyer}</>}
             {/* مسودة زميل في الشركة (مكالمة ٨ أكتوبر) */}

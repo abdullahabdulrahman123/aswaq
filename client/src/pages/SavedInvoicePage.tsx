@@ -6,7 +6,7 @@ import { PriceDialogFor } from '../components/PriceDialog';
 import { useAuth } from '../context/AuthContext';
 import { rememberSalesShop, useSales } from '../context/SalesContext';
 import { advanceOrder, fetchOrder, orderShopId, type Order } from '../lib/aswaqApi';
-import { isEditable, nextActionOf, stageLabel } from '../lib/orderFlow';
+import { isEditable, nextActionOf, serialTag, stageLabel, stateNumber } from '../lib/orderFlow';
 import { PERMISSIONS, can, deniedMessage } from '../lib/permissions';
 import { orderToView } from '../lib/invoiceView';
 import { ApiError } from '../lib/waslaApi';
@@ -113,7 +113,8 @@ export function SavedInvoicePage() {
             order.state === 'cancelled' ? 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300' : 'bg-accent-50 text-accent-700 dark:bg-accent-500/10 dark:text-accent-300'
           }`}
         >
-          فاتورة رقم {order.number} — {stageLabel(order)}
+          {stateNumber(order, true)} — {stageLabel(order)}
+          {serialTag(order) && <> · {serialTag(order)}</>}
         </p>
       )}
       <CancellationNote order={order} />
@@ -122,7 +123,7 @@ export function SavedInvoicePage() {
         <PriceDialogFor
           accountId={order.from.acc}
           itemId={pricingId}
-          note={`فاتورة رقم ${order.number} متأكدة ومش هتتغيّر — السعر الجديد للطلبات الجاية من «${order.names.store}».`}
+          note={`أسعار ${stateNumber(order, true)} مش هتتغيّر — السعر الجديد للطلبات الجاية من «${order.names.store}».`}
           onSaved={() => setPricingId(null)}
           onClose={() => setPricingId(null)}
         />

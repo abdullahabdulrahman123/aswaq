@@ -110,6 +110,28 @@ export function reachesInvoice(flow: string[], state: string, invoiceStage: stri
   return state === 'done' || (at >= 0 && at >= flow.indexOf(invoiceStage));
 }
 
+/**
+ * حالات عملية البيع (مكالمة ٨ أكتوبر: «دول التلات حالات… مفيش حالة خارجهم») — كل حالة
+ * ليها مسلسل لوحدها عند النشاط البائع. بتتكتب في جدول order_kinds ساعة ما السيرفر يقوم
+ */
+export const ORDER_KINDS = [
+  { key: 'draft', name: 'مسودة', sort: 1, description: 'لسه بيختار الأصناف — رقمها من مسلسل المسودات من أول ما تتعمل' },
+  { key: 'order', name: 'طلب', sort: 2, description: 'بعد «تأكيد» — رقمه من مسلسل الطلبات، وبيتعدّل ويتلغي' },
+  {
+    key: 'invoice',
+    name: 'فاتورة',
+    sort: 3,
+    description: 'مع المرحلة اللي النشاط اختارها («الطلب يبقى فاتورة مع») — رقمها من مسلسل الفواتير المتصل، وبتدخل الحسابات ومبتتعدّلش ولا بتتلغي',
+  },
+] as const;
+
+/** جدول الحالات زي ORDER_KINDS — بيضيف اللي ناقص ويحدّث الاسم والوصف */
+export async function syncOrderKinds() {
+  for (const kind of ORDER_KINDS) {
+    await prisma.orderKind.upsert({ where: { key: kind.key }, create: { ...kind }, update: { name: kind.name, sort: kind.sort, description: kind.description } });
+  }
+}
+
 /** مراحل النشاط ومرحلة الفاتورة عنده */
 export async function salesFlowOf(businessId: string): Promise<{ flow: string[]; invoiceStage: string }> {
   const row = await prisma.businessSettings.findUnique({ where: { businessId } });

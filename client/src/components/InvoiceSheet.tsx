@@ -16,8 +16,17 @@ export interface InvoiceLine {
 
 /** الفاتورة زي ما بتتعرض وتتطبع — من سلة على الجهاز أو من أوردر على السيرفر */
 export interface InvoiceView {
-  /** رقم الفاتورة. null = مسودة */
+  /** رقم الحالة اللي الأوردر فيها (رقم الطلب، أو رقم الفاتورة لو بقت فاتورة). null = مسودة */
   number: number | null;
+  /**
+   * مكالمة ٨ أكتوبر — مسلسل لكل حالة: «طلب رقم 20» لحد ما يبقى «فاتورة رقم 25»، والفاتورة عليها
+   * رقم طلبها كمان (الورقة اللي اتطبعت قبلها تتطابق). المسودة: «فاتورة [مسودة 7]»
+   */
+  kind?: 'draft' | 'order' | 'invoice';
+  /** رقم الطلب — بيتكتب تحت رقم الفاتورة */
+  orderNumber?: number | null;
+  /** المرجع الكبير («البيج سيريال») */
+  serial?: number | null;
   businessName: string;
   storeName: string;
   date: Date;
@@ -84,17 +93,23 @@ export function InvoiceSheet({ view, onPrice }: { view: InvoiceView; onPrice?: (
           </div>
           <div className="shrink-0 text-end">
             <p className="font-display text-lg font-bold leading-tight">
-              {view.number === null ? (
+              {view.number === null || view.kind === 'draft' ? (
                 <>
                   فاتورة{' '}
                   <span className="rounded-md bg-amber-50 px-1.5 py-0.5 align-middle text-xs font-semibold text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 print:bg-transparent print:text-black">
-                    مسودة
+                    مسودة{view.number != null && <> {view.number}</>}
                   </span>
                 </>
               ) : (
-                <>فاتورة رقم {view.number}</>
+                <>
+                  {view.kind === 'order' ? 'طلب' : 'فاتورة'} رقم {view.number}
+                </>
               )}
             </p>
+            {view.kind === 'invoice' && view.orderNumber != null && (
+              <p className="mt-0.5 text-xs tabular-nums text-gray-500 dark:text-gray-400 print:text-black">طلب رقم {view.orderNumber}</p>
+            )}
+            {view.serial != null && <p className="mt-0.5 text-xs tabular-nums text-gray-500 dark:text-gray-400 print:text-black">رقم مرجعي {view.serial}</p>}
             <p className="mt-1 text-xs tabular-nums text-gray-500 dark:text-gray-400 print:text-black">{dateFormat.format(view.date)}</p>
           </div>
         </div>
