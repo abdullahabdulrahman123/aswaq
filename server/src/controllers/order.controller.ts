@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import type { Prisma } from '@prisma/client';
 import { currentUser, fetchWaslaStore, findManagedBusiness } from '../middleware/auth.js';
 import { isObjectId } from '../schemas/common.js';
-import { announceIncoming, announceState } from '../realtime.js';
+import { announceDraft, announceIncoming, announceState } from '../realtime.js';
 import { cancelSchema, draftSchema, headerSchema, lineSchema } from '../schemas/order.schema.js';
 import { afterOrderChange } from '../services/metrics.service.js';
 import { isFinished, nextIn, reachesInvoice, salesFlowOf, viewOf, withFlow, withoutCost, type OrderView } from '../services/orderFlow.js';
@@ -13,14 +13,15 @@ import {
   cancelState,
   checkOut,
   deleteOrder,
+  findClosedSale,
   findDraft,
   findById,
   findSaleDraft,
+  listClosedSaleRefs,
   listIncoming,
   listMine,
   listPurchases,
   listSaleDrafts,
-  nextDraftNumber,
   nextNumber,
   nextOrderSerial,
   priceFieldFor,
@@ -63,9 +64,17 @@ export async function putDraft(req: Request, res: Response) {
   const ref = `${input.sale?.id ?? 'me'}:${input.shopId}`;
   const shared = input.sale ? await findManagedBusiness(req, input.sale.accountId) : undefined;
   const existing = shared ? await findSaleDraft(input.sale!.accountId, ref) : await findDraft(me.accountId, ref);
+  // البيعة اتأكدت من جهاز تاني (رسالة العميل ٩ أكتوبر): السلة اللي فاضلة هنا قديمة — متتعملش مسودة مكررة
+  if (shared && !existing && input.lines.length > 0 && (await findClosedSale(input.sale!.accountId, ref))) {
+    res.status(409).json({ message: 'Sale already checked out' });
+    return;
+  }
 
   if (input.lines.length === 0) {
-    if (existing) await deleteOrder(existing.id);
+    if (existing) {
+      await deleteOrder(existing.id);
+      announceDraft(existing, true);
+    }
     res.json({ order: null });
     return;
   }
@@ -118,12 +127,13 @@ export async function putDraft(req: Request, res: Response) {
     return;
   }
 
+  const serial = existing?.serial ?? (await nextOrderSerial(store.business.accountId));
   const data: Prisma.OrderCreateInput = {
     state: 'draft',
     kind: 'draft',
-    // المرجع الكبير ورقم المسودة من مسلسلات النشاط البائع من أول ما تتعمل (مكالمة ٨ أكتوبر)، وبيفضلوا معاها
-    serial: existing?.serial ?? (await nextOrderSerial(store.business.accountId)),
-    draftNumber: existing?.draftNumber ?? (await nextDraftNumber(store.business.accountId)),
+    // المرجع الكبير من مسلسل النشاط البائع من أول ما تتعمل (مكالمة ٨ أكتوبر)، وبيفضل معاها — ورقم المسودة هو هو (٩ أكتوبر)
+    serial,
+    draftNumber: serial,
     ref,
     creator: existing?.creator ?? { acc: me.accountId, name: me.name },
     editor: { acc: me.accountId, name: me.name },
@@ -148,7 +158,10 @@ export async function putDraft(req: Request, res: Response) {
     res.status(409).json({ message: 'Order already checked out' });
     return;
   }
-  res.json({ order: shownTo(req)(await viewOf(order)) });
+  const view = await viewOf(order);
+  // «مهامي» عند الباقيين في الشركة لحظياً (رسالة العميل ٩ أكتوبر)
+  announceDraft(view);
+  res.json({ order: shownTo(req)(view) });
 }
 
 /**
@@ -206,11 +219,14 @@ export async function putLine(req: Request, res: Response) {
     }
     if (details.length === 0) {
       await deleteOrder(order.id);
+      announceDraft(order, true);
       res.json({ order: null });
       return;
     }
     if (await replaceDetails(order, details, { acc: me.accountId, name: me.name })) {
-      res.json({ order: shownTo(req)(await viewOf((await findById(id))!)) });
+      const view = await viewOf((await findById(id))!);
+      announceDraft(view);
+      res.json({ order: shownTo(req)(view) });
       return;
     }
   }
@@ -291,9 +307,12 @@ export async function putConfirmedLine(req: Request, res: Response) {
  */
 export async function list(req: Request, res: Response) {
   const me = await currentUser(req);
-  const [mine, shared] = await Promise.all([listMine(me.accountId), listSaleDrafts((req.waslaBusinesses ?? []).map((b) => b.accountId))]);
+  const businesses = (req.waslaBusinesses ?? []).map((b) => b.accountId);
+  // بيعات على جهازي (?sales=ref,ref) — اللي زميل أكدها سلتها هنا قديمة (رسالة العميل ٩ أكتوبر)
+  const sales = typeof req.query.sales === 'string' ? req.query.sales.split(',').filter(Boolean).slice(0, 100) : [];
+  const [mine, shared, closedSales] = await Promise.all([listMine(me.accountId), listSaleDrafts(businesses), listClosedSaleRefs(businesses, sales)]);
   const orders = [...mine, ...shared.filter((o) => o.creator.acc !== me.accountId)];
-  res.json({ me: me.accountId, orders: (await withFlow(orders)).map(shownTo(req)) });
+  res.json({ me: me.accountId, orders: (await withFlow(orders)).map(shownTo(req)), closedSales });
 }
 
 /**

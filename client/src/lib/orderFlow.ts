@@ -56,8 +56,20 @@ export function stateNumber(order: Numbered, withWord = false): string {
   return number == null ? label : `${label} ${withWord ? 'رقم ' : ''}${number}`;
 }
 
-/** المرجع الكبير («البيج سيريال») — «#1727». null = لسه ملوش */
-export const serialTag = (order: Pick<Order, 'serial'>) => (order.serial != null ? `#${order.serial}` : null);
+/**
+ * المرجع الكبير («البيج سيريال») اللي بيتكتب جنب رقم الحالة. null = لسه ملوش، أو مسودة: رقمها
+ * هو المرجع نفسه (رسالة العميل ٩ أكتوبر) فمبيتكررش — «مسودة 69» مش «مسودة 69 · #69»
+ */
+export function shownSerial(order: Pick<Order, 'serial' | 'state' | 'draftNumber'>): number | null {
+  if (order.serial == null) return null;
+  return order.state === 'draft' && order.draftNumber === order.serial ? null : order.serial;
+}
+
+/** المرجع الكبير — «#1727» (shownSerial) */
+export const serialTag = (order: Pick<Order, 'serial' | 'state' | 'draftNumber'>) => {
+  const serial = shownSerial(order);
+  return serial == null ? null : `#${serial}`;
+};
 
 /** الفاتورة المؤكدة لسه بتتعدّل وبتتلغي: مفتوحة ولسه مبقتش فاتورة */
 export const isEditable = (order: Pick<Order, 'state' | 'kind'>) => isOpenState(order.state) && !isInvoice(order);

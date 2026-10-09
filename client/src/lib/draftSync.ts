@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSales, type SalesSession } from '../context/SalesContext';
 import type { CartLine } from '../context/StoreCartContext';
@@ -114,14 +114,19 @@ const ALL = '*';
  */
 export function useDraftSync(shopId: string | null, lines: CartLine[], method: ReceivingMethod, delivery: Delivery | null = null) {
   const { user, sessionExpired, selectedBusiness, withToken } = useAuth();
-  const { session } = useSales();
+  const { session, drop } = useSales();
   const enabled = Boolean(user && !user.demo && !sessionExpired && shopId);
+  /** البيعة اتأكدت من جهاز تاني وهي مفتوحة هنا (رسالة العميل ٩ أكتوبر) — سلتها اتمسحت */
+  const [closedElsewhere, setClosedElsewhere] = useState(false);
+  useEffect(() => {
+    if (session) setClosedElsewhere(false);
+  }, [session]);
   const input = shopId ? draftInput(shopId, lines, method, session, selectedBusiness?.accountId ?? null, delivery) : null;
   const ref = shopId ? draftRef(shopId, session) : '';
 
   /** آخر نسخة من السلة — الطلب اللي بيتنفّذ بعدين بياخد منها */
-  const latest = useRef({ input, ref });
-  latest.current = { input, ref };
+  const latest = useRef({ input, ref, saleId: session?.id ?? null });
+  latest.current = { input, ref, saleId: session?.id ?? null };
 
   /**
    * اللي السيرفر شايله: الهيدر وكمية كل صنف. null = مش عارفين (أول مرة، أو
@@ -140,12 +145,25 @@ export function useDraftSync(shopId: string | null, lines: CartLine[], method: R
 
   /** المسودة كلها — بتفتحها، أو بتعيد تسعيرها، أو بتطابقها مع الجهاز */
   const saveAll = useCallback(async () => {
-    const { input: now, ref: nowRef } = latest.current;
+    const { input: now, ref: nowRef, saleId } = latest.current;
     if (!now) return;
-    const order = await withToken((token) => putDraft(token, now));
+    let order;
+    try {
+      order = await withToken((token) => putDraft(token, now));
+    } catch (err) {
+      // البيعة اتأكدت من جهاز تاني: السيرفر مبيعملش مسودة مكررة، والسلة اللي هنا قديمة
+      if (!(saleId && err instanceof ApiError && err.status === 409)) throw err;
+      rememberDraftId(nowRef, null);
+      synced.current = null;
+      for (const timer of timers.current.values()) clearTimeout(timer);
+      timers.current.clear();
+      drop(saleId);
+      setClosedElsewhere(true);
+      return;
+    }
     rememberDraftId(nowRef, order?.id ?? null);
     synced.current = { ref: nowRef, header: headerOf(now), lines: new Map(now.lines.map((l) => [lineKey(l), lineState(l)])) };
-  }, [withToken]);
+  }, [withToken, drop]);
 
   /** صنف واحد على رقم المسودة. من غير رقم، أو لو المسودة راحت: المسودة كلها */
   const saveLine = useCallback(
@@ -250,5 +268,5 @@ export function useDraftSync(shopId: string | null, lines: CartLine[], method: R
     await queue.current;
   }, [flush]);
 
-  return { settle };
+  return { settle, closedElsewhere };
 }

@@ -197,6 +197,25 @@ export function findSaleDraft(sellerAcc: string, ref: string) {
   return prisma.order.findFirst({ where: { from: { is: { acc: sellerAcc } }, source: 'onsite', ref, state: 'draft' } });
 }
 
+/**
+ * بيعة «مبيعات» اتأكدت (أو اتلغت) — رقم البيعة مبيتكررش، فمسودة جديدة بنفس الـref تبقى
+ * نسخة مكررة من سلة فاضلة على جهاز زميل (رسالة العميل ٩ أكتوبر: «قطاعي 12» مسودة تانية
+ * لفاتورة اتسلّمت)
+ */
+export function findClosedSale(sellerAcc: string, ref: string) {
+  return prisma.order.findFirst({ where: { from: { is: { acc: sellerAcc } }, source: 'onsite', ref, state: { not: 'draft' } } });
+}
+
+/** من البيعات دي، اللي اتأكدت في أنشطتي — السلال بتاعتها على الجهاز قديمة وبتتمسح */
+export async function listClosedSaleRefs(sellerAccs: string[], refs: string[]) {
+  if (sellerAccs.length === 0 || refs.length === 0) return [];
+  const closed = await prisma.order.findMany({
+    where: { from: { is: { acc: { in: sellerAccs } } }, source: 'onsite', ref: { in: refs }, state: { not: 'draft' } },
+    select: { ref: true },
+  });
+  return [...new Set(closed.map((o) => o.ref))];
+}
+
 /** مسودات «مبيعات» اللي لسه متأكدتش للأنشطة دي — اللي عملها أي حد فيها */
 export function listSaleDrafts(sellerAccs: string[]) {
   if (sellerAccs.length === 0) return Promise.resolve([]);
@@ -296,14 +315,12 @@ async function nextSerial(counter: string): Promise<number> {
 /** رقم الطلب الجاي للنشاط ده — مع «تأكيد». العدّاد اسمه invoice:… من قبل مسلسل الفواتير */
 export const nextNumber = (sellerAcc: string) => nextSerial(`invoice:${sellerAcc}`);
 
-/** المرجع الكبير الجاي للنشاط البائع (مكالمة ٨ أكتوبر: «البيج سيريال») — مع أول حفظ للأوردر */
-export const nextOrderSerial = (sellerAcc: string) => nextSerial(`serial:${sellerAcc}`);
-
 /**
- * رقم المسودة الجاي للنشاط البائع (مكالمة ٨ أكتوبر: «درافتات ملهاش أرقام… عشان يكون لها
- * هوية»). المسودة اللي بتتمسح رقمها مبيرجعش — المتصل المهم مسلسل الفواتير
+ * المرجع الكبير الجاي للنشاط البائع (مكالمة ٨ أكتوبر: «البيج سيريال») — مع أول حفظ للأوردر،
+ * وهو نفسه رقم المسودة (رسالة العميل ٩ أكتوبر). المسودة اللي بتتمسح رقمها مبيرجعش — المتصل
+ * المهم مسلسل الفواتير
  */
-export const nextDraftNumber = (sellerAcc: string) => nextSerial(`draft:${sellerAcc}`);
+export const nextOrderSerial = (sellerAcc: string) => nextSerial(`serial:${sellerAcc}`);
 
 export function checkOut(id: string, number: number) {
   return prisma.order.update({ where: { id }, data: { state: 'order', kind: 'order', number, checkedOutAt: new Date() } });
@@ -381,7 +398,7 @@ export async function backfillOrderSources(): Promise<number> {
 const SERIAL_RETRIES = 5;
 
 /** رقم من العدّاد ده للأوردر ده لو لسه ملوش — في عملية واحدة، فالعدّاد مبيزيدش على الفاضي */
-async function numberOnce(id: string, field: 'invoiceNumber' | 'draftNumber' | 'serial', next: (tx: Prisma.TransactionClient, sellerAcc: string) => Promise<number>) {
+async function numberOnce(id: string, field: 'invoiceNumber' | 'serial', next: (tx: Prisma.TransactionClient, sellerAcc: string) => Promise<number>) {
   for (let attempt = 0; ; attempt++) {
     try {
       return await prisma.$transaction(async (tx) => {
@@ -400,8 +417,10 @@ async function numberOnce(id: string, field: 'invoiceNumber' | 'draftNumber' | '
 /**
  * المسلسلات (مكالمة ٨ أكتوبر) للأوردرات اللي قبلها — ساعة ما السيرفر يقوم، بعد ما الفواتير
  * تاخد kind: كل أوردر بمرجعه الكبير بترتيب ما اتعمل، والفاتورة برقم فاتورة بترتيب ما بقت
- * فاتورة (حركة البيع بتاعتها في الجدول الحاكم)، والمسودة برقم مسودة بترتيب ما اتعملت.
- * الطلبات بأرقامها زي ما هي، وupdatedAt زي ما هو. اللي اترقّم مبيترقّمش تاني
+ * فاتورة (حركة البيع بتاعتها في الجدول الحاكم). ورقم المسودة هو المرجع لكل أوردر، حتى اللي
+ * اتأكد قبل كده (رسالة العميل ٩ أكتوبر: «المسودات القديمة واخدة null… اديها أرقام») — والمسودات
+ * اللي خدت رقم من عدّاد المسودات القديم بتاخد مرجعها. الطلبات بأرقامها زي ما هي، وupdatedAt زي
+ * ما هو. اللي اترقّم مبيترقّمش تاني
  */
 export async function backfillSerials(): Promise<{ serials: number; invoices: number; drafts: number }> {
   const unserialed = await prisma.order.findMany({
@@ -422,31 +441,24 @@ export async function backfillSerials(): Promise<{ serials: number; invoices: nu
   const at = (o: (typeof invoices)[number]) => invoicedAt.get(o.id) ?? (o.completedAt ?? o.updatedAt).getTime();
   invoices.sort((a, b) => at(a) - at(b));
 
-  const drafts = await prisma.order.findMany({
-    where: { state: 'draft', OR: [{ draftNumber: null }, { draftNumber: { isSet: false } }] },
-    orderBy: { createdAt: 'asc' },
-    select: { id: true },
-  });
-
   let serials = 0;
   for (const o of unserialed) if (await numberOnce(o.id, 'serial', nextSerialCounter)) serials++;
   let numberedInvoices = 0;
   for (const o of invoices) if (await numberOnce(o.id, 'invoiceNumber', nextInvoiceNumber)) numberedInvoices++;
-  let numberedDrafts = 0;
-  for (const d of drafts) if (await numberOnce(d.id, 'draftNumber', nextDraftCounter)) numberedDrafts++;
-  return { serials, invoices: numberedInvoices, drafts: numberedDrafts };
+  // رقم المسودة = المرجع، في أمر واحد على المونجو (من غير ما updatedAt يتلمس). مسودة اتعملت
+  // في نفس اللحظة بتاخد الاتنين مع بعض من putDraft
+  const res = (await prisma.$runCommandRaw({
+    update: 'orders',
+    updates: [{ q: { serial: { $type: 'number' }, $expr: { $ne: ['$draftNumber', '$serial'] } }, u: [{ $set: { draftNumber: '$serial' } }], multi: true }],
+  })) as { nModified?: number };
+  // عدّاد المسودات القديم ملوش لازمة بعد كده
+  await prisma.counter.deleteMany({ where: { id: { startsWith: 'draft:' } } });
+  return { serials, invoices: numberedInvoices, drafts: res.nModified ?? 0 };
 }
 
 /** عدّاد المرجع الكبير جوه عملية — نفس عدّاد nextOrderSerial */
 async function nextSerialCounter(tx: Prisma.TransactionClient, sellerAcc: string): Promise<number> {
   const id = `serial:${sellerAcc}`;
-  const { seq } = await tx.counter.upsert({ where: { id }, create: { id, seq: 1 }, update: { seq: { increment: 1 } } });
-  return seq;
-}
-
-/** عدّاد المسودات جوه عملية — نفس عدّاد nextDraftNumber */
-async function nextDraftCounter(tx: Prisma.TransactionClient, sellerAcc: string): Promise<number> {
-  const id = `draft:${sellerAcc}`;
   const { seq } = await tx.counter.upsert({ where: { id }, create: { id, seq: 1 }, update: { seq: { increment: 1 } } });
   return seq;
 }

@@ -65,6 +65,16 @@ export async function announceState(order: Order) {
   io?.to(room(order.from.acc)).emit('order:state', { order });
 }
 
+/**
+ * مسودة «مبيعات» اتعملت أو اتعدّلت أو اتمسحت (رسالة العميل ٩ أكتوبر: «التقرير ده كله هيكون لحظي…
+ * مش هتستنى إنه يدخل أو يحمل أو يرفرش» — عربية بتحمّل وطلبية على خط سيرها لسه مسودة): «مهامي»
+ * عند كل اللي بيتابعوا النشاط البائع. gone = اتمسحت (آخر صنف اتشال). مسودة «طلباتي» لصاحبها بس
+ */
+export function announceDraft(order: Order, gone = false) {
+  if (order.source !== 'onsite') return;
+  io?.to(room(order.from.acc)).emit('order:draft', gone ? { gone: { id: order.id, ref: order.ref, acc: order.from.acc } } : { order });
+}
+
 export async function announceIncoming(order: Order) {
   if (!io) return;
   for (const socket of await io.in(room(order.from.acc)).fetchSockets()) {

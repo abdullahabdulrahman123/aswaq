@@ -536,11 +536,13 @@ export async function fetchMetrics(token: string, accountId: string): Promise<Bu
 
 /**
  * أوردراتي، ومعاها مسودات «مبيعات» بتاعة أنشطتي اللي عملها غيري (مكالمة ٨ أكتوبر).
- * me = حسابي في وصلة — عشان اسم اللي عمل المسودة يظهر لو مش أنا
+ * me = حسابي في وصلة — عشان اسم اللي عمل المسودة يظهر لو مش أنا. sales = بيعات على
+ * الجهاز، وclosedSales = اللي منها اتأكد في أنشطتي (رسالة العميل ٩ أكتوبر)
  */
-export async function fetchOrders(token: string): Promise<{ orders: Order[]; me: string | null }> {
-  const { orders, me } = await request<{ orders: Order[]; me?: string }>('/api/orders', token);
-  return { orders, me: me ?? null };
+export async function fetchOrders(token: string, sales: string[] = []): Promise<{ orders: Order[]; me: string | null; closedSales: string[] }> {
+  const query = sales.length ? `?sales=${encodeURIComponent(sales.join(','))}` : '';
+  const { orders, me, closedSales } = await request<{ orders: Order[]; me?: string; closedSales?: string[] }>(`/api/orders${query}`, token);
+  return { orders, me: me ?? null, closedSales: closedSales ?? [] };
 }
 
 /**

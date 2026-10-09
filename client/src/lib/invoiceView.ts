@@ -1,6 +1,6 @@
 import type { InvoiceView } from '../components/InvoiceSheet';
 import type { Order } from './aswaqApi';
-import { stateNumberOf } from './orderFlow';
+import { shownSerial, stateNumberOf } from './orderFlow';
 
 /** أوردر من السيرفر بشكل الفاتورة */
 export function orderToView(order: Order): InvoiceView {
@@ -9,7 +9,7 @@ export function orderToView(order: Order): InvoiceView {
     number: stateNumberOf(order).number,
     kind: ({ مسودة: 'draft', طلب: 'order', فاتورة: 'invoice' } as const)[stateNumberOf(order).label],
     orderNumber: order.number,
-    serial: order.serial ?? null,
+    serial: shownSerial(order),
     businessName: order.names.business,
     storeName: order.names.store,
     date: new Date(order.checkedOutAt ?? order.updatedAt),

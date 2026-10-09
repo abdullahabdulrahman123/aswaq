@@ -197,7 +197,7 @@ export function StorePage() {
   }, [session, store, delivery]);
 
   // المسودة على السيرفر مع كل تغيير في سلة المتجر ده
-  const { settle } = useDraftSync(store?.id ?? null, store ? linesOf(store.id) : [], method, session ? null : delivery);
+  const { settle, closedElsewhere } = useDraftSync(store?.id ?? null, store ? linesOf(store.id) : [], method, session ? null : delivery);
 
   // الأسعار بتتغيّر مع نوع الحساب ولما البيعة تبدأ — سطور السلة بتمشي معاها
   useEffect(() => {
@@ -346,6 +346,11 @@ export function StorePage() {
         onlyInvoice={onlyInvoice}
         onToggleOnlyInvoice={() => setOnlyInvoice((v) => !v)}
       />
+      {closedElsewhere && !session && (
+        <p role="alert" data-closed-elsewhere className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-300 sm:max-w-xl print:hidden">
+          البيعة دي اتأكدت من جهاز تاني، فاتشالت من هنا. تلاقيها في «مهامي».
+        </p>
+      )}
       {denied && session && (
         <p role="alert" className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-300 sm:max-w-xl print:hidden">
           {denied}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useIncoming } from '../context/IncomingContext';
 import { buyerLabel, useSales, type SalesSession } from '../context/SalesContext';
 import { useStoreCart } from '../context/StoreCartContext';
 import { fetchOrders, fetchPurchases, orderShopId, type Order } from './aswaqApi';
@@ -52,6 +53,11 @@ export function useOrderRows() {
   const [saved, setSaved] = useState<Order[] | null>(null);
   /** حسابي في وصلة — من السيرفر مع الأوردرات */
   const [me, setMe] = useState<string | null>(null);
+  /** بيعات على الجهاز اتأكدت في أنشطتي — من السيرفر مع الأوردرات */
+  const [closedSales, setClosedSales] = useState<string[]>([]);
+  /** بيعات اتأكدت أو مسودتها اتمسحت لحظياً من جهاز تاني — سلالها هنا قديمة */
+  const [settledSales, setSettledSales] = useState<string[]>([]);
+  const { subscribe, resync } = useIncoming();
   /** «طلباتي» للحساب المختار — null = لسه بنجيب */
   const [purchases, setPurchases] = useState<Order[] | null>(null);
   const buyerAccount = selectedBusiness?.accountId ?? null;
@@ -69,14 +75,25 @@ export function useOrderRows() {
     };
   }, []);
 
+  /**
+   * رسالة العميل ٩ أكتوبر: البيعة اللي فتحتها من «مهامي» وزميل أكدها، سلتها بتفضل على جهازي
+   * وتظهر «مسودة» من غير رقم — ولو اتفتحت كانت بتعمل مسودة مكررة («قطاعي 12»). السيرفر
+   * بيقول أنهي منها اتأكد، فبتتمسح زي بيعاتي
+   */
+  const localSales = local
+    .filter((o) => o.sale)
+    .map((o) => o.key)
+    .sort()
+    .join(',');
   useEffect(() => {
     if (!signedIn) return;
     let cancelled = false;
-    withToken(fetchOrders)
-      .then(({ orders, me: account }) => {
+    withToken((token) => fetchOrders(token, localSales ? localSales.split(',') : []))
+      .then(({ orders, me: account, closedSales: closed }) => {
         if (cancelled) return;
         setSaved(orders);
         setMe(account);
+        setClosedSales(closed);
       })
       .catch(() => {
         if (!cancelled) setSaved([]);
@@ -84,7 +101,27 @@ export function useOrderRows() {
     return () => {
       cancelled = true;
     };
-  }, [signedIn, withToken]);
+  }, [signedIn, withToken, localSales, resync]);
+
+  /**
+   * رسالة العميل ٩ أكتوبر: «مهامي» لحظية — مسودة زميل بتظهر وبتتحدّث وبتختفي من غير refresh،
+   * واللي اتأكدت بتنزل من المسودات (وبتظهر في «الطلبات الواردة» من IncomingContext)
+   */
+  useEffect(
+    () =>
+      subscribe((event) => {
+        if (event.type === 'draft') {
+          setSaved((prev) => prev && [event.order, ...prev.filter((o) => o.id !== event.order.id)]);
+        } else if (event.type === 'draft-gone') {
+          setSaved((prev) => prev && prev.filter((o) => o.id !== event.id));
+          setSettledSales((prev) => [...prev, event.ref]);
+        } else if (event.order.sale != null) {
+          setSaved((prev) => prev && prev.map((o) => (o.id === event.order.id ? event.order : o)));
+          setSettledSales((prev) => [...prev, event.order.ref]);
+        }
+      }),
+    [subscribe],
+  );
 
   useEffect(() => {
     if (!signedIn) return;
@@ -107,7 +144,7 @@ export function useOrderRows() {
    * على الجهاز ده قديمة: متظهرش مسودة، ومتتبعتش تاني فتعمل مسودة مكررة. رقم البيعة
    * مبيتكررش، بعكس سلة «طلباتي» (me:<متجر>) اللي بتتعمل تاني لنفس المتجر
    */
-  const confirmedSales = new Set((saved ?? []).filter((o) => o.sale != null && o.state !== 'draft').map((o) => o.ref));
+  const confirmedSales = new Set([...(saved ?? []).filter((o) => o.sale != null && o.state !== 'draft').map((o) => o.ref), ...closedSales, ...settledSales]);
   const leftovers = local.filter((o) => o.sale && confirmedSales.has(o.key));
   const leftoverKeys = leftovers.map((o) => o.key).join();
   useEffect(() => {

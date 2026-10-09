@@ -20,7 +20,16 @@ import { useAuth } from './AuthContext';
  *   - الطلب اللي المستخدم أكّده بنفسه (بيعة «مبيعات») بيتعد من غير تنبيه.
  *   - الترتيب (رسالة العميل ٦ أكتوبر): بيوم التسليم وبعدين الساعة، الأقرب فوق —
  *     كان الأحدث تأكيداً فوق. الطلب اللي بيوصل أو ميعاده بيتعدّل بياخد مكانه.
+ *   - رسالة العميل ٩ أكتوبر: «مهامي» كلها لحظية — مسودات «مبيعات» كمان (subscribe)،
+ *     والـsocket لما يرجع بعد ما فصل (الموبايل نام أو النت قطع) الليستة بتتجاب تاني
+ *     (resync) عشان اللي فات وهو فاصل ميضيعش.
  */
+
+/** اللي بيوصل لحظياً لـ«مهامي»: مسودة «مبيعات» اتعملت أو اتعدّلت، أو اتمسحت، أو أوردر اتأكد أو اتنقل */
+export type OrderEvent =
+  | { type: 'draft'; order: Order }
+  | { type: 'draft-gone'; id: string; ref: string }
+  | { type: 'order'; order: Order };
 
 interface Incoming {
   /** بميعاد التسليم، الأقرب الأول. null = لسه بنجيب، أو مفيش نشاط مختار */
@@ -34,6 +43,10 @@ interface Incoming {
   dismissToast: () => void;
   /** الـsocket شغال ومتابع النشاط */
   live: boolean;
+  /** يسمع أحداث النشاط المختار لحظياً — بيرجّع اللي يوقّفه */
+  subscribe: (listener: (event: OrderEvent) => void) => () => void;
+  /** بيزيد كل ما الـsocket يرجع بعد ما فصل — الليستات بتتجاب تاني */
+  resync: number;
 }
 
 const Ctx = createContext<Incoming | null>(null);
@@ -49,13 +62,18 @@ export function IncomingProvider({ children }: { children: ReactNode }) {
   const [orders, setOrders] = useState<Order[] | null>(null);
   const [toast, setToast] = useState<Order | null>(null);
   const [live, setLive] = useState(false);
+  const [resync, setResync] = useState(0);
+  const listeners = useRef(new Set<(event: OrderEvent) => void>());
   const here = useRef(pathname);
   here.current = pathname;
 
-  // الليستة من السيرفر مع كل نشاط
   useEffect(() => {
     setOrders(null);
     setToast(null);
+  }, [accountId]);
+
+  // الليستة من السيرفر مع كل نشاط، وتاني لما الـsocket يرجع
+  useEffect(() => {
     if (!accountId) return;
     let cancelled = false;
     withToken((token) => fetchIncoming(token, accountId))
@@ -68,7 +86,7 @@ export function IncomingProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [accountId, withToken]);
+  }, [accountId, withToken, resync]);
 
   // لحظة بلحظة: الـsocket بيتابع النشاط المختار بس
   useEffect(() => {
@@ -84,17 +102,29 @@ export function IncomingProvider({ children }: { children: ReactNode }) {
       transports: ['websocket', 'polling'],
     });
     const watch = () => socket.emit('watch', accountId, (res: { ok: boolean }) => setLive(Boolean(res?.ok)));
-    socket.on('connect', watch);
+    const tell = (event: OrderEvent) => listeners.current.forEach((listener) => listener(event));
+    let connected = false;
+    socket.on('connect', () => {
+      watch();
+      if (connected) setResync((n) => n + 1);
+      connected = true;
+    });
     socket.on('disconnect', () => setLive(false));
     socket.on('order:new', ({ order, own }: { order: Order; own: boolean }) => {
       if (order.from.acc !== accountId) return;
       setOrders((prev) => [order, ...(prev ?? []).filter((o) => o.id !== order.id)]);
       if (!own && !onIncomingPage(here.current)) setToast(order);
+      tell({ type: 'order', order });
     });
     // اتنقل مرحلة («إتمام» من أي جهاز) أو اتلغى أو الفاتورة اتعدّلت: المكتمل والملغي بيخرجوا من «مهامي»
     socket.on('order:state', ({ order }: { order: Order }) => {
       if (order.from.acc !== accountId) return;
       setOrders((prev) => (prev ? (isOpenState(order.state) ? prev.map((o) => (o.id === order.id ? order : o)) : prev.filter((o) => o.id !== order.id)) : prev));
+      tell({ type: 'order', order });
+    });
+    socket.on('order:draft', ({ order, gone }: { order?: Order; gone?: { id: string; ref: string; acc: string } }) => {
+      if (order && order.from.acc === accountId) tell({ type: 'draft', order });
+      if (gone && gone.acc === accountId) tell({ type: 'draft-gone', id: gone.id, ref: gone.ref });
     });
     return () => {
       socket.disconnect();
@@ -102,6 +132,12 @@ export function IncomingProvider({ children }: { children: ReactNode }) {
   }, [accountId, withToken]);
 
   const markSeen = useCallback(() => setToast(null), []);
+  const subscribe = useCallback((listener: (event: OrderEvent) => void) => {
+    listeners.current.add(listener);
+    return () => {
+      listeners.current.delete(listener);
+    };
+  }, []);
   const sorted = useMemo(() => (orders ? [...orders].sort(byDueTime) : null), [orders]);
 
   const value = useMemo<Incoming>(
@@ -112,8 +148,10 @@ export function IncomingProvider({ children }: { children: ReactNode }) {
       toast: accountId ? toast : null,
       dismissToast: () => setToast(null),
       live,
+      subscribe,
+      resync,
     }),
-    [accountId, orders, sorted, markSeen, toast, live],
+    [accountId, orders, sorted, markSeen, toast, live, subscribe, resync],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
