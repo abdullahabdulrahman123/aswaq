@@ -355,6 +355,18 @@ export async function advanceState(order: Order, to: string, person: { acc: stri
 }
 
 /**
+ * «تراجع» (مكالمة العميل ٩ أكتوبر): لمرحلة قبلها — بشرط إنه لسه في المرحلة اللي الواجهة شافتها ولسه
+ * مبقاش فاتورة. null = اتنقل أو اتفوتر من مكان تاني في نفس اللحظة
+ */
+export async function moveBack(order: Order, to: string, editor: { acc: string; name: string }) {
+  const { count } = await prisma.order.updateMany({
+    where: { id: order.id, state: order.state, kind: { not: 'invoice' } },
+    data: { state: to, editor, updatedAt: new Date() },
+  });
+  return count === 1 ? prisma.order.findUnique({ where: { id: order.id } }) : null;
+}
+
+/**
  * رأس فاتورة مؤكدة (رسالة العميل ٦ أكتوبر) — بشرط إنها متغيّرتش من ساعة ما
  * اتقرت. null = اتعدّلت أو اتنقلت من مكان تاني في نفس اللحظة
  */

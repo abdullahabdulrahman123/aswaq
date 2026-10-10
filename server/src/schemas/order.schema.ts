@@ -80,6 +80,11 @@ export const cancelSchema = z.object({
   reason: z.string().trim().min(1).max(300),
 });
 
+/** «تراجع» (مكالمة العميل ٩ أكتوبر): المرحلة اللي الطلب يرجعلها */
+export const backSchema = z.object({
+  to: z.string().min(1).max(40),
+});
+
 export type DraftInput = z.infer<typeof draftSchema>;
 export type HeaderInput = z.infer<typeof headerSchema>;
 export type LineInput = z.infer<typeof lineSchema>;

@@ -14,10 +14,12 @@ import { latinDigits } from '../lib/quantity';
 import { ApiError, searchCustomers, type Customer } from '../lib/waslaApi';
 import { Avatar, personInitial } from './Avatar';
 import { stageColor } from '../lib/stageColors';
+import { BackOrderDialog } from './BackOrderDialog';
 import { CancelOrderDialog, CancellationNote } from './CancelOrderDialog';
 import { DeliveryFields } from './DeliveryFields';
 import { FilterIcon } from './FilterIcon';
 import { InvoiceSheet, type InvoiceView } from './InvoiceSheet';
+import { MoreMenu, menuItemClass } from './MoreMenu';
 import { Notch, compactFieldClass } from './OutlinedField';
 
 const METHODS: { key: ReceivingMethod; label: string }[] = [
@@ -64,6 +66,9 @@ function CustomerAvatar({ customer, size }: { customer: Customer; size: number }
  *
  * مكالمة ٥ أكتوبر: «إلغاء الفاتورة» جنب «فاتورة جديدة» لحد ما تخلص — بالسبب، وبصلاحية
  * «إلغاء فاتورة بيع» للموظف.
+ *
+ * مكالمة العميل ٩ أكتوبر («إيه أكتر زرار هستخدمه؟»): الباين زرار المرحلة وجنبه «تراجع» (لمرحلة قبلها جوه
+ * مراحل الطلب)، والباقي في ⋮ — تحصيل، طباعة، الفلتر، فاتورة جديدة، وإلغاء الفاتورة آخرها.
  */
 export function SalesPanel({
   storeId,
@@ -92,6 +97,7 @@ export function SalesPanel({
   /** الورقة اللي بتتطبع — مستخبية على الشاشة */
   const [printView, setPrintView] = useState<InvoiceView | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [goingBack, setGoingBack] = useState(false);
   const navigate = useNavigate();
 
   // الطباعة بعد ما الورقة تترسم
@@ -191,6 +197,9 @@ export function SalesPanel({
   }
 
   const empty = !confirmed && lines.length === 0;
+  /** «تراجع»: الطلب في مرحلة بعد «مؤكد» ولسه مبقاش فاتورة */
+  const canGoBack = confirmed && order !== null && !loading && (order.backTo?.length ?? 0) > 0;
+  const cancelAllowed = business ? can(business, PERMISSIONS.invoiceCancel) : false;
 
   return (
     <>
@@ -198,6 +207,7 @@ export function SalesPanel({
         aria-label="مبيعات"
         data-expanded="false"
         data-state={confirmed ? (order?.state ?? '') : 'draft'}
+        data-only-invoice={onlyInvoice}
         className="mt-3 rounded-2xl border border-brand-300 bg-brand-50/60 p-1.5 dark:border-brand-500/40 dark:bg-brand-500/10 sm:max-w-xl print:hidden"
       >
         <div className="flex items-center gap-2">
@@ -263,28 +273,59 @@ export function SalesPanel({
               {busy === 'confirm' ? 'بنأكد…' : busy === 'advance' ? 'لحظة…' : action}
             </button>
           )}
-          <button
-            type="button"
-            onClick={handlePrint}
-            disabled={empty || loading || busy !== null}
-            className="shrink-0 rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-semibold transition hover:border-gray-400 disabled:opacity-50 dark:border-white/15 dark:bg-transparent"
-          >
-            {busy === 'print' ? 'لحظة…' : 'طباعة'}
-          </button>
-          <button
-            type="button"
-            aria-label="أصناف الفاتورة بس"
-            aria-pressed={onlyInvoice}
-            title="أصناف الفاتورة بس"
-            onClick={onToggleOnlyInvoice}
-            className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl border transition ${
-              onlyInvoice
-                ? 'border-brand-600 bg-brand-600 text-white'
-                : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400 dark:border-white/15 dark:bg-transparent dark:text-gray-300'
-            }`}
-          >
-            <FilterIcon />
-          </button>
+          {canGoBack && (
+            <button
+              type="button"
+              data-back
+              onClick={() => {
+                setError('');
+                setGoingBack(true);
+              }}
+              disabled={busy !== null}
+              className="shrink-0 rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-semibold transition hover:border-gray-400 disabled:opacity-50 dark:border-white/15 dark:bg-transparent"
+            >
+              تراجع
+            </button>
+          )}
+          <MoreMenu label="خيارات الفاتورة" dot={onlyInvoice}>
+            {/* مكالمة ٧ أكتوبر: «تحصيل» زرار مش مرحلة — إيصال استلام نقدية في صفحة لوحده، والرجوع بيرجّع هنا */}
+            {confirmed && order && !loading && order.state !== 'cancelled' && (
+              <button type="button" role="menuitem" data-collect onClick={() => navigate(`/receipt/${order.id}`, { state: { from: 'store' } })} className={menuItemClass()}>
+                تحصيل
+              </button>
+            )}
+            <button type="button" role="menuitem" onClick={handlePrint} disabled={empty || loading || busy !== null} className={menuItemClass()}>
+              {busy === 'print' ? 'لحظة…' : 'طباعة'}
+            </button>
+            <button
+              type="button"
+              role="menuitemcheckbox"
+              aria-checked={onlyInvoice}
+              aria-label="أصناف الفاتورة بس"
+              onClick={onToggleOnlyInvoice}
+              className={`${menuItemClass()} ${onlyInvoice ? 'text-brand-700 dark:text-brand-300' : ''}`}
+            >
+              <FilterIcon />
+              <span className="flex-1">أصناف الفاتورة بس</span>
+              {onlyInvoice && <span aria-hidden="true">✓</span>}
+            </button>
+            {confirmed && business && (
+              <button type="button" role="menuitem" onClick={() => openDialog(business)} className={menuItemClass()}>
+                فاتورة جديدة
+              </button>
+            )}
+            {confirmed && business && order && !loading && isEditable(order) && (
+              <button
+                type="button"
+                role="menuitem"
+                aria-disabled={!cancelAllowed}
+                onClick={() => (cancelAllowed ? setCancelling(true) : setError(deniedMessage(PERMISSIONS.invoiceCancel)))}
+                className={`${menuItemClass(true)} border-t border-gray-100 dark:border-white/10`}
+              >
+                إلغاء الفاتورة
+              </button>
+            )}
+          </MoreMenu>
         </div>
         {error && (
           <p role="alert" className="mt-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-500/10 dark:text-red-300">
@@ -293,41 +334,17 @@ export function SalesPanel({
         )}
         {/* الطلب اللي بيتفتح من «مهامي» ممكن يتلغي من الناحية التانية — مين لغاه وليه */}
         {confirmed && order && !loading && <CancellationNote order={order} className="mt-1.5" />}
-        {confirmed && business && (
-          <div className="mt-1.5 flex justify-end gap-2">
-            {/* مكالمة ٧ أكتوبر: «تحصيل» زرار مش مرحلة — إيصال استلام نقدية في صفحة لوحده، والرجوع بيرجّع هنا */}
-            {order && !loading && order.state !== 'cancelled' && (
-              <button
-                type="button"
-                data-collect
-                onClick={() => navigate(`/receipt/${order.id}`, { state: { from: 'store' } })}
-                className="rounded-xl border border-brand-500 px-4 py-1.5 text-xs font-semibold text-brand-700 transition hover:bg-brand-50 dark:text-brand-300 dark:hover:bg-brand-500/10"
-              >
-                تحصيل
-              </button>
-            )}
-            {order && !loading && isEditable(order) && (
-              <button
-                type="button"
-                aria-disabled={!can(business, PERMISSIONS.invoiceCancel)}
-                onClick={() => (can(business, PERMISSIONS.invoiceCancel) ? setCancelling(true) : setError(deniedMessage(PERMISSIONS.invoiceCancel)))}
-                className={`rounded-xl border border-red-300 px-4 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50 dark:border-red-500/40 dark:text-red-300 dark:hover:bg-red-500/10 ${
-                  can(business, PERMISSIONS.invoiceCancel) ? '' : 'opacity-40'
-                }`}
-              >
-                إلغاء الفاتورة
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => openDialog(business)}
-              className="rounded-xl border border-accent-600 px-4 py-1.5 text-xs font-semibold text-accent-700 transition hover:bg-accent-50 dark:text-accent-300 dark:hover:bg-accent-500/10"
-            >
-              فاتورة جديدة
-            </button>
-          </div>
-        )}
       </section>
+      {goingBack && order && (
+        <BackOrderDialog
+          order={order}
+          onMoved={(moved) => {
+            setGoingBack(false);
+            onOrder(moved);
+          }}
+          onClose={() => setGoingBack(false)}
+        />
+      )}
       {cancelling && order && (
         <CancelOrderDialog
           order={order}

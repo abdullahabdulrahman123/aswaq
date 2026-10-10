@@ -325,6 +325,8 @@ export interface Order {
   stateColor?: string;
   /** زرار المرحلة اللي بعدها — null = آخر مرحلة */
   nextAction?: string | null;
+  /** المراحل اللي «تراجع» يرجّعه لها، الأقدم الأول (مكالمة العميل ٩ أكتوبر) — فاضي = مفيش تراجع */
+  backTo?: { state: string; label: string }[];
   /** me:<shopId> أو <saleId>:<shopId> — نفس مفتاح الأوردر على الجهاز */
   ref: string;
   createdAt: string;
@@ -567,6 +569,15 @@ export async function advanceOrder(token: string, orderId: string): Promise<Orde
 }
 
 /** إلغاء فاتورة مؤكدة لسه مخلصتش، بسبب — البائع في أي مرحلة، والمشتري وهي «مؤكد» بس */
+/** «تراجع» لمرحلة قبلها جوه مراحل الطلب (مكالمة العميل ٩ أكتوبر). 409 = اتنقل من مكان تاني، 422 = مبقاش ينفع */
+export async function backOrder(token: string, orderId: string, to: string): Promise<Order> {
+  const { order } = await request<{ order: Order }>(`/api/orders/${encodeURIComponent(orderId)}/back`, token, {
+    method: 'POST',
+    body: JSON.stringify({ to }),
+  });
+  return order;
+}
+
 export async function cancelOrder(token: string, orderId: string, reason: string): Promise<Order> {
   const { order } = await request<{ order: Order }>(`/api/orders/${encodeURIComponent(orderId)}/cancel`, token, {
     method: 'POST',

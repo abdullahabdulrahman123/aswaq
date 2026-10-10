@@ -84,6 +84,18 @@ export function nextIn(flow: string[], state: string): string | null {
   return i >= 0 ? flow[i + 1] ?? null : 'done';
 }
 
+/**
+ * المراحل اللي الطلب يقدر يرجعلها بـ«تراجع» (مكالمة العميل ٩ أكتوبر: «يفتحلي دايلوج صغير إن أنا أرجعه لحالة سابقة
+ * في الستيج اللي هو فيها» — الميزان طلّع غلط في العدد فيرجع للمراجعة): جوه مراحل الطلب بس، من «مؤكد» لحد اللي قبل
+ * مرحلته. الفاتورة لأ (تصحيحها «مردود بيع»)، ولا المسودة (دي حالة تانية). مرحلة اتشالت من الإعدادات والطلب
+ * لسه فيها: يرجع لأي مرحلة مفتوحة
+ */
+export function backStatesOf(flow: string[], order: Pick<Order, 'state' | 'kind'>): string[] {
+  if (order.kind === 'invoice' || order.state === 'draft' || isFinished(order.state)) return [];
+  const at = flow.indexOf(order.state);
+  return at < 0 ? flow.slice(1, -1) : flow.slice(1, at);
+}
+
 export function labelOf(state: string): string {
   return byKey.get(state)?.label ?? state;
 }
@@ -146,6 +158,8 @@ export type OrderView = Order & {
   nextAction: string | null;
   /** لون المرحلة — مفتاح من FIXED_COLORS أو STAGE_COLOR_CHOICES */
   stateColor: string;
+  /** المراحل اللي «تراجع» يرجّعه لها، الأقدم الأول (backStatesOf). فاضي = مفيش تراجع */
+  backTo: { state: string; label: string }[];
 };
 
 /**
@@ -158,12 +172,14 @@ export async function withFlow(orders: Order[]): Promise<OrderView[]> {
   const flows = new Map(rows.map((r) => [r.businessId, flowOf(r.salesStages)]));
   const colors = new Map(rows.map((r) => [r.businessId, stageColorsOf(r.stageColors)]));
   return orders.map((order) => {
-    const next = nextIn(flows.get(order.from.acc) ?? flowOf([]), order.state);
+    const flow = flows.get(order.from.acc) ?? flowOf([]);
+    const next = nextIn(flow, order.state);
     return {
       ...order,
       stateLabel: labelOf(order.state),
       nextAction: next ? labelOfAction(next) : null,
       stateColor: colorOf(order.state, colors.get(order.from.acc) ?? stageColorsOf(null)),
+      backTo: backStatesOf(flow, order).map((state) => ({ state, label: labelOf(state) })),
     };
   });
 }

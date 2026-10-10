@@ -17,6 +17,8 @@ router.put('/:orderId/header', orderController.putHeader);
 router.get('/:orderId', orderController.get);
 router.post('/:orderId/checkout', orderController.checkout);
 router.post('/:orderId/advance', orderController.advance);
+// «تراجع» لمرحلة قبلها جوه مراحل الطلب (مكالمة العميل ٩ أكتوبر)
+router.post('/:orderId/back', orderController.back);
 router.post('/:orderId/cancel', orderController.cancel);
 // «تحصيل» على فاتورة البيع (مكالمة ٧ أكتوبر)
 router.get('/:orderId/receipts', financeController.receipts);

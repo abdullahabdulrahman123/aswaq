@@ -3,9 +3,9 @@ import type { Prisma } from '@prisma/client';
 import { currentUser, fetchWaslaStore, findManagedBusiness } from '../middleware/auth.js';
 import { isObjectId } from '../schemas/common.js';
 import { announceDraft, announceIncoming, announceState } from '../realtime.js';
-import { cancelSchema, draftSchema, headerSchema, lineSchema } from '../schemas/order.schema.js';
+import { backSchema, cancelSchema, draftSchema, headerSchema, lineSchema } from '../schemas/order.schema.js';
 import { afterOrderChange } from '../services/metrics.service.js';
-import { isFinished, nextIn, reachesInvoice, salesFlowOf, viewOf, withFlow, withoutCost, type OrderView } from '../services/orderFlow.js';
+import { backStatesOf, isFinished, nextIn, reachesInvoice, salesFlowOf, viewOf, withFlow, withoutCost, type OrderView } from '../services/orderFlow.js';
 import { PERMISSIONS, can } from '../services/permissions.js';
 import {
   advanceState,
@@ -22,6 +22,7 @@ import {
   listMine,
   listPurchases,
   listSaleDrafts,
+  moveBack,
   nextNumber,
   nextOrderSerial,
   priceFieldFor,
@@ -497,6 +498,41 @@ export async function advance(req: Request, res: Response) {
  * 403 فيه `permission` الناقصة، أو `stage` لو المشتري اتأخر. 409 لو خلصت أو
  * اتنقلت في نفس اللحظة.
  */
+/**
+ * POST /api/orders/:orderId/back — «تراجع» (مكالمة العميل ٩ أكتوبر): الطلب يرجع لمرحلة قبل اللي هو فيها، جوه
+ * مراحل الطلب بس (backStatesOf) — للنشاط البائع. 422 = المرحلة دي مش قبلها أو الطلب بقى فاتورة، 409 = اتنقل
+ * من مكان تاني في نفس اللحظة
+ */
+export async function back(req: Request, res: Response) {
+  const id = String(req.params.orderId);
+  const parsed = backSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ message: 'Invalid input', issues: parsed.error.issues });
+    return;
+  }
+  const order = isObjectId(id) ? await findById(id) : null;
+  if (!order || order.state === 'draft' || !(await findManagedBusiness(req, order.from.acc))) {
+    res.status(404).json({ message: 'Order not found' });
+    return;
+  }
+  const { flow } = await salesFlowOf(order.from.acc);
+  if (!backStatesOf(flow, order).includes(parsed.data.to)) {
+    res.status(422).json({ message: 'The order can’t go back to that stage', allowed: backStatesOf(flow, order) });
+    return;
+  }
+  const me = await currentUser(req);
+  const moved = await moveBack(order, parsed.data.to, { acc: me.accountId, name: me.name });
+  if (!moved) {
+    res.status(409).json({ message: 'Order moved while going back, try again' });
+    return;
+  }
+  const view = await viewOf(moved);
+  // «مهامي» عند الباقيين بالمرحلة اللي رجعلها، ومؤشرات البيع
+  await announceState(view).catch(() => undefined);
+  await afterOrderChange(order.from.acc);
+  res.json({ order: shownTo(req)(view) });
+}
+
 export async function cancel(req: Request, res: Response) {
   const id = String(req.params.orderId);
   const parsed = cancelSchema.safeParse(req.body);

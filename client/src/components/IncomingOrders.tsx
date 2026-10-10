@@ -5,11 +5,12 @@ import { egp } from '../lib/money';
 import type { Order } from '../lib/aswaqApi';
 import { useOrderRows } from '../lib/orderRows';
 import { deliveryLabel } from '../lib/delivery';
-import { serialTag, stageLabel, stateNumberOf } from '../lib/orderFlow';
+import { serialTag, stageLabel } from '../lib/orderFlow';
 import { itemsLabel } from '../lib/quantity';
 import { stageColor } from '../lib/stageColors';
 import { FilterIcon } from './FilterIcon';
 import { OrderRowButton } from './OrderRowButton';
+import { StateBox } from './StateBox';
 
 const timeFormat = new Intl.DateTimeFormat('ar-EG', { dateStyle: 'medium', timeStyle: 'short' });
 
@@ -236,7 +237,6 @@ const volume = (cm3: number) =>
 function IncomingRow({ order, marked, onOpen }: { order: Order; marked: boolean; onOpen: () => void }) {
   const count = new Set(order.details.map((d) => d.itemId)).size;
   const color = stageColor(order);
-  const state = stateNumberOf(order);
   const tag = serialTag(order);
   const measures = [order.totalWeight > 0 ? kg(order.totalWeight) : null, order.totalVolume ? volume(order.totalVolume) : null].filter(Boolean);
   return (
@@ -252,9 +252,7 @@ function IncomingRow({ order, marked, onOpen }: { order: Order; marked: boolean;
         <span className="min-w-0 flex-1">
           <span className="flex min-w-0 items-center gap-2">
             {/* مكالمة ٨ أكتوبر: رقم الحالة اللي الطلب فيها — «طلب 20» لحد ما يبقى «فاتورة 25» */}
-            <span data-state-number className={`shrink-0 rounded-md px-1.5 py-0.5 font-display text-sm font-bold leading-snug tabular-nums ${color.box}`}>
-              <span className="text-[11px] font-semibold">{state.label}</span> {state.number}
-            </span>
+            <StateBox order={order} />
             <span className="truncate font-display font-bold">{order.names.buyer}</span>
           </span>
           <span className="mt-0.5 block truncate text-sm text-gray-500 dark:text-gray-400">
